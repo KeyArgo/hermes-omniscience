@@ -1,0 +1,25 @@
+name: omniscience
+label: Omniscience
+kind: standalone
+author: InovinLabs
+license: MIT
+manifest_version: 2
+api_version: 1
+requires_hermes: ">=0.23.0"
+version: "1.0.0"
+description: Metadata-only observer for Hermes that records sanitized execution events and draws a live agent graph with deterministic replay. Local and read-only.
+provides_hooks:
+  - on_session_start
+  - on_session_end
+  - pre_llm_call
+  - post_llm_call
+  - pre_api_request
+  - post_api_request
+  - api_request_error
+  - post_tool_call
+  - on_session_delete
+  - subagent_start
+  - subagent_stop
+  - pre_auxiliary_call
+  - post_auxiliary_call
+  - on_skill_lifecycle

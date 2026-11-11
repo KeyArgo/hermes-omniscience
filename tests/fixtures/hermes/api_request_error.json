@@ -1,0 +1,101 @@
+{
+  "hook": "api_request_error",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["agent/api_request_hooks.py:173-177"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "task_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:2",
+        "platform": "cli",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "provider": "custom",
+        "base_url": "https://api.example.com/v1",
+        "api_mode": "chat_completions",
+        "api_call_count": 2,
+        "api_duration": 0.8,
+        "started_at": 110.0,
+        "ended_at": 110.8,
+        "status_code": 429,
+        "retry_count": 1,
+        "max_retries": 3,
+        "retryable": true,
+        "reason": "rate_limit",
+        "error": {
+          "type": "RateLimitError",
+          "message": "429 Too Many Requests; retry after 2s"
+        },
+        "request": {"model": "DeepSeek-V4.1-Flash-1017", "messages": []}
+      },
+      "expected": {
+        "kind": "llm.error",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:2",
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": "error",
+        "attrs": {
+          "duration_s": 0.8,
+          "status_code": 429,
+          "retryable": true,
+          "reason": "rate_limit",
+          "error_type": "RateLimitError",
+          "error_message_chars": 37
+        }
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "task_id": "sa-0-2ad31b82",
+        "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+        "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:2",
+        "platform": "subagent",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "provider": "custom",
+        "base_url": "https://api.example.com/v1",
+        "api_mode": "chat_completions",
+        "api_call_count": 1,
+        "api_duration": 5.0,
+        "started_at": 210.0,
+        "ended_at": 215.0,
+        "status_code": 500,
+        "retry_count": 0,
+        "max_retries": 3,
+        "retryable": true,
+        "reason": "server_error",
+        "error": {
+          "type": "APIError",
+          "message": "500 Internal Server Error"
+        },
+        "request": {"model": "DeepSeek-V4.1-Flash-1017", "messages": []}
+      },
+      "expected": {
+        "kind": "llm.error",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+          "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:2",
+          "tool_call_id": null,
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": "error",
+        "attrs": {
+          "duration_s": 5.0,
+          "status_code": 500,
+          "retryable": true,
+          "reason": "server_error",
+          "error_type": "APIError",
+          "error_message_chars": 25
+        }
+      }
+    }
+  }
+}

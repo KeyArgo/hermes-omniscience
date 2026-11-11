@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Omniscience">
+  <rect width="64" height="64" rx="14" fill="#0b1119"/>
+  <path d="M32 11 L53 32 L32 53 L11 32 Z" fill="none" stroke="#3ee6ff" stroke-width="3.6" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="5.4" fill="#3ee6ff"/>
+  <circle cx="32" cy="32" r="10.5" fill="none" stroke="#3ee6ff" stroke-opacity="0.28" stroke-width="1.6"/>
+</svg>

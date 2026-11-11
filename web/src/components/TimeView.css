@@ -1,0 +1,194 @@
+.tv-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--mono);
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.tv-findings {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.tv-findings-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tv-findings-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tv-finding {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.tv-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tv-zoom-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tv-zoom {
+  width: 140px;
+  accent-color: var(--cyan);
+}
+
+.tv-zoom-val {
+  color: var(--cyan);
+  min-width: 32px;
+}
+
+.tv-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+
+.tv-inner {
+  position: relative;
+  min-width: 100%;
+}
+
+.tv-axis-row {
+  display: flex;
+  height: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tv-axis-label {
+  width: 90px;
+  flex: 0 0 90px;
+  position: sticky;
+  left: 0;
+  background: var(--panel-2);
+  z-index: 3;
+  border-right: 1px solid var(--line);
+}
+
+.tv-axis-track {
+  position: relative;
+  height: 100%;
+}
+
+.tv-tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+
+.tv-tick-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--line-2);
+}
+
+.tv-tick-text {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 10px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.tv-lane-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.tv-lane-label {
+  width: 90px;
+  flex: 0 0 90px;
+  position: sticky;
+  left: 0;
+  background: var(--panel-2);
+  z-index: 2;
+  border-right: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  padding-left: 6px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv-lane-track {
+  position: relative;
+  height: 100%;
+}
+
+.tv-bar {
+  position: absolute;
+  top: 3px;
+  height: 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  box-sizing: border-box;
+  min-width: 2px;
+}
+
+.tv-bar-llm {
+  background: var(--cyan);
+  opacity: 0.85;
+}
+
+.tv-bar-tool {
+  background: var(--line-2);
+  opacity: 0.9;
+}
+
+.tv-bar-helper {
+  background: var(--amber);
+  opacity: 0.85;
+}
+
+.tv-bar-error {
+  background: var(--red) !important;
+  opacity: 0.95;
+}
+
+.tv-bar-running {
+  opacity: 0.5;
+  border: 1px dashed var(--muted);
+}
+
+.tv-bar-fallback {
+  outline: 1px dashed var(--amber);
+  outline-offset: 1px;
+}
+
+.tv-tick-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--red);
+  transform: translateX(-1px);
+}

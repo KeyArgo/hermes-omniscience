@@ -1,0 +1,53 @@
+{
+  "hook": "on_session_start",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["agent/conversation_loop.py:934"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "platform": "cli"
+      },
+      "expected": {
+        "kind": "session.start",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": null,
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": null,
+        "attrs": {
+          "platform": "cli",
+          "model": "DeepSeek-V4.1-Flash-1017"
+        }
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "platform": "subagent"
+      },
+      "expected": {
+        "kind": "session.start",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": null,
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": null,
+        "attrs": {
+          "platform": "subagent",
+          "model": "DeepSeek-V4.1-Flash-1017"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+.demo-home/
+node_modules/
+__pycache__/
+*.db
+*.db-*
+.lanes/
+dist/
+.venv/
+.demo-out/
+!dashboard/dist/
+!viewer_app/static/
+viewer_app/BUILD_INFO.json
+/BUILD_INFO.json
+viewer_app/BUILD_INFO.json

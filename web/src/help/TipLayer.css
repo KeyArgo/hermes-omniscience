@@ -1,0 +1,29 @@
+.tl-bubble {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  font: 13px/1.45 var(--sans);
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / .45);
+  pointer-events: none;
+  white-space: pre-line;
+  opacity: 0;
+  transition: opacity 120ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.tl-bubble.tl-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-bubble {
+    transition: none;
+  }
+}
+
+/* The page-wide layer replaces the older CSS-only bubbles, so a control never shows two. */
+.tip::after { display: none; }

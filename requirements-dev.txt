@@ -1,0 +1,5 @@
+pytest
+hypothesis
+fastapi
+uvicorn[standard]
+httpx

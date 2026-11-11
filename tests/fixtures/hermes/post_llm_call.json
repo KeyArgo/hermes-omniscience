@@ -1,0 +1,65 @@
+{
+  "hook": "post_llm_call",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["agent/turn_finalizer.py:495"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "task_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "user_message": "Summarize the repository layout.",
+        "assistant_response": "The repository contains plugin, viewer, web, demo, and tests.",
+        "conversation_history": [{"role": "user", "content": "Summarize the repository layout."}],
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "platform": "cli",
+        "side_question_token": null
+      },
+      "expected": {
+        "kind": "turn.end",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": null,
+        "attrs": {
+          "model": "DeepSeek-V4.1-Flash-1017",
+          "assistant_chars": 61
+        }
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "task_id": "sa-0-2ad31b82",
+        "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+        "user_message": "Check the contract tests.",
+        "assistant_response": "Two tests fail: contract and viewer.",
+        "conversation_history": [{"role": "user", "content": "Check the contract tests."}],
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "platform": "subagent",
+        "side_question_token": null
+      },
+      "expected": {
+        "kind": "turn.end",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": null,
+        "attrs": {
+          "model": "DeepSeek-V4.1-Flash-1017",
+          "assistant_chars": 36
+        }
+      }
+    }
+  }
+}

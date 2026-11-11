@@ -1,0 +1,284 @@
+/* ============================================================
+   PASS 5 — MICROCRAFT
+   Black Box: forensic, matte, sober. One brass accent.
+   Serif only for the verdict. Warm near-black base.
+   ============================================================ */
+
+:root {
+  --accent: #b08d57;          /* brass — the only accent */
+  --bg: #17140f;              /* warm near-black */
+  --bg-2: #1e1a14;
+  --bg-3: #26211a;
+  --text: #e6e0d4;
+  --text-dim: #9a927f;
+  --line: #2e2921;
+  --line-2: #3a342a;
+  --serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* ------------------------------------------------------------
+   CURSORS — pointer only on things that act
+   ------------------------------------------------------------ */
+
+button,
+.icon-button,
+.help-button,
+a[href],
+[role="button"],
+[role="tab"],
+[role="option"],
+[role="menuitem"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+summary,
+.clickable,
+[data-clickable] {
+  cursor: pointer;
+}
+
+/* text surfaces: default arrow, not pointer, not I-beam on chrome */
+.ml-root,
+.vh-container,
+.top-metrics,
+.stage-title,
+.session-title {
+  cursor: default;
+}
+
+/* text you can actually select: I-beam */
+p, h1, h2, h3, h4, h5, h6, li, td, th, dd, dt,
+.verdict, .verdict-text, .note, .hint,
+input[type="text"], input[type="search"], textarea {
+  cursor: text;
+}
+
+/* replay slider: grab while idle, grabbing while dragging */
+.replay-slider,
+.replay-slider-thumb,
+input[type="range"].replay-slider {
+  cursor: grab;
+}
+
+.replay-slider:active,
+.replay-slider-thumb:active,
+input[type="range"].replay-slider:active {
+  cursor: grabbing;
+}
+
+/* slider thumb itself, when rendered as a child element */
+.replay-slider .thumb {
+  cursor: grab;
+}
+.replay-slider .thumb:active {
+  cursor: grabbing;
+}
+
+/* disabled controls: no pointer promise */
+button:disabled,
+.icon-button:disabled,
+[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* ------------------------------------------------------------
+   SELECTION — brass 30%, text stays legible
+   ------------------------------------------------------------ */
+
+::selection {
+  background: rgba(176, 141, 87, 0.3); /* var(--accent) @ 30% */
+  color: var(--text);
+}
+
+/* Firefox alias, same values */
+::-moz-selection {
+  background: rgba(176, 141, 87, 0.3);
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------
+   ELLIPSIS — long chat ids / titles never wrap or blow out
+   ------------------------------------------------------------ */
+
+.session-title,
+.stage-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0; /* required inside flex/grid parents */
+}
+
+/* flex parents of those titles must allow shrink */
+.session-row,
+.stage-row,
+.stage-header {
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------
+   DOCKED PANE ROOT — fill the pane, breathe once
+   ------------------------------------------------------------ */
+
+.ml-root {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+}
+
+.ml-root *,
+.ml-root *::before,
+.ml-root *::after {
+  box-sizing: border-box;
+}
+
+/* ------------------------------------------------------------
+   WRAPPED TOOLBAR → VERDICT GAP
+   8px between a toolbar that wraps and the verdict below
+   ------------------------------------------------------------ */
+
+.vh-container {
+  margin-top: 8px;
+}
+
+/* ------------------------------------------------------------
+   NUMERALS — tabular everywhere numbers align or tick
+   ------------------------------------------------------------ */
+
+.top-metrics,
+.top-metrics .metric-value,
+.top-metrics .metric,
+.top-metrics [data-metric],
+.replay-counter,
+.replay-counter .value,
+.replay-time,
+.replay-step-count {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ------------------------------------------------------------
+   SCROLLBARS — thin, matte, no chrome
+   ------------------------------------------------------------ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ------------------------------------------------------------
+   ICON BUTTONS — 28×28, glyph dead centre
+   ------------------------------------------------------------ */
+
+.icon-button,
+.help-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 14px;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.icon-button:hover:not(:disabled),
+.help-button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--line-2);
+  background: var(--bg-3);
+}
+
+.icon-button:active:not(:disabled),
+.help-button:active:not(:disabled) {
+  background: var(--bg-2);
+}
+
+.icon-button[aria-pressed="true"],
+.icon-button.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.help-button {
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
+/* glyph spans inside icon buttons inherit centring */
+.icon-button span,
+.icon-button svg,
+.help-button span,
+.help-button svg {
+  display: block;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+   MICRO-ORDER (sober, no flourish)
+   ------------------------------------------------------------ */
+
+/* verdict is the one serif moment */
+.verdict,
+.verdict-text {
+  font-family: var(--serif);
+}
+
+/* focus rings: visible, brass, quiet */
+.icon-button:focus-visible,
+.help-button:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* reduced motion: kill transitions */
+@media (prefers-reduced-motion: reduce) {
+  .ml-root * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* View names read as words: "List", "Graph", ... (the values stay lower-case in code). */
+.view-switch .chip,
+.top-metrics .chip {
+  text-transform: capitalize;
+}
+

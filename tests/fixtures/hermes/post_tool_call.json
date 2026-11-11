@@ -1,0 +1,81 @@
+{
+  "hook": "post_tool_call",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["model_tools.py:700-708"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "task_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:1",
+        "tool_call_id": "call_713285d6",
+        "tool_name": "terminal",
+        "args": {"command": "ls -la", "timeout": 30},
+        "result": "plugin\nviewer\nweb\ndemo\ntests\n",
+        "duration_ms": 3230,
+        "status": "ok",
+        "error_type": null,
+        "error_message": null,
+        "middleware_trace": []
+      },
+      "expected": {
+        "kind": "tool.end",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:1",
+          "tool_call_id": "call_713285d6",
+          "subagent_id": null
+        },
+        "status": "ok",
+        "attrs": {
+          "tool_name": "terminal",
+          "duration_ms": 3230,
+          "arg_names": ["command", "timeout"],
+          "result_chars": 29
+        },
+        "attrs_ignore": ["started_at"]
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "task_id": "sa-0-2ad31b82",
+        "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+        "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:1",
+        "tool_call_id": "call_9f4a2b1c",
+        "tool_name": "read_file",
+        "args": {"path": "tests/contract/test_hook_contract.py", "limit": 200},
+        "result": "{\"ok\": false, \"error\": \"FileNotFoundError\"}",
+        "duration_ms": 42,
+        "status": "error",
+        "error_type": "tool_error",
+        "error_message": "FileNotFoundError: tests/contract/test_hook_contract.py",
+        "middleware_trace": []
+      },
+      "expected": {
+        "kind": "tool.end",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+          "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:1",
+          "tool_call_id": "call_9f4a2b1c",
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": "error",
+        "attrs": {
+          "tool_name": "read_file",
+          "duration_ms": 42,
+          "error_type": "tool_error",
+          "error_message_chars": 55,
+          "arg_names": ["limit", "path"],
+          "result_chars": 43
+        },
+        "attrs_ignore": ["started_at"]
+      }
+    }
+  }
+}

@@ -1,0 +1,466 @@
+/* Pass 10 — Nous Bridge. Loaded last. Nous stays the identity; this layer owns the two faces'
+   full token sets (so Paper no longer inherits dark values), calms the console field, and fixes
+   cascade bugs between earlier passes. Light-face overrides for hard-coded colours are generated
+   into pass10-paper.gen.css. */
+
+/* ---- dark face (default) ---------------------------------------------------------------- */
+:root,
+:root[data-theme="console"] {
+  --bg: #070a10;
+  --bg-2: #0a0e15;
+  --bg-3: #0f141c;
+  --panel: #0c1118;
+  --panel-2: #111822;
+  --panel-3: #17202c;
+  --line: #1b2430;
+  --line-2: #2a3546;
+  --line-strong: #3a4a62;
+  --text: #f2efe8;
+  --text-dim: #b7c1d0;
+  --muted: #b7c1d0;
+  --dim: #8592a5;
+
+  --accent: #3d7bff;
+  --cyan: #3d7bff;
+  --accent-glow: rgb(61 123 255 / 0.35);
+  --gold: #d9b876;
+  --green: #34d399;
+  --amber: #f5b544;
+  --red: #f2545b;
+  --violet: #a78bfa;
+  --info: #5ac8fa;
+
+  --chart-model: #3d7bff;
+  --chart-tool: #2dd4bf;
+  --chart-selected: #ffffff;
+  --chart-fail: var(--red);
+
+  --grid-line: rgb(61 123 255 / 0.05);
+  --glow: var(--accent-glow);
+  --shadow-float: 0 0 0 1px var(--line-2), 0 12px 32px rgb(0 0 0 / 0.45);
+  --shadow-seam: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: dark;
+}
+
+/* ---- light face ------------------------------------------------------------------------- */
+:root[data-theme="paper"] {
+  --bg: #f6f3ec;
+  --bg-2: #efebe2;
+  --bg-3: #e7e2d6;
+  --panel: #ffffff;
+  --panel-2: #f3efe6;
+  --panel-3: #ebe6db;
+  --line: #ddd6c8;
+  --line-2: #cbc2b1;
+  --line-strong: #a89e8a;
+  --text: #14181f;
+  --text-dim: #4a5361;
+  --muted: #4a5361;
+  --dim: #646d7a;
+
+  --accent: #2357d9;
+  --cyan: #2357d9;
+  --accent-glow: rgb(35 87 217 / 0.22);
+  --gold: #8a6a24;
+  --green: #0f7a53;
+  --amber: #9a5b00;
+  --red: #c42b33;
+  --violet: #6d4fd6;
+  --info: #0b6fa4;
+
+  --chart-model: #2357d9;
+  --chart-tool: #0f8f7f;
+  --chart-selected: #14181f;
+  --chart-fail: var(--red);
+
+  --grid-line: rgb(35 87 217 / 0.06);
+  --glow: var(--accent-glow);
+  --shadow-float: 0 0 0 1px var(--line), 0 12px 32px rgb(20 24 31 / 0.12);
+  --shadow-seam: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: light;
+}
+
+/* ---- the field: calm, no page-wide grid ------------------------------------------------- */
+:root[data-theme="console"] body,
+:root body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 520px at 78% -12%, rgb(61 123 255 / 0.12), transparent 62%),
+    radial-gradient(700px 420px at 8% 108%, rgb(217 184 118 / 0.05), transparent 60%);
+  background-size: auto;
+  background-attachment: fixed;
+  color: var(--text);
+}
+
+:root[data-theme="paper"] body {
+  background-image:
+    radial-gradient(1100px 520px at 78% -12%, rgb(35 87 217 / 0.06), transparent 62%);
+}
+
+:root[data-theme="paper"] .us-answer b {
+  color: var(--text);
+}
+
+:root[data-theme="paper"] ::selection {
+  background: rgb(35 87 217 / 0.18);
+  color: var(--text);
+}
+
+/* ---- surfaces: one hairline and a specular top edge, no stacked boxes -------------------- */
+.rail-left,
+.rail-right,
+.topbar {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.cx-wrap,
+.pf,
+.us-panel {
+  box-shadow: var(--shadow-seam);
+}
+
+/* ---- focus: one ring everywhere ------------------------------------------------------------ */
+:where(button, a, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+/* ---- rails stay where they are: hovering one no longer slides it over the stage --------- */
+@media (min-width: 901px) {
+  .rail-right:not(.is-collapsed):hover,
+  .rail-left:not(.is-collapsed):hover {
+    margin-left: 0;
+    margin-right: 0;
+    box-shadow: none;
+  }
+}
+
+/* ---- Tokens: the 820 px and 1040 px container rules both applied and put the chat name and
+   its counts in the same cell. Under 820 px each part gets its own row. -------------------- */
+@container (max-width: 820px) {
+  .tk-chat {
+    grid-template-rows: auto auto auto;
+  }
+  .tk-chat .tk-chat-main { grid-row: 1; }
+  .tk-chat .tk-chat-counts { grid-row: 2; }
+  .tk-chat .tk-chat-meta { grid-row: 3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+/* ======================= layout: the stage reads top-down in one glance ===================== */
+
+/* toolbar: views left, menus right; wraps instead of clipping a control off-screen */
+.stage-toolbar {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  overflow: visible;
+  position: relative;
+  z-index: 20;
+}
+.stage-toolbar .chips {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  overflow: visible;
+  min-width: 0;
+}
+.toolbar-spacer { flex: 1 1 auto; }
+.stage-toolbar .mb-trigger,
+.panels-button {
+  height: 30px;
+}
+
+/* the status band: verdict on one line, a summary line that never disappears */
+.status-band {
+  margin: 10px 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow-seam);
+}
+.status-band .vh-container {
+  margin: 0;
+  padding: 10px 14px 6px;
+  border: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  box-shadow: none;
+  min-height: 0;
+  align-items: center;
+}
+.status-band .vh-headline {
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.25;
+}
+.status-band:not(.is-open) .vh-reasons { display: none; }
+.status-band .vh-right { gap: 8px; }
+.sb-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 4px 10px 8px;
+}
+.sb-briefing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sb-briefing:hover { border-color: var(--line-2); background: var(--panel-2); }
+.sb-caret { color: var(--accent); }
+.sb-label { font-weight: 600; font-size: 13px; }
+.sb-digest { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.sb-open { color: var(--accent); font-size: 12.5px; }
+.sb-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--red) 45%, var(--line));
+  border-radius: 6px;
+}
+.sb-stepper button {
+  width: 26px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.sb-stepper button:hover { background: var(--panel-2); }
+.sb-fails { color: var(--red); font-size: 12px; padding: 0 4px; }
+.sb-lost {
+  color: var(--amber);
+  font-size: 12.5px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--line));
+  border-radius: 6px;
+}
+.briefing {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+.briefing > * { margin: 0; }
+
+/* the token chart as a panel: chart first; its notes come with ⤢ (focus) */
+.stage > .pf { margin: 10px 12px 0; }
+.pf .cx-wrap.cx-inline {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+.pf .cx-inline-head { display: none; }
+.pf:not(.is-focused) .cx-inline .cx-notes { display: none; }
+
+.stage > .graph-surface { margin-top: 10px; }
+
+/* right rail tabs */
+.rail-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 8px 10px 6px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+.rail-tab {
+  flex: 1 1 0;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: 500 12.5px/1 var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rail-tab:hover { color: var(--text); }
+.rail-tab.is-active {
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.rail-tabpanel { min-height: 0; }
+
+/* header */
+.telemetry { display: contents; }
+.panels-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* verdict in the band: one row; its "summary" button is the Briefing toggle below */
+.status-band .vh-container { flex-direction: row; flex-wrap: wrap; gap: 6px 18px; }
+.status-band .vh-left { flex: 1 1 420px; min-width: 0; }
+.status-band .vh-right { flex: 0 1 360px; flex-direction: row; align-items: center; }
+.status-band .vh-time-bar-container { flex: 1 1 auto; min-width: 200px; }
+.status-band .vh-show-me { display: none; }
+
+/* header: badges keep to one line; the subtitle gives way first */
+.live-badge,
+.brand-status,
+.metric { white-space: nowrap; }
+/* The tagline earns its space down to 1180 px; below that the header needs the room for controls. */
+@media (max-width: 1180px) {
+  .brand-sub { display: none; }
+}
+
+/* Account pages (Usage, Latency) are full width whatever the rails' collapsed state: the
+   collapsed-rails grid had more specificity and put the page in a 28 px column. */
+.app.is-account .workspace,
+.app.is-account .workspace.left-collapsed,
+.app.is-account .workspace.right-collapsed,
+.app.is-account .workspace.left-collapsed.right-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* rail tabs shrink with the rail instead of widening it */
+.rail-tabs { min-width: 0; }
+.rail-tab { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+
+/* header under 1440: icon-first buttons so the last control is never off the edge */
+.topbar { min-width: 0; }
+.top-metrics { min-width: 0; flex-wrap: nowrap; }
+@media (max-width: 1439px) {
+  .mini-chip .mini-label,
+  .top-metrics .mb-trigger .mb-label-text { display: none; }
+  .brand-status { display: none; }
+  .top-metrics { gap: 6px; }
+}
+.stage-toolbar .chip.more-views { flex: 0 0 auto; width: auto; max-width: 150px; }
+
+/* The shell has four rows (header, workspace, the "facts accurate to" line, the replay bar) but the
+   grid declared three, so the one-line note sat in the 58 px row meant for the replay bar. */
+.app:not(.app-mini) { grid-template-rows: 54px minmax(0, 1fr) auto auto; }
+.app.is-account:not(.app-mini) { grid-template-rows: 54px minmax(0, 1fr) auto; }
+@media (max-width: 480px) {
+  .app:not(.app-mini) { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+}
+
+/* Narrow windows (and 200 % zoom): the details rail is a drawer, never a second grid row; the
+   header scrolls sideways rather than clipping its last controls. */
+@media (max-width: 900px) {
+  .app:not(.app-mini) .rail-right {
+    position: fixed;
+    top: 0;
+    /* The grid rule sets left: 0; with both sides pinned the box is over-constrained and left wins,
+       so the drawer opened over the map from the left. */
+    left: auto;
+    right: 0;
+    bottom: 0;
+    width: min(340px, 88vw);
+    z-index: 30;
+    transform: translateX(101%);
+    box-shadow: var(--shadow-float);
+  }
+  .app:not(.app-mini) .rail-right:not(.is-collapsed) { transform: none; }
+  .app:not(.app-mini) .rail-right.is-collapsed { display: none; }
+  .top-metrics {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .top-metrics::-webkit-scrollbar { display: none; }
+  .top-metrics > * { flex: none; }
+}
+
+@media (max-width: 700px) {
+  .app:not(.app-mini) .rail-right .rail-collapse { display: block !important; }
+}
+
+/* Keep the full build chip and the header controls visible when a single row is too narrow. */
+@media (min-width: 901px) and (max-width: 1599px) {
+  .app:not(.app-mini) { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+  .app.is-account:not(.app-mini) { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .topbar { flex-wrap: wrap; gap: 4px; padding-block: 6px; }
+  .topbar .brand { flex-basis: 100%; }
+  .top-metrics { width: 100%; gap: 6px; }
+}
+
+/* The details rail is a drawer below 900 px. Give it the two ways out a drawer is expected to have:
+   a 40 px X in its corner, and the page behind it as a click-away scrim. */
+.rail-close { display: none; }
+.rail-scrim { display: none; }
+@media (max-width: 900px) {
+  .app:not(.app-mini) .rail-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    background: rgba(4, 7, 12, 0.55);
+  }
+  .app:not(.app-mini) .rail-right .rail-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 40px;
+    height: 40px;
+    z-index: 3;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .app:not(.app-mini) .rail-right .rail-close:hover { background: var(--panel); border-color: var(--accent); }
+  .app:not(.app-mini) .rail-right .rail-collapse { display: none; }
+}
+
+/* The brand line: a promise in seven words, in the display serif, not a category label. */
+.brand-sub {
+  display: inline-block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.reset-view-chip, .tour-chip { gap: 6px; }
+@media (max-width: 1100px) { .reset-view-chip, .tour-chip { display: none; } }
+
+/* Closed the token chart? A chip in the header says where it went. */
+.restore-chart-chip { gap: 6px; color: var(--muted); }
+.restore-chart-chip:hover { color: var(--text); border-color: var(--accent); }
+@media (max-width: 1180px) { .restore-chart-chip { display: none; } }
+
+/* Timeline / Links: two ways to read the same chat. */
+.map-style { display: inline-flex; gap: 2px; align-items: center; }
+.map-style .chip { padding: 3px 9px; font-size: 11.5px; }
+.map-style .chip.is-on { color: var(--text); border-color: var(--accent); background: rgba(61, 123, 255, 0.14); }
+@media (max-width: 1180px) { .map-style { display: none; } }

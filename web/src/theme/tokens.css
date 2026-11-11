@@ -1,0 +1,99 @@
+/* One place for colour, elevation and motion. Imported last, so these win.
+
+   Before this file the palette lived in ten `pass*.css` layers with six different --accent values,
+   and event colours were picked per component: teal in one chart, violet in another for the same
+   thing. Colour is a language here — model call, tool run, failure, recovered retry, compaction,
+   privacy — so it gets one definition and every component reads it.
+
+   Rules that keep it cheap:
+   - motion is transform/opacity only, so the compositor runs it and the main thread does not;
+   - nothing loops for decoration; a looping indicator is the one exception and it still composites;
+   - every animation respects prefers-reduced-motion at the bottom of this file. */
+
+:root,
+:root[data-theme] {
+  /* Surfaces, darkest to lightest. */
+  --s0: #0b0d12;
+  --s1: #11141b;
+  --s2: #171b24;
+  --s3: #1e2330;
+
+  /* Hairlines: barely there, a little more, unmistakable. */
+  --edge-1: rgba(255, 255, 255, 0.06);
+  --edge-2: rgba(255, 255, 255, 0.10);
+  --edge-3: rgba(255, 255, 255, 0.16);
+
+  /* Identity. One accent, used for selection and links. */
+  --accent: #3d7bff;
+  --ink: #f2f5fa;
+  --ink-dim: #9aa6b8;
+  --ink-faint: #6b7689;
+
+  /* Status. Reserved: never a fill over a large area. */
+  --ok: #3ecf8e;
+  --warn: #f5a524;
+  --err: #f0506e;
+
+  /* What a step IS. Each is paired with a label or glyph in the UI — colour never carries meaning
+     alone, because a reader with a different monitor or a colour deficiency still needs the answer. */
+  --c-model: #3d7bff;      /* a model call */
+  --c-tool: #2dd4bf;       /* a tool run */
+  --c-fail: #f0506e;       /* a step that failed */
+  --c-recovered: #f5a524;  /* a retry that then succeeded */
+  --c-compact: #a78bfa;    /* a compaction, or context dropped */
+  --c-private: #ff8fd0;    /* browser or desktop use — deliberately unlike every other hue */
+  --c-helper: #94a3b8;     /* a subagent or helper: structure, not a category */
+
+  /* The one glass surface in the product: the open drawer. Everywhere else is flat elevation,
+     because blur costs a full re-composite of the region behind it every time anything moves. */
+  --glass-bg: rgba(23, 27, 36, 0.72);
+  --glass-blur: blur(14px) saturate(140%);
+
+  /* Type scale. Display serif for names, mono for anything countable. */
+  --type-xs: 11px;
+  --type-sm: 12px;
+  --type-md: 13px;
+  --type-lg: 16px;
+  --type-xl: 20px;
+
+  /* Spacing, one rhythm. */
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 24px;
+
+  --dur-fast: 120ms;
+  --dur-mid: 180ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* The single permitted glass surface. */
+.glass-surface {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--edge-2);
+}
+
+/* Arrival: one shot, compositor-only. A row that just landed fades and lifts once, then stays still.
+   Done badly this becomes a flicker on a busy chat, so it runs only on the first paint of a row. */
+@keyframes omni-arrive {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+.is-arriving {
+  animation: omni-arrive var(--dur-mid) var(--ease-out) 1;
+}
+
+/* Nothing loops for decoration. The one exception is a live indicator, and it composites. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

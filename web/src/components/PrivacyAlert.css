@@ -1,0 +1,136 @@
+/* The privacy alert: a strip in the title bar, plus a blue pulse on the whole window. The pulse is
+   deliberately the only animation in the app — everything else stays still so this reads as an
+   interruption, not decoration. */
+
+.privacy-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid #3d7bff;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(61, 123, 255, 0.22), rgba(61, 123, 255, 0.1));
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pa-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6ea0ff;
+  position: relative;
+}
+
+/* The ring is a scaled, fading pseudo-element, not an animated box-shadow: a box-shadow keyframe
+   repaints the region every frame, a transform+opacity layer is handed to the compositor and costs
+   nothing on the main thread. Same look, none of the paint. */
+.pa-dot::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid rgba(110, 160, 255, 0.9);
+  transform-origin: center;
+  animation: pa-dot 1.6s ease-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes pa-dot {
+  0% { transform: scale(1); opacity: 0.9; }
+  70% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.pa-label { font-weight: 600; letter-spacing: 0.01em; }
+.pa-tool { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.pa-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pa-actions { display: inline-flex; align-items: center; gap: 4px; }
+
+.pa-btn {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pa-btn:hover { border-color: var(--accent); }
+.pa-stop {
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.16);
+  color: #ffd9d9;
+}
+.pa-stop:hover { background: rgba(248, 113, 113, 0.28); }
+.pa-quiet { color: var(--muted); border-style: dashed; }
+.pa-x {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.pa-x:hover { color: var(--text); }
+
+/* The window itself. A slow outward pulse, blue, on the app's own frame — visible from any view,
+   any scroll position, because it is the container, not a panel inside it. */
+.privacy-glow {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 95;
+  border: 2px solid rgba(61, 123, 255, 0.85);
+  box-shadow: inset 0 0 60px rgba(61, 123, 255, 0.35), 0 0 24px rgba(61, 123, 255, 0.5);
+  animation: pa-pulse 2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* A full-window element animating box-shadow repaints the whole viewport twice a second. The glow
+   is drawn once and only its opacity moves — same breathing, one composited layer. */
+@keyframes pa-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .privacy-glow,
+  .pa-dot { animation: none; }
+}
+
+/* What the viewer answered, in words, next to the strip it came from. */
+.privacy-note-toast {
+  position: fixed;
+  left: 16px;
+  bottom: 56px;
+  z-index: 96;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 46ch;
+  padding: 9px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: var(--shadow-float);
+}
+.pnt-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.pnt-x:hover { color: var(--text); }
+
+/* The quieter tally: network and MCP calls, mentioned but not alerted. */
+.quiet-chip {
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.pa-chat { color: var(--text); font-size: 11.5px; max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

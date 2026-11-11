@@ -1,0 +1,26 @@
+name: omniscience
+repo: https://github.com/KeyArgo/hermes-omniscience
+sha: TBD-set-at-submission  # must be the pushed commit the catalog PR points at
+description: "Local, read-only observability for Hermes Agent: a live graph of every session, turn, model request, tool call and subagent, plus deterministic replay of a stored run. Disclosure — the plugin records sanitized metadata only (IDs, timings, model/provider names, token counts, statuses, error types, tool names, argument names and character counts) from Hermes observer hooks into a local SQLite database under the active profile's plugin-data directory; prompts, conversation history, assistant text, tool argument values, tool results, request/response bodies, headers, environment values and credentials are never stored by default; free-text fields it does keep are truncated and redacted, and error messages are stored only as a length; a bounded queue means a slow or locked database drops and counts events instead of blocking the agent; the viewer is a separate process that opens the database read-only, binds 127.0.0.1, requires a per-launch key and has no write endpoints; no network calls, no LLM calls, no stored credentials and no self-updater."
+maintainer: KeyArgo
+tier: community
+category: tools
+version: "1.0.0"
+requires_hermes: ">=0.23.0"
+docs_url: https://github.com/KeyArgo/hermes-omniscience/blob/main/docs/INSTALL.md
+platforms: []
+capabilities:
+  provides_tools: []
+  provides_hooks:
+    - on_session_start
+    - on_session_end
+    - pre_llm_call
+    - post_llm_call
+    - pre_api_request
+    - post_api_request
+    - api_request_error
+    - post_tool_call
+    - subagent_start
+    - subagent_stop
+  provides_middleware: []
+  requires_env: []

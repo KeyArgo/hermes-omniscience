@@ -1,0 +1,93 @@
+{
+  "tips": {
+    ".rail-collapse[aria-label='Hide conversation list']": "Fold the chat list to a thin strip. Bring it back with the strip, or from Panels.",
+    ".rail-expand[aria-label='Show conversation list']": "Show the chat list again.",
+    ".rail-collapse[aria-label='Hide details']": "Fold the details panel to a thin strip. Bring it back with the strip, or from Panels.",
+    ".rail-expand[aria-label='Show details']": "Show the details panel: Inspect, Warnings and Why.",
+    ".session-filter select, .rail-left select": "Choose which chats are listed, how they are sorted, and how they are grouped.",
+    ".fp-toggle": "Fold or unfold this failure: what happened, why, and what to do next.",
+    ".fp-nav button": "Step to the previous or next failure in this chat.",
+    ".fp-body button": "Select this step on the map and open it in Inspect.",
+    ".event-timeline summary": "The recorded timeline: every event in order, with its recording time. Click one to select it.",
+    ".why button, .why summary": "Explain why this run failed, read from its recorded failures.",
+    ".us-sources button": "Read the token counters again from the selected sources.",
+    ".us-source-main": "Count this harness or Spark lane in Usage. Off by default; nothing is read until you switch it on.",
+    ".ps-reset": "Put this preset's panels back to their defaults. Your chat and filters stay.",
+    ".ps-preset": "Switch how much interface you see. Nothing is deleted; every panel stays listed here.",
+    ".ps-switch": "Show or hide this panel. Hidden panels stay listed here.",
+    ".tour-btn": "",
+    ".mb-item": "",
+    ".replay-bar input[type='range']": "Drag to replay the chat up to any step. Nothing is re-run.",
+    ".asof": "The newest recorded event in this view. If this stops advancing while the agent works, the recorder or the stream has stalled."
+  },
+  "sections": [
+    {
+      "title": "The header",
+      "items": [
+        { "name": "Live badge", "what": "Whether the page is connected to the viewer and how long ago the last event arrived." },
+        { "name": "Telemetry", "what": "The build (click to copy it for a bug report), the number of loaded events, and lost records the recorder had to skip. Shown in Standard and Everything; turn it on in any preset from Panels." },
+        { "name": "Follow Newest", "what": "Jump to whichever chat is working right now and keep its newest step in view." },
+        { "name": "All Chats / This Chat Only", "what": "Show the list of every recorded chat, or only the one you are reading." },
+        { "name": "Reset view (↺)", "what": "Put view, zoom, filters and panels back the way Omniscience first opens. Recordings are never touched." },
+        { "name": "Maximize (⛶)", "what": "Full screen; Esc leaves." },
+        { "name": "Mini Panel", "what": "A small frame on the right with only what you chose to watch." },
+        { "name": "Panels", "what": "Show, hide and resize every panel, switch between Simple, Standard and Everything, and reset the layout." },
+        { "name": "Settings (⚙)", "what": "Default view, compact text, chat titles, the theme (dark or Paper), recording and privacy." },
+        { "name": "Help", "what": "What Am I Looking At? explains every box and colour; Take the Tour walks five stops in about 30 seconds." }
+      ]
+    },
+    {
+      "title": "The toolbar",
+      "items": [
+        { "name": "List · Map · Time · Tokens · Usage", "what": "The five main views. More Views adds Flame, Tools, Context, Helpers, Coverage and Latency." },
+        { "name": "Filters", "what": "Hide tool steps, hide model calls, or show errors only. The number on the button counts filters that are on." },
+        { "name": "Ask a Model", "what": "One of your own models reads this recording (tokens, timings, rate limits, context growth) and writes what to fix." },
+        { "name": "Actions", "what": "Export CSV (timings, tokens, models, never message text), open Panels, or reset the view." }
+      ]
+    },
+    {
+      "title": "The status band",
+      "items": [
+        { "name": "Verdict", "what": "One sentence: OK, Delays, Failing or Running, with where the time went (model, tools, waiting)." },
+        { "name": "Summary line", "what": "Always visible: how the chat ended, model calls, tools and failures. Click it to open the Briefing." },
+        { "name": "Briefing", "what": "The plain-English chat summary, each failure with why and what to do, the activity summary, the recorded timeline and the summary bar. Stays open or closed as you left it." },
+        { "name": "Failure stepper", "what": "‹ and › step through this chat's failures and select each one on the map." },
+        { "name": "Lost records", "what": "Shown when the recorder had to skip events; conclusions about this chat may be incomplete." }
+      ]
+    },
+    {
+      "title": "Panels you can shape",
+      "items": [
+        { "name": "Tokens per call", "what": "How much context each model call re-sent: spikes show where it piled up, drops show compactions. On by default; not repeated on Tokens and Context, which are already that chart." },
+        { "name": "Fold (–)", "what": "Fold a panel to its title bar; + unfolds it. Remembered." },
+        { "name": "Double height (↕)", "what": "Give a panel twice the room, or put it back." },
+        { "name": "Hide (×)", "what": "Hide a panel. It stays listed in Panels, where one click brings it back." },
+        { "name": "Focus (⤢)", "what": "Lift one panel over the page, full height, with its notes. Esc leaves." },
+        { "name": "Resize bar", "what": "Drag a panel's bottom edge, or focus it and use the arrow keys (Shift for bigger steps, Home and End for the limits). Remembered per panel." }
+      ]
+    },
+    {
+      "title": "The details panel",
+      "items": [
+        { "name": "Inspect", "what": "The selected step's timing, tokens and data; with nothing selected, the longest steps. Selecting a step opens this tab." },
+        { "name": "Warnings", "what": "Patterns worth a look in this chat, grouped by kind with a count. Select one to highlight it on the map." },
+        { "name": "Why", "what": "Why the run failed, read from its recorded failures." }
+      ]
+    },
+    {
+      "title": "Presets",
+      "items": [
+        { "name": "Simple", "what": "One thing at a time: the map, the status band and the token chart. Chat list and details fold to the edges. The default." },
+        { "name": "Standard", "what": "Chat list, map and the details panel side by side, with the telemetry in the header." },
+        { "name": "Everything", "what": "Every panel open, including the Briefing, the map key and the telemetry." }
+      ]
+    },
+    {
+      "title": "Getting started",
+      "items": [
+        { "name": "First-run tour", "what": "New visitors are offered a five-stop tour: pick a chat, the status line, tokens per call, the map, and Panels. Not Now dismisses it for good; Help → Take the Tour runs it any time, and so does adding ?tour=1 to the address." },
+        { "name": "Tooltips", "what": "Hover any control, or reach it with the keyboard, to see what it does." }
+      ]
+    }
+  ]
+}

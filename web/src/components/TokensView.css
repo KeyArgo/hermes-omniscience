@@ -1,0 +1,416 @@
+.tk-root {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.tk-root * {
+  box-sizing: border-box;
+}
+
+/* (a) totals strip */
+.tk-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.tk-strip-nums {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.tk-stat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.tk-stat-num {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.tk-stat-lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.tk-dot {
+  color: var(--dim);
+  align-self: center;
+}
+
+.tk-cyan {
+  color: var(--cyan);
+}
+.tk-amber {
+  color: var(--amber);
+}
+.tk-green {
+  color: var(--green);
+}
+.tk-muted {
+  color: var(--muted);
+}
+
+.tk-stackbar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.tk-seg {
+  height: 100%;
+  min-width: 0;
+}
+.tk-seg-cached {
+  background: var(--cyan);
+}
+.tk-seg-fresh {
+  background: var(--amber);
+}
+.tk-seg-output {
+  background: var(--green);
+}
+
+/* (b) notes */
+.tk-notes {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.tk-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tk-note {
+  color: var(--text);
+  line-height: 1.4;
+  padding-left: 14px;
+  position: relative;
+}
+.tk-note::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--cyan);
+}
+
+/* (c) per call chart */
+.tk-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.tk-h {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tk-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.tk-bar-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 84px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.tk-bar-row:hover {
+  background: var(--panel-2);
+}
+
+.tk-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+.tk-bar-model {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.tk-badge {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+  flex: none;
+}
+.tk-badge-background {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+.tk-badge-helper {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.tk-bar-track {
+  display: block;
+  height: 10px;
+  background: var(--panel-2);
+  border-radius: 5px;
+  overflow: hidden;
+  min-width: 0;
+}
+.tk-bar-fill {
+  display: flex;
+  height: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.tk-bar-seg {
+  height: 100%;
+  min-width: 0;
+}
+
+.tk-bar-right {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-empty {
+  color: var(--dim);
+  margin: 6px 0;
+}
+
+/* (d) by model table */
+.tk-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.tk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tk-table th,
+.tk-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tk-table thead th {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.tk-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tk-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-model {
+  color: var(--text);
+}
+
+@media (max-width: 480px) {
+  .tk-bar-row {
+    grid-template-columns: 72px 1fr 64px;
+  }
+  .tk-stat-num {
+    font-size: 18px;
+  }
+}
+
+/* ---------- context heat ---------- */
+/* A tint on the left edge of a chat row and on a call bar, never a filled background:
+   the colour says "how much context this re-sends", the numbers stay the thing being read. */
+.tk-chat.tk-heat-green { box-shadow: inset 2px 0 0 #34d399; }
+.tk-chat.tk-heat-lime { box-shadow: inset 2px 0 0 #a3e635; }
+.tk-chat.tk-heat-yellow { box-shadow: inset 2px 0 0 #facc15; }
+.tk-chat.tk-heat-orange { box-shadow: inset 2px 0 0 #fb923c; }
+.tk-chat.tk-heat-red { box-shadow: inset 2px 0 0 #f87171; }
+.tk-chat.tk-heat-blood { box-shadow: inset 2px 0 0 #7f1d1d; }
+.tk-chat.is-selected { box-shadow: inset 2px 0 0 var(--cyan); }
+
+.tk-bar-row.tk-heat-lime .tk-bar-track { box-shadow: inset 2px 0 0 #a3e635; }
+.tk-bar-row.tk-heat-yellow .tk-bar-track { box-shadow: inset 2px 0 0 #facc15; }
+.tk-bar-row.tk-heat-orange .tk-bar-track { box-shadow: inset 2px 0 0 #fb923c; }
+.tk-bar-row.tk-heat-red .tk-bar-track { box-shadow: inset 2px 0 0 #f87171; }
+.tk-bar-row.tk-heat-blood .tk-bar-track { box-shadow: inset 2px 0 0 #7f1d1d; }
+
+.tk-heatkey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.tk-heatkey-caption { color: var(--dim); }
+.tk-heatkey-item {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+  border-bottom: 1px dotted transparent;
+}
+.tk-heatkey-item:hover { border-bottom-color: var(--line-2); }
+
+/* The context bar: solid = what the next message pays for, pale = where the chat peaked
+   before a compaction. Lifetime totals live in the tooltip, not in the bar. */
+.tk-chat-bar-track { position: relative; }
+.tk-chat-bar-peak {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 2px;
+}
+.tk-chat-bar-fill {
+  position: relative;
+  background: #34d399;
+  border-radius: 2px;
+}
+.tk-chat-bar-fill.tk-heat-lime { background: #a3e635; }
+.tk-chat-bar-fill.tk-heat-yellow { background: #facc15; }
+.tk-chat-bar-fill.tk-heat-orange { background: #fb923c; }
+.tk-chat-bar-fill.tk-heat-red { background: #f87171; }
+.tk-chat-bar-fill.tk-heat-blood { background: #7f1d1d; }
+
+/* Sort control in a section header: small enough to sit in the title row. */
+.tk-sort,
+.tk-window {
+  font: inherit;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+/* Two controls share the header: keep a gap so they read as two choices, not one. */
+.tk-h-actions { display: inline-flex; align-items: center; gap: 6px; }
+
+/* The empty state offers the next step instead of reporting a dead end. */
+.tk-empty-action {
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.tk-empty-action:hover { border-color: var(--accent); }
+
+/* ---------- latency view ---------- */
+.lat { padding: 14px 16px; max-width: 1100px; }
+.lat-lede, .lat-note { font-size: 12px; color: var(--muted); line-height: 1.55; margin: 0 0 10px; }
+.lat-note { margin-top: 12px; color: var(--dim); }
+.lat-empty { padding: 20px 16px; color: var(--muted); font-size: 12px; }
+.lat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.lat-table th {
+  text-align: left; font-weight: 500; color: var(--dim); font-size: 11px;
+  padding: 0 8px 6px; border-bottom: 1px solid var(--line-2);
+}
+.lat-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.lat-table tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+.lat-num { text-align: right; font-variant-numeric: tabular-nums; }
+.lat-model { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lat-prov { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.lat-when { color: var(--dim); }
+.lat-panel { margin: 14px 0 4px; }
+.lat-h {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--text);
+  letter-spacing: 0.02em;
+}
+.lat-hint {
+  display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%;
+  border: 1px solid var(--line-2); color: var(--dim); font-size: 9px; cursor: help;
+}
+/* A finding is a sentence about this machine's own recordings, so it reads before the numbers. */
+.lat-findings {
+  list-style: none; margin: 0 0 14px; padding: 10px 12px;
+  border: 1px solid var(--line-2); border-left: 2px solid var(--accent);
+  border-radius: 6px; background: rgba(34, 211, 238, 0.04);
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+}
+.lat-findings li { margin: 0; }
+.lat-warn { color: var(--amber, #d9a441); }
+.lat-bad { color: var(--red, #e5626a); }
+.lat-periods { display: flex; gap: 6px; margin: 0 0 14px; }
+.warning-todo { display: block; margin-top: 3px; color: var(--text); opacity: 0.85; }
+
+/* Output tokens sit past the end of the context bar, drawn thin, so they read as what the model
+   wrote rather than as context that was sent. */
+.tk-bar-out {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 0 2px 2px 0;
+}
+.tk-bar-fill { position: relative; }

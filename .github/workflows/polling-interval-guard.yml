@@ -1,0 +1,99 @@
+name: Omniscience Polling Interval Guard
+
+on:
+  pull_request:
+    paths:
+      - 'viewer_app/omniscience_viewer/app.py'
+      - '.github/workflows/polling-interval-guard.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'viewer_app/omniscience_viewer/app.py'
+
+jobs:
+  polling-interval-check:
+    runs-on: ubuntu-latest
+    name: Verify polling interval is production-safe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Check for hardcoded unsafe polling intervals
+        run: |
+          FILE="viewer_app/omniscience_viewer/app.py"
+
+          # FAIL if any hardcoded unsafe value is found
+          # Pattern: POLL_INTERVAL_S = NUMBER (without os.environ.get)
+          if grep -E 'POLL_INTERVAL_S\s*=\s*[0-9]+(\.[0-9]+)?' "$FILE" | grep -v 'os.environ.get'; then
+            echo "❌ FAILED: Hardcoded polling interval found!"
+            echo ""
+            echo "This is a performance regression risk. Polling interval MUST be:"
+            echo "  POLL_INTERVAL_S = float(os.environ.get(\"OMNISCIENCE_POLL_INTERVAL_S\", \"1.0\"))"
+            echo ""
+            echo "Why:"
+            echo "  - 0.25s polling = 41% CPU (unsafe, system hog)"
+            echo "  - 1.0s polling = 28% CPU (production-safe)"
+            echo ""
+            echo "See: PREVENT_POLLING_REGRESSION.md"
+            exit 1
+          fi
+
+          echo "✅ No hardcoded polling interval values found"
+
+      - name: Verify environment-variable based polling
+        run: |
+          FILE="viewer_app/omniscience_viewer/app.py"
+
+          if grep -q 'os.environ.get.*OMNISCIENCE_POLL_INTERVAL_S' "$FILE"; then
+            echo "✅ Polling interval is correctly environment-variable-based"
+          else
+            echo "❌ FAILED: Expected environment-variable version not found"
+            echo ""
+            echo "Expected:"
+            echo "  POLL_INTERVAL_S = float(os.environ.get(\"OMNISCIENCE_POLL_INTERVAL_S\", \"1.0\"))"
+            echo ""
+            exit 1
+          fi
+
+      - name: Verify default value is 1.0s
+        run: |
+          FILE="viewer_app/omniscience_viewer/app.py"
+
+          if grep -q 'OMNISCIENCE_POLL_INTERVAL_S.*"1.0"' "$FILE"; then
+            echo "✅ Default polling interval is 1.0s (production-safe)"
+          else
+            echo "❌ FAILED: Default polling interval is not 1.0s"
+            echo ""
+            echo "Expected default: \"1.0\""
+            echo "This ensures safe 24/7 operation at ~28% CPU."
+            echo ""
+            exit 1
+          fi
+
+      - name: Check merge conflict markers
+        run: |
+          FILE="viewer_app/omniscience_viewer/app.py"
+
+          if grep -E '^(<|>|=){7}' "$FILE"; then
+            echo "❌ FAILED: Unresolved merge conflict markers found in app.py"
+            echo ""
+            echo "This often happens when polling interval reverts during merge."
+            echo "Ensure you took the environment-variable version, not a hardcoded one."
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ No merge conflict markers detected"
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ All polling interval checks passed"
+          echo ""
+          echo "Protected against:"
+          echo "  - Hardcoded polling intervals"
+          echo "  - Unsafe merge resolutions"
+          echo "  - Default value changes"
+          echo "  - Unresolved conflicts"

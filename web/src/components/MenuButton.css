@@ -1,0 +1,175 @@
+.mb-root {
+  position: relative;
+  display: inline-block;
+}
+
+.mb-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 160ms cubic-bezier(.2,.8,.2,1), opacity 160ms cubic-bezier(.2,.8,.2,1);
+}
+
+.mb-trigger:hover {
+  background: var(--panel-2);
+}
+
+.mb-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mb-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.mb-label-text {
+  white-space: nowrap;
+}
+
+.mb-caret {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.mb-badge {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.mb-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  /* 40 put the Help menu under the details rail and the stage panels. */
+  z-index: 90;
+  min-width: 220px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / .45);
+  animation: mb-in 160ms cubic-bezier(.2,.8,.2,1);
+}
+
+.mb-pop-start {
+  left: 0;
+}
+
+.mb-pop-end {
+  right: 0;
+}
+
+@keyframes mb-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mb-label {
+  padding: 8px 8px 4px;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.mb-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--line);
+}
+
+.mb-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(.2,.8,.2,1);
+}
+
+.mb-item:hover:not(:disabled) {
+  background: var(--panel);
+}
+
+.mb-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mb-item:disabled {
+  color: var(--dim);
+  cursor: default;
+}
+
+.mb-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.mb-check-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  color: var(--accent);
+  font-size: 11px;
+  flex: none;
+}
+
+.mb-item-label {
+  flex: 1;
+}
+
+.mb-hint {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mb-trigger,
+  .mb-item {
+    transition: none;
+  }
+  .mb-pop {
+    animation: none;
+  }
+}

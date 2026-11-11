@@ -1,0 +1,241 @@
+/* ============================================================
+   Omniscience viewer — PASS 4: MOTION & STATE (CSS only)
+   BLACK BOX direction. Loaded last. No layout/size/palette
+   changes beyond what a state needs. No new class names.
+   Durations: 160ms hover/focus · 240ms reveal/expand ·
+   420ms replay "now" line. Easing: expo-out.
+   ============================================================ */
+
+/* ---- 1. Interactive states: hover lift / active inset / disabled ---- */
+
+button,
+.chip,
+.view-switch .chip,
+select.more-views,
+.icon-button,
+.help-button,
+.rl-turn-head,
+.rl-step,
+.session-item,
+.rl-earlier,
+.summary-toggle {
+  transition:
+    background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* hover = surface lifts one step + text to --text */
+button:hover:not(:disabled),
+.chip:hover,
+.view-switch .chip:hover,
+select.more-views:hover,
+.icon-button:hover,
+.help-button:hover,
+.rl-turn-head:hover,
+.rl-step:hover,
+.session-item:hover,
+.rl-earlier:hover,
+.summary-toggle:hover {
+  background-color: var(--panel-2);
+  color: var(--text);
+}
+
+/* active = 1px inset */
+button:active:not(:disabled),
+.chip:active,
+.view-switch .chip:active,
+select.more-views:active,
+.icon-button:active,
+.help-button:active,
+.rl-turn-head:active,
+.rl-step:active,
+.session-item:active,
+.rl-earlier:active,
+.summary-toggle:active {
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+/* disabled = 0.45 opacity, not-allowed */
+button:disabled,
+.chip:disabled,
+select.more-views:disabled,
+.icon-button:disabled,
+.help-button:disabled,
+.rl-earlier:disabled,
+.summary-toggle:disabled,
+[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- 2. :focus-visible everywhere interactive ---- */
+
+button:focus-visible,
+.chip:focus-visible,
+.view-switch .chip:focus-visible,
+select.more-views:focus-visible,
+.icon-button:focus-visible,
+.help-button:focus-visible,
+.rl-turn-head:focus-visible,
+.rl-step:focus-visible,
+.session-item:focus-visible,
+.rl-earlier:focus-visible,
+.summary-toggle:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* radius matches element (outline follows border-radius) */
+.chip:focus-visible,
+.view-switch .chip:focus-visible,
+.live-badge:focus-visible,
+.help-button:focus-visible,
+.rl-earlier:focus-visible {
+  border-radius: inherit;
+}
+
+/* never on mouse focus */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ---- 3. Signature detail — RECORDING TAPE ---- */
+
+.rl-root {
+  position: relative;
+}
+
+/* 1px vertical line down the left edge */
+.rl-root::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-2);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* every step row gets a 5px horizontal tick at the line */
+.rl-step {
+  position: relative;
+}
+
+.rl-step::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 5px;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--dim);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* failed steps' tick red */
+.rl-step.rl-error::before {
+  background: var(--red);
+}
+
+/* selected step's tick brass, 9px */
+.rl-step.rl-selected::before {
+  width: 9px;
+  background: var(--accent);
+}
+
+/* ---- 4. Live: slow opacity breaths (no scale) ---- */
+
+/* live dot breath 0.4 <-> 1 over 1.6s */
+.live-badge.is-live .live-dot {
+  animation: omniscience-live-breath 1.6s ease-in-out infinite;
+}
+
+@keyframes omniscience-live-breath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* running list rows: breath on their status dot only */
+.rl-dot-running {
+  animation: omniscience-live-breath 1.6s ease-in-out infinite;
+}
+
+/* sessions working now: keep pulse, retuned to 2s, 0.55 <-> 1 */
+.session-item.is-live .session-title {
+  animation: omniscience-session-pulse 2s ease-in-out infinite;
+}
+
+@keyframes omniscience-session-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* ---- 5. Expand/collapse of list turns ---- */
+/* No open-state class exists in the provided CSS for the steps block,
+   so the fade/translate reveal is intentionally skipped. The caret
+   rotation already exists in RunList.css. */
+
+/* ---- 6. Loading: quiet opacity breath ---- */
+
+.stage-overlay {
+  animation: omniscience-loading-breath 1.6s ease-in-out infinite;
+}
+
+@keyframes omniscience-loading-breath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ---- 7. Selected row: brass left rule fading full -> 40% (420ms) ---- */
+
+.rl-step.rl-selected {
+  outline: none;
+  background: var(--panel);
+  animation: omniscience-select-rule 420ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+}
+
+@keyframes omniscience-select-rule {
+  0%   { box-shadow: inset 2px 0 0 var(--accent); }
+  100% { box-shadow: inset 2px 0 0 rgba(232, 176, 75, 0.4); }
+}
+
+/* ---- 8. Replay "now" line: 420ms ease ---- */
+
+.rl-now-line {
+  transition:
+    top 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---- Reduced motion: no transitions/animations, instant state only ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  /* keep the selected brass rule as an instant state */
+  .rl-step.rl-selected {
+    box-shadow: inset 2px 0 0 rgba(232, 176, 75, 0.4);
+  }
+
+  /* keep live indicators visible at full opacity */
+  .live-badge.is-live .live-dot,
+  .rl-dot-running,
+  .session-item.is-live .session-title,
+  .stage-overlay {
+    opacity: 1;
+  }
+}

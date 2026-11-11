@@ -1,0 +1,1153 @@
+/* web/src/theme/pass2-type.css
+   PASS 2 — TYPE ONLY. Loaded after styles.css, component CSS, pass1-composition.css.
+   Overrides ONLY: font-family, font-size, font-weight, line-height, letter-spacing,
+   text-transform, font-variant-numeric, text-wrap.
+   System stacks only. Nothing below 11px. */
+
+/* ---------- tokens ---------- */
+:root {
+  --font-ui: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* ---------- base ---------- */
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  font-weight: 400;
+}
+
+/* ---------- brand ---------- */
+.brand-mark {
+  font-size: 18px;
+}
+
+.brand-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.brand-sub {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- top bar ---------- */
+.top-metrics {
+  font-size: 12px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric b {
+  font-weight: 600;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.replay-badge {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- rail / session list ---------- */
+.rail-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.rail-count {
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-muted,
+.rail-error {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.session-start {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-sub {
+  font-size: 11px;
+}
+
+.session-model {
+  font-size: 11px;
+}
+
+.session-id {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.session-meta {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-title {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.activity-summary {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-filters {
+  font-size: 13px;
+}
+
+.session-age {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-empty {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.rail-empty code {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.rail-expand {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rail-collapse {
+  line-height: 1;
+}
+
+.popout-link {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* warnings panel */
+.warnings-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.warnings-sub {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.warning-occurrences {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warning-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.warning-happened {
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warning-meaning {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.warning-severity {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* slowest panel */
+.slowest-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.slowest-row {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.slowest-time {
+  font-size: 12px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.slowest-empty {
+  font-size: 12px;
+}
+
+/* why panel */
+.why-answer {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.why-link {
+  font-size: 12px;
+}
+
+/* ---------- stage ---------- */
+.stage-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.chip {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.stage-overlay {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.stage-window-note {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-zoom-hint {
+  font-size: 12px;
+}
+
+/* graph nodes */
+.gnode-gap .gnode-title {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.fold-button {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 16px;
+}
+
+.gnode-kind {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.gnode-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.gnode-sub {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.gnode-metrics {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.gnode-metrics b {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.retry-badge {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- inspector ---------- */
+.inspector-empty {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.inspector-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.inspector-id {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector h3 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.inspector-kind {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.inspector-sentence {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.inspector-capture-note {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.inspector-close {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* kv tables — data is mono, tabular */
+table.kv {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+table.kv th {
+  font-weight: 500;
+  font-size: 11px;
+}
+
+table.kv.compact th,
+table.kv.compact td {
+  font-size: 11px;
+}
+
+table.kv.friendly th {
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+table.kv.friendly td {
+  font-size: 12px;
+}
+
+.event-ids {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.event-card-head {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-kind {
+  font-weight: 600;
+}
+
+.event-card-head .muted {
+  font-size: 11px;
+}
+
+.attrs-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+pre.attrs {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-timeline {
+  font-size: 12px;
+}
+
+.event-timeline summary {
+  font-weight: 600;
+}
+
+/* what went wrong */
+.what-went-wrong .www-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.what-went-wrong p {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tech-details summary {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+/* ---------- transport / replay bar ---------- */
+.transport {
+  font-size: 12px;
+}
+
+.replay-mode {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.replay-pos {
+  font-size: 12px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.live-button {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- help ---------- */
+.help-button {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.help-head {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 22px;
+}
+
+.help-close {
+  font-size: 14px;
+}
+
+.help-body h2 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.help-body p {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.help-defs dt {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.help-defs dd {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.help-ok {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ---------- legend ---------- */
+.legend-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.legend-item {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.legend-kind {
+  font-size: 12px;
+}
+
+/* ---------- summary fold ---------- */
+.summary-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.summary-toggle-digest {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.summary-sentence {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.summary-line {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.summary-status {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.summary-item b {
+  font-weight: 500;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-hint {
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.summary-next-error,
+.summary-prev-error {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.now-line {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* time split */
+.time-split {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-split-label {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.time-split-partial {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* failure nav */
+.failure-nav {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.failure-nav button {
+  font-size: 12px;
+}
+
+/* all chats toggle */
+.all-chats {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- top bar icon buttons ---------- */
+.icon-button {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ---------- ContextView ---------- */
+.cx-wrap {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-note {
+  font-size: 12px;
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.cx-axis {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-tip {
+  font-size: 12px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- CoverageView ---------- */
+.cv-root {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cv-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  font-family: var(--font-ui);
+}
+
+.cv-badge {
+  font-size: 11px;
+}
+
+.cv-intro {
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.cv-mark {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.cv-check-label {
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+.cv-check-detail {
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.cv-notes-title,
+.cv-kinds-title {
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+.cv-note {
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.cv-table th {
+  font-weight: 600;
+  font-size: 11px;
+  font-family: var(--font-ui);
+}
+
+/* ---------- FlameView ---------- */
+.fl-root {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-toolbar {
+  font-size: 12px;
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.fl-reset {
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.fl-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- HelpersView ---------- */
+.hp {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hp-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  font-family: var(--font-ui);
+}
+
+.hp-parallel {
+  font-size: 12px;
+  font-family: var(--font-ui);
+}
+
+.hp-note {
+  font-size: 12px;
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.hp-axis {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hp-lane-label {
+  font-size: 11px;
+  line-height: 16px;
+  font-family: var(--font-ui);
+}
+
+.hp-status {
+  font-size: 11px;
+}
+
+/* ---------- MiniLive ---------- */
+.ml-root {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ml-status {
+  line-height: 18px;
+}
+
+.ml-notlive {
+  font-size: 12px;
+}
+
+.ml-empty {
+  line-height: 18px;
+}
+
+.ml-now {
+  line-height: 18px;
+}
+
+.ml-badge {
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.ml-step {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.ml-step-dur {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ml-pause {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.ml-btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+/* ---------- PrivacyPanel ---------- */
+.pp-dialog {
+  font-family: var(--font-ui);
+}
+
+.pp-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.pp-close {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.pp-h3 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.pp-list {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.pp-code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.pp-btn {
+  font-family: inherit;
+  font-size: 13px;
+}
+
+/* ---------- RunList ---------- */
+.rl-root {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rl-earlier {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.rl-pill {
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- SettingsPanel ---------- */
+.sp-head h2 {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.sp-dialog h3 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.sp-close {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sp-row {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.sp-row select {
+  font-size: 13px;
+}
+
+.sp-muted {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.sp-commands {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.sp-commands code {
+  font-family: var(--mono);
+}
+
+.sp-link {
+  font-size: 12px;
+}
+
+/* ---------- TimeView ---------- */
+.tv-root {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-findings-empty {
+  font-size: 12px;
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.tv-finding {
+  font-size: 12px;
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.tv-zoom-label {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-tick-text {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-lane-label {
+  font-size: 11px;
+  line-height: 16px;
+  font-family: var(--font-ui);
+}
+
+/* ---------- TokensView ---------- */
+.tk-root {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-stat {
+  line-height: 16px;
+}
+
+.tk-stat-num {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-stat-lbl {
+  font-size: 11px;
+  text-transform: none;
+  font-family: var(--font-ui);
+}
+
+.tk-note {
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.tk-h {
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+.tk-bar-row {
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.tk-badge {
+  font-size: 11px;
+}
+
+.tk-bar-right {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-table {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-table thead th {
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+/* ---------- ToolsView ---------- */
+.tl-wrap {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-note {
+  font-size: 12px;
+  line-height: 18px;
+  font-family: var(--font-ui);
+}
+
+.tl-server {
+  font-size: 12px;
+}
+
+.tl-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  line-height: 16px;
+  font-family: var(--font-ui);
+}
+
+.tl-name {
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+.tl-pill {
+  font-size: 11px;
+}
+
+.tl-bar-label {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-args {
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.tl-failbtn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+/* ---------- VerdictHeader — the one human moment ---------- */
+.vh-pill {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.vh-headline {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.vh-reason {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.vh-legend {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.vh-show-me {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* The chat title is a name, not a section heading. */
+.stage-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-ui);
+}

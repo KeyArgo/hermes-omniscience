@@ -1,0 +1,8 @@
+
+/* Glance facts: each is a recorded value, and each carries a label so colour never has to. */
+.ctx-strip-model { color: var(--ink-dim); font-size: var(--type-xs); font-family: var(--font-mono); }
+.ctx-strip-press { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.ctx-strip-press.is-warm { color: var(--warn); }
+.ctx-strip-press.is-hot { color: var(--err); font-weight: 600; }
+.ctx-strip-cache { color: var(--ok); }
+.ctx-strip-err { color: var(--err); }

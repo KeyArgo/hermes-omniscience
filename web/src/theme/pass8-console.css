@@ -1,0 +1,395 @@
+/*
+ * Pass 8 — "console": a second face for the same data.
+ *
+ * Nothing here changes markup or behaviour: it re-points the colour and surface
+ * tokens and adds a few technical details (a faint grid, corner ticks, a live
+ * dot) so the viewer reads like an instrument panel. Everything is opt-in via
+ * <html data-theme="console">; the warm "paper" face stays the untouched base.
+ *
+ * Deliberately NOT used: gradient text, letter-spaced all-caps labels, neon on
+ * every element, glow around body text. Glow marks state, not decoration.
+ */
+
+:root[data-theme="console"] {
+  --bg: #04060b;
+  --bg-2: #070b14;
+  --bg-3: #0b1220;
+  --panel: #070b14;
+  --panel-2: #0b1220;
+  --line: #131c2e;
+  --line-2: #1d2b45;
+
+  --text: #dfe9f5;
+  --text-dim: #8fa3bd;
+  --muted: #9fb2c9;
+  --dim: #788ca4;
+
+  --accent: #3ee6ff;
+  --cyan: #3ee6ff;
+  --green: #45f0a3;
+  --amber: #ffc352;
+  --red: #ff5c78;
+  --violet: #a578ff;
+
+  --chart-model: #3ee6ff;
+  --chart-tool: #a578ff;
+  --chart-selected: #ffffff;
+  --chart-fail: var(--red);
+
+  --shadow-float: 0 0 0 1px rgba(62, 230, 255, 0.16), 0 18px 50px -24px rgba(0, 0, 0, 0.9);
+  --shadow-seam: 0 1px 0 rgba(62, 230, 255, 0.06);
+
+  --grid-line: rgba(62, 230, 255, 0.045);
+  --glow: rgba(62, 230, 255, 0.55);
+}
+
+/* The field: a faint technical grid, brightest behind the top of the page. */
+:root[data-theme="console"] body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(900px 380px at 18% -8%, rgba(62, 230, 255, 0.07), transparent 70%),
+    radial-gradient(700px 320px at 92% -4%, rgba(165, 120, 255, 0.06), transparent 72%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+}
+
+:root[data-theme="console"] ::selection {
+  background: rgba(62, 230, 255, 0.24);
+  color: #ffffff;
+}
+
+/* Panels: a hairline of light on top, a shadow that reads as depth, no fill gradient. */
+:root[data-theme="console"] .panel,
+:root[data-theme="console"] .event-card,
+:root[data-theme="console"] .fr-root,
+:root[data-theme="console"] .tk-root section,
+:root[data-theme="console"] .sp-dialog,
+:root[data-theme="console"] .help-panel {
+  border-color: var(--line);
+  box-shadow: inset 0 1px 0 rgba(62, 230, 255, 0.07), 0 10px 30px -22px rgba(0, 0, 0, 0.9);
+}
+
+/* Top bar: the one place that gets a glow, because it is the instrument's face. */
+:root[data-theme="console"] .topbar {
+  border-bottom-color: var(--line-2);
+  box-shadow: 0 1px 0 rgba(62, 230, 255, 0.1), 0 12px 40px -32px var(--glow);
+}
+
+:root[data-theme="console"] .brand-mark {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(62, 230, 255, 0.45);
+}
+
+:root[data-theme="console"] .brand-name {
+  letter-spacing: 0.01em;
+}
+
+:root[data-theme="console"] .brand-sub {
+  color: var(--dim);
+}
+
+/* Chips and the one action button: cyan rules, cyan only when on. */
+:root[data-theme="console"] .chip {
+  border-color: var(--line-2);
+  background: rgba(7, 11, 20, 0.72);
+  color: var(--muted);
+}
+
+:root[data-theme="console"] .chip:hover {
+  border-color: rgba(62, 230, 255, 0.42);
+  color: var(--text);
+}
+
+:root[data-theme="console"] .chip.is-active {
+  border-color: rgba(62, 230, 255, 0.7);
+  background: rgba(62, 230, 255, 0.1);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(62, 230, 255, 0.18), 0 0 18px -10px var(--glow);
+}
+
+:root[data-theme="console"] .icon-button,
+:root[data-theme="console"] .help-button {
+  border-color: var(--line-2);
+  color: var(--muted);
+}
+
+:root[data-theme="console"] .icon-button:hover,
+:root[data-theme="console"] .help-button:hover {
+  border-color: rgba(62, 230, 255, 0.5);
+  color: var(--accent);
+}
+
+/* The mini-panel button reads as a mode switch, not another word in a row. */
+:root[data-theme="console"] .mini-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-inline: 10px;
+}
+
+:root[data-theme="console"] .mini-glyph {
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(62, 230, 255, 0.5);
+}
+
+:root[data-theme="console"] .mini-chip.is-active,
+:root[data-theme="console"] .mini-chip.is-active .mini-label {
+  color: var(--text);
+}
+
+:root[data-theme="console"] .mini-label {
+  font-size: 12.5px;
+  /* The chips are upper-cased by the type pass; this label is a sentence. */
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Numbers are numbers: tabular, monospaced, quietly cyan. */
+:root[data-theme="console"] .tk-count b,
+:root[data-theme="console"] .fr-summary,
+:root[data-theme="console"] .fr-pressure-line,
+:root[data-theme="console"] .cx-axis,
+:root[data-theme="console"] .tm-axis {
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-theme="console"] .fr-summary {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--accent);
+  opacity: 0.92;
+}
+
+/* The follow rail: a scan column. Each row is a channel with a live strip. */
+:root[data-theme="console"] .fr-root {
+  background: linear-gradient(180deg, rgba(62, 230, 255, 0.035), transparent 120px), var(--panel);
+}
+
+:root[data-theme="console"] .fr-title {
+  color: var(--text);
+}
+
+:root[data-theme="console"] .fr-title::before {
+  content: "◉";
+  margin-right: 6px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--glow);
+  animation: console-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes console-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="console"] .fr-title::before {
+    animation: none;
+  }
+}
+
+:root[data-theme="console"] .fr-spark-bar {
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+:root[data-theme="console"] .fr-spark-bad .fr-spark-bar,
+:root[data-theme="console"] .fr-spark-warn .fr-spark-bar {
+  background: currentColor;
+}
+
+:root[data-theme="console"] .fr-row {
+  border-top-color: var(--line);
+}
+
+:root[data-theme="console"] .fr-row:hover {
+  background: rgba(62, 230, 255, 0.04);
+}
+
+:root[data-theme="console"] .fr-dot {
+  box-shadow: 0 0 8px currentColor;
+}
+
+:root[data-theme="console"] .fr-pressure {
+  border-color: var(--line-2);
+  background: rgba(62, 230, 255, 0.04);
+}
+
+:root[data-theme="console"] .fr-pressure.is-compact {
+  border-color: rgba(255, 92, 120, 0.55);
+  background: rgba(255, 92, 120, 0.07);
+}
+
+:root[data-theme="console"] .fr-pressure.is-watch {
+  border-color: rgba(255, 195, 82, 0.5);
+  background: rgba(255, 195, 82, 0.06);
+}
+
+/* The picker: things that exist in this chat, offered as one-click channels. */
+:root[data-theme="console"] .fr-pick-head {
+  color: var(--dim);
+}
+
+:root[data-theme="console"] .fr-pick ul {
+  display: grid;
+  gap: 4px;
+}
+
+:root[data-theme="console"] .fr-pick button {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(62, 230, 255, 0.03);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+:root[data-theme="console"] .fr-pick button:hover {
+  border-color: rgba(62, 230, 255, 0.55);
+  background: rgba(62, 230, 255, 0.08);
+}
+
+:root[data-theme="console"] .fr-pick-plus {
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+:root[data-theme="console"] .fr-pick-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-theme="console"] .fr-pick-kind {
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-transform: lowercase;
+}
+
+:root[data-theme="console"] .fr-pick-count {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Charts: grid lines and series take the palette without shouting. */
+:root[data-theme="console"] .cx-grid line,
+:root[data-theme="console"] .cx-axis line {
+  stroke: var(--line-2);
+}
+
+:root[data-theme="console"] .cx-line {
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 6px rgba(62, 230, 255, 0.35));
+}
+
+:root[data-theme="console"] .cx-area {
+  fill: rgba(62, 230, 255, 0.1);
+}
+
+/* Focus: one clear ring, never a glow on text. */
+:root[data-theme="console"] :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Tables and tokens view keep their density; only the rules change. */
+:root[data-theme="console"] .tk-chat.is-selected,
+:root[data-theme="console"] .tk-chat:hover {
+  background: rgba(62, 230, 255, 0.05);
+}
+
+:root[data-theme="console"] .tk-bar-fill {
+  background: linear-gradient(90deg, rgba(62, 230, 255, 0.75), rgba(165, 120, 255, 0.75));
+}
+
+:root[data-theme="console"] .pr-banner {
+  border-left-width: 3px;
+}
+
+:root[data-theme="console"] .pr-compact {
+  background: rgba(255, 92, 120, 0.08);
+  border-color: rgba(255, 92, 120, 0.5);
+}
+
+:root[data-theme="console"] .pr-watch {
+  background: rgba(255, 195, 82, 0.07);
+  border-color: rgba(255, 195, 82, 0.42);
+}
+
+/* The rail's own chrome reaches the 12px floor in this face. */
+:root[data-theme="console"] .fr-pressure-label,
+:root[data-theme="console"] .fr-pick-head,
+:root[data-theme="console"] .fr-editor-hint,
+:root[data-theme="console"] .fr-foot {
+  font-size: 12px;
+}
+
+/* Buttons the older passes left bare shouldn't look like browser defaults. */
+:root[data-theme="console"] .vh-show-me,
+:root[data-theme="console"] .sp-link {
+  padding: 4px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: rgba(62, 230, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+:root[data-theme="console"] .vh-show-me:hover,
+:root[data-theme="console"] .sp-link:hover {
+  border-color: rgba(62, 230, 255, 0.55);
+  color: var(--accent);
+}
+
+/* The session list is a data view: 12px floor for its numbers. */
+:root[data-theme="console"] .session-meta,
+:root[data-theme="console"] .sess-meta {
+  font-size: 11.5px;
+}
+
+/* The session list's secondary line is information, not decoration. */
+:root[data-theme="console"] .session-outcome,
+:root[data-theme="console"] .session-meta,
+:root[data-theme="console"] .session-sep {
+  color: var(--muted);
+}
+
+:root[data-theme="console"] .session-title {
+  color: var(--text);
+}
+
+/* Rail rows get room to breathe: a label, a strip and a last-hit line are three
+   different things and read as one blur when they are packed tight. */
+:root[data-theme="console"] .fr-row {
+  padding-block: 8px;
+}
+
+:root[data-theme="console"] .fr-label {
+  color: var(--text);
+}
+
+:root[data-theme="console"] .fr-last {
+  color: var(--dim);
+}
+
+/* Chat cards: a hairline between them so the count row is not read as a footer. */
+:root[data-theme="console"] .tk-chat + .tk-chat {
+  border-top: 1px solid var(--line);
+}

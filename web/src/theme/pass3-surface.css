@@ -1,0 +1,1092 @@
+/* ==========================================================================
+   PASS 3 — SURFACE ONLY (BLACK BOX direction)
+   Color, light, borders, shadows. Loaded last. No layout/size/font changes.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. TOKENS — redefine in place so every existing rule follows.
+   -------------------------------------------------------------------------- */
+:root {
+  /* base surfaces */
+  --bg: #0c0b0a;
+  --panel: #121110;
+  --panel-2: #181715;
+  --line: #26231f;
+  --line-2: #33302b;
+
+  /* ink */
+  --text: #e8e3da;
+  --muted: #a39d92;   /* AA 4.5:1 on --panel */
+  --dim: #6f6a62;
+
+  /* single accent — brass. Used only for focus, verdict rule, active chip, selected row. */
+  --accent: #e8b04b;
+
+  /* remap the old "everything cyan" to quiet neutral ink */
+  --cyan: #d9d4ca;
+
+  /* semantics at ~60% chroma — text/dots/2px rules only */
+  --green: #8fae86;
+  --amber: #c9a35a;
+  --red: #c7695f;
+
+  /* chart inks */
+  --chart-model: #d9d4ca;
+  --chart-tool: #8a847a;
+  --chart-selected: var(--accent);
+  --chart-fail: var(--red);
+
+  /* shadows */
+  --shadow-float: 0 1px 0 rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+  --shadow-seam: 0 1px 0 rgba(0, 0, 0, .4);
+}
+
+/* --------------------------------------------------------------------------
+   2. PAGE — warm near-black, single very subtle vertical vignette.
+   -------------------------------------------------------------------------- */
+body {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, .22), transparent 40%),
+    var(--bg);
+  color: var(--text);
+}
+
+::selection {
+  background: rgba(232, 176, 75, .30);
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   3. TOP BAR / BRAND / LIVE BADGES
+   -------------------------------------------------------------------------- */
+.topbar {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-seam);
+}
+
+.brand-mark { color: var(--text); }
+.brand-sub { color: var(--muted); }
+.top-metrics { color: var(--muted); }
+.metric b { color: var(--text); }
+
+.live-badge { border: 1px solid var(--line-2); color: var(--muted); }
+.live-dot { background: currentColor; box-shadow: none; }
+
+.live-badge.is-live { color: var(--green); border-color: rgba(143, 174, 134, .5); }
+.live-badge.is-live .live-dot { box-shadow: none; }
+
+.live-badge.is-recorded { color: var(--amber); border-color: rgba(201, 163, 90, .5); }
+.live-badge.is-recorded .live-dot { box-shadow: none; }
+
+.live-badge.is-disconnected { color: var(--red); border-color: rgba(199, 105, 95, .5); }
+.live-badge.is-disconnected .live-dot { box-shadow: none; }
+
+.replay-badge { color: var(--amber); border: 1px solid rgba(201, 163, 90, .5); }
+
+/* --------------------------------------------------------------------------
+   4. RAILS / SESSIONS
+   -------------------------------------------------------------------------- */
+.rail-left, .rail-right { background: var(--panel); }
+.rail-left { border-right: 1px solid var(--line); }
+.rail-right { border-left: 1px solid var(--line); }
+
+.rail-head { color: var(--muted); border-bottom: 1px solid var(--line); }
+.rail-count { color: var(--dim); }
+.rail-muted { color: var(--muted); }
+.rail-error { color: var(--red); }
+
+.session-item {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+}
+.session-item:hover {
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+.session-item.is-active {
+  background: var(--panel-2);
+  border-color: var(--line-2);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.session-item.is-active .session-title { color: var(--text); }
+.session-item.is-live .session-title { color: var(--text); }
+
+.status-dot {
+  background: var(--st, var(--dim));
+  box-shadow: none;
+}
+.session-sub { color: var(--muted); }
+.session-sep { color: var(--dim); }
+.session-id { color: var(--dim); }
+.session-meta { color: var(--muted); }
+.session-title { color: var(--text); }
+.session-age { color: var(--muted); }
+
+.rail-empty { color: var(--muted); }
+.rail-empty code {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+/* --------------------------------------------------------------------------
+   5. STAGE / TOOLBAR / CHIPS
+   -------------------------------------------------------------------------- */
+.stage-toolbar {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.stage-title { color: var(--muted); }
+.stage-title .mono { color: var(--text); }
+
+.chip {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--muted);
+}
+.chip:hover {
+  color: var(--text);
+  border-color: var(--line-2);
+  background: var(--panel-2);
+}
+.chip.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: transparent;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.graph-surface .react-flow { background: transparent; }
+.stage-overlay {
+  color: var(--muted);
+  background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   6. REACT FLOW CHROME
+   -------------------------------------------------------------------------- */
+.react-flow__controls {
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-seam);
+}
+.react-flow__controls-button {
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  fill: var(--text);
+}
+.react-flow__controls-button:hover { background: var(--line); }
+
+.react-flow__minimap {
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+}
+
+/* --------------------------------------------------------------------------
+   7. NODES
+   -------------------------------------------------------------------------- */
+.gnode {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  box-shadow: var(--shadow-seam);
+}
+.gnode::before {
+  background: var(--accent, var(--line-2));
+  opacity: .85;
+}
+.gnode.is-selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(232, 176, 75, .35),
+    var(--shadow-seam);
+}
+.gnode.is-running {
+  border-color: var(--line-2);
+}
+
+.fold-button {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.fold-button:hover {
+  color: var(--text);
+  border-color: var(--line-2);
+}
+
+.gnode-kind { color: var(--muted); }
+.status-pill {
+  border: 1px solid var(--line-2);
+  color: var(--st, var(--muted));
+}
+.gnode-sub { color: var(--muted); }
+.gnode-metrics { color: var(--muted); }
+.gnode-metrics b { color: var(--text); }
+
+.retry-badge { color: var(--amber); border: 1px solid rgba(201, 163, 90, .5); }
+.error-text { color: var(--red); }
+.loss-text { color: var(--amber); }
+
+.gnode-handle {
+  border: 0;
+  background: var(--line-2);
+  opacity: .8;
+}
+.gnode.status-running .gnode-handle {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   8. INSPECTOR / KV / EVENTS
+   -------------------------------------------------------------------------- */
+.inspector-empty { color: var(--muted); }
+.inspector-id { color: var(--muted); }
+.inspector h3 { color: var(--muted); }
+.inspector-kind { color: var(--muted); }
+.inspector-sentence { color: var(--text); }
+.inspector-capture-note { color: var(--muted); }
+
+table.kv th, table.kv td { border-bottom: 1px solid var(--line); }
+table.kv th { color: var(--muted); }
+table.kv td { color: var(--text); }
+table.kv.friendly th { color: var(--muted); }
+
+.status-text { color: var(--st, var(--text)); }
+.event-ids { color: var(--muted); }
+
+.event-card {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.event-kind { color: var(--muted); }
+.attrs-label { color: var(--muted); }
+pre.attrs {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.event-timeline p { color: var(--muted); }
+.event-timeline time { color: var(--muted); }
+
+.what-went-wrong {
+  border: 1px solid rgba(199, 105, 95, .5);
+  border-left: 2px solid var(--red);
+  background: transparent;
+}
+.what-went-wrong .www-head { color: var(--red); }
+.what-went-wrong p { color: var(--text); }
+
+.tech-details {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.tech-details summary { color: var(--muted); }
+.tech-details summary:hover { color: var(--text); }
+
+/* --------------------------------------------------------------------------
+   9. REPLAY BAR
+   -------------------------------------------------------------------------- */
+.replay-bar {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-seam);
+}
+.transport {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+}
+.transport:hover:not(:disabled) {
+  border-color: var(--line-2);
+  box-shadow: none;
+}
+.transport:disabled { color: var(--dim); }
+
+.replay-mode { color: var(--muted); }
+.replay-mode.is-live { color: var(--green); }
+.replay-pos { color: var(--muted); }
+.replay-range:disabled { opacity: .4; }
+
+.speed-group { border: 1px solid var(--line-2); }
+.speed {
+  border: 0;
+  border-right: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.speed:last-child { border-right: 0; }
+.speed:hover { color: var(--text); }
+.speed.is-active {
+  background: transparent;
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.live-button {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.live-button.is-active {
+  color: var(--green);
+  border-color: rgba(143, 174, 134, .5);
+  box-shadow: none;
+}
+.live-button:hover { color: var(--text); }
+
+/* --------------------------------------------------------------------------
+   10. NARROW SCREENS / TOGGLES
+   -------------------------------------------------------------------------- */
+.sessions-toggle {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.sessions-toggle:hover { color: var(--text); }
+
+.inspector-close {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.inspector-close:hover { color: var(--text); }
+
+.rail-left { box-shadow: none; }
+.rail-backdrop.is-open { background: rgba(0, 0, 0, .55); }
+.rail-right {
+  border-top: 1px solid var(--line);
+  border-left: 0;
+  box-shadow: none;
+}
+.rail-right:not(.is-collapsed):hover { box-shadow: none; }
+.rail-left:not(.is-collapsed):hover { box-shadow: none; }
+
+.rail-expand { background: transparent; border: 0; color: var(--muted); }
+.rail-expand:hover { color: var(--text); }
+.rail-collapse {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.popout-link { color: var(--muted); border: 1px solid var(--line-2); }
+
+/* --------------------------------------------------------------------------
+   11. HELP
+   -------------------------------------------------------------------------- */
+.help-button {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.help-button:hover {
+  color: var(--text);
+  border-color: var(--line-2);
+  box-shadow: none;
+}
+.help-overlay { background: rgba(3, 5, 8, .72); }
+.help-panel {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  box-shadow: var(--shadow-float);
+}
+.help-head { border-bottom: 1px solid var(--line); color: var(--text); }
+.help-close {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--muted);
+}
+.help-close:hover { color: var(--text); }
+.help-body h2 { color: var(--text); }
+.help-body p { color: var(--text); }
+.help-defs dt { color: var(--muted); }
+.help-defs dd { color: var(--text); }
+.help-foot { border-top: 1px solid var(--line); }
+.help-ok {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--text);
+}
+.help-ok:hover { background: var(--panel); }
+
+/* --------------------------------------------------------------------------
+   12. LEGEND STRIP
+   -------------------------------------------------------------------------- */
+.legend {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.legend-toggle { border: 0; background: transparent; color: var(--muted); }
+.legend-toggle:hover { color: var(--text); }
+.legend-item { color: var(--muted); }
+.legend-kind-session { color: var(--text); }
+.legend-kind-turn { color: var(--muted); }
+.legend-kind-llm { color: var(--text); }
+.legend-kind-group { color: var(--muted); }
+.legend-kind-tool { color: var(--dim); }
+.legend-gap, .legend-kind-gap { color: var(--amber); }
+.legend-sep { background: var(--line-2); }
+.legend-dot {
+  background: var(--st, var(--dim));
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   13. SUMMARY BAR
+   -------------------------------------------------------------------------- */
+.summary-bar {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.summary-sentence { color: var(--text); }
+.summary-line { color: var(--muted); }
+
+.summary-status {
+  border: 1px solid var(--st, var(--line-2));
+  color: var(--st, var(--text));
+}
+.summary-status.is-ok { color: var(--green); }
+.summary-status.is-running { color: var(--muted); }
+.summary-status.is-error { color: var(--red); }
+.summary-status.is-warn { color: var(--amber); }
+
+.summary-item b { color: var(--text); }
+.summary-hint { color: var(--amber); }
+
+.summary-next-error,
+.summary-prev-error {
+  border: 1px solid rgba(199, 105, 95, .5);
+  background: transparent;
+  color: var(--red);
+}
+.summary-next-error:hover,
+.summary-prev-error:hover {
+  background: var(--panel-2);
+  box-shadow: none;
+}
+
+.now-line { color: var(--muted); }
+.now-pulse {
+  background: var(--accent);
+  box-shadow: none;
+}
+.time-split { color: var(--muted); }
+.time-split-bar { background: var(--line); }
+.time-split-partial { color: var(--amber); }
+
+.summary-toggle {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.summary-toggle:hover { color: var(--text); }
+.summary-toggle-digest { color: var(--text); }
+
+/* --------------------------------------------------------------------------
+   14. ALL-CHATS / FAILURE NAV / SELECTED ROW
+   -------------------------------------------------------------------------- */
+.all-chats {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--muted);
+}
+.all-chats.is-active {
+  background: transparent;
+  border-color: var(--line-2);
+  color: var(--muted);
+}
+
+.failure-nav { color: var(--red); }
+.failure-nav button {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+}
+.failure-nav button:hover { border-color: var(--red); }
+
+.rl-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background: var(--panel-2) !important;
+}
+
+/* --------------------------------------------------------------------------
+   15. ICON BUTTONS
+   -------------------------------------------------------------------------- */
+.icon-button {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.icon-button:hover {
+  color: var(--text);
+  border-color: var(--line-2);
+}
+
+/* --------------------------------------------------------------------------
+   16. WARNINGS PANEL
+   -------------------------------------------------------------------------- */
+.warnings { border-bottom: 1px solid var(--line); }
+.warnings-title { color: var(--text); }
+.warnings-sub { color: var(--muted); }
+
+.warning-item {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.warning-item:hover { border-color: var(--line-2); }
+.warning-meaning { color: var(--muted); }
+
+.warning-severity {
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.warning-severity.severity-error,
+.warning-severity.severity-high {
+  color: var(--red);
+  border-color: rgba(199, 105, 95, .5);
+}
+.warning-severity.severity-warn,
+.warning-severity.severity-medium {
+  color: var(--amber);
+  border-color: rgba(201, 163, 90, .5);
+}
+
+.slowest-head { color: var(--muted); }
+.slowest-row {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.slowest-row:hover { border-color: var(--line-2); }
+.slowest-time { color: var(--text); }
+.slowest-empty { color: var(--muted); }
+
+.why-answer { color: var(--muted); }
+.why-answer p { color: var(--text); }
+.why-link {
+  background: none;
+  border: none;
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   17. STAGE NOTE / ACTIVITY / ZOOM HINT
+   -------------------------------------------------------------------------- */
+.stage-window-note {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.activity-summary { color: var(--muted); }
+.activity-summary strong { color: var(--text); }
+.graph-zoom-hint {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   18. VERDICT HEADER — brass left rule only
+   -------------------------------------------------------------------------- */
+.vh-container {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  box-shadow: var(--shadow-seam);
+}
+.vh-headline { color: var(--text); }
+.vh-reason { color: var(--muted); }
+.vh-time-bar { background: var(--panel); }
+.vh-legend { color: var(--dim); }
+.vh-show-me {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-2);
+}
+.vh-show-me:hover {
+  background: var(--panel);
+  border-color: var(--line-2);
+}
+
+/* --------------------------------------------------------------------------
+   19. CONTEXT VIEW
+   -------------------------------------------------------------------------- */
+.cx-wrap {
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.cx-note {
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line-2);
+}
+.cx-note-empty { color: var(--muted); }
+.cx-grid { stroke: var(--line); }
+.cx-axis { fill: var(--dim); }
+.cx-bound { stroke: var(--line-2); opacity: .6; }
+.cx-area { fill: var(--chart-model); stroke: none; opacity: .18; }
+.cx-cached { fill: var(--green); stroke: none; }
+.cx-line { fill: none; stroke: var(--chart-model); }
+.cx-point { fill: var(--chart-model); stroke: var(--panel); outline: none; }
+.cx-point:hover, .cx-point:focus { fill: var(--accent); }
+.cx-hover-line { stroke: var(--muted); }
+.cx-tip-bg { fill: var(--panel-2); stroke: var(--line-2); }
+.cx-tip { fill: var(--text); }
+
+/* --------------------------------------------------------------------------
+   20. COVERAGE VIEW
+   -------------------------------------------------------------------------- */
+.cv-root {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.cv-title { color: var(--text); }
+.cv-badge { border: 1px solid var(--line-2); }
+.cv-badge-ok {
+  color: var(--green);
+  border-color: rgba(143, 174, 134, .5);
+  background: transparent;
+}
+.cv-badge-warn {
+  color: var(--amber);
+  border-color: rgba(201, 163, 90, .5);
+  background: transparent;
+}
+.cv-intro { color: var(--muted); }
+.cv-check-item {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.cv-mark-ok { color: var(--green); }
+.cv-mark-warn { color: var(--amber); }
+.cv-check-label { color: var(--text); }
+.cv-check-detail { color: var(--muted); }
+.cv-notes {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+}
+.cv-notes-title { color: var(--amber); }
+.cv-notes-list { color: var(--muted); }
+.cv-kinds-title { color: var(--text); }
+.cv-empty { color: var(--dim); }
+.cv-table th, .cv-table td { border-bottom: 1px solid var(--line); }
+.cv-table th { color: var(--dim); }
+.cv-kind { color: var(--muted); }
+.cv-num { color: var(--text); }
+
+/* --------------------------------------------------------------------------
+   21. FLAME VIEW
+   -------------------------------------------------------------------------- */
+.fl-root {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.fl-toolbar {
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.fl-zoom-label { color: var(--dim); }
+.fl-reset {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line-2);
+}
+.fl-reset:hover {
+  border-color: var(--line-2);
+  color: var(--text);
+}
+.fl-canvas { background: var(--panel); }
+.fl-label { fill: var(--text); }
+
+/* --------------------------------------------------------------------------
+   22. HELPERS VIEW
+   -------------------------------------------------------------------------- */
+.hp {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.hp-empty { color: var(--muted); }
+.hp-title { color: var(--text); }
+.hp-parallel { color: var(--dim); }
+.hp-note { color: var(--muted); }
+.hp-axis {
+  color: var(--dim);
+  border-bottom: 1px solid var(--line-2);
+}
+.hp-bar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hp-bar-btn:hover .hp-lane-label { color: var(--text); }
+.hp-lane-label { color: var(--text); }
+.hp-status--ok { color: var(--green); }
+.hp-status--run { color: var(--muted); }
+.hp-status--fail { color: var(--red); }
+.hp-track {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+}
+.hp-bar--ok { background: var(--green); opacity: .75; }
+.hp-bar--run { background: var(--chart-model); opacity: .75; }
+.hp-bar--fail { background: var(--red); opacity: .75; }
+.hp-bar--open { opacity: .45; }
+
+/* --------------------------------------------------------------------------
+   23. MINI LIVE
+   -------------------------------------------------------------------------- */
+.ml-root {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.ml-dot { background: var(--dim); }
+.ml-dot-ok { background: var(--green); }
+.ml-dot-error { background: var(--red); }
+.ml-dot-warn { background: var(--amber); }
+.ml-dot-running { background: var(--accent); }
+.ml-dot-dim { background: var(--dim); }
+.ml-notlive { color: var(--muted); }
+.ml-empty { color: var(--muted); }
+.ml-now-label { color: var(--muted); }
+.ml-now-text { color: var(--text); }
+.ml-badge {
+  background: transparent;
+  border: 1px solid rgba(201, 163, 90, .5);
+  color: var(--amber);
+}
+.ml-steps {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.ml-steps-empty { color: var(--dim); }
+.ml-step {
+  background: transparent;
+  border: none;
+  color: var(--text);
+}
+.ml-step:hover { background: var(--line); }
+.ml-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ml-step-icon { color: var(--muted); }
+.ml-step-running { background: var(--accent); }
+.ml-step-dur { color: var(--muted); }
+.ml-pause {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.ml-pause:hover {
+  color: var(--text);
+  border-color: var(--line);
+}
+.ml-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  color: var(--text);
+}
+.ml-btn:hover { border-color: var(--line-2); }
+.ml-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --------------------------------------------------------------------------
+   24. PRIVACY PANEL
+   -------------------------------------------------------------------------- */
+.pp-backdrop { background: rgba(0, 0, 0, .6); }
+.pp-dialog {
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  color: var(--text);
+  box-shadow: var(--shadow-float);
+}
+.pp-header {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.pp-title { color: var(--text); }
+.pp-close {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.pp-close:hover {
+  color: var(--text);
+  border-color: var(--line);
+}
+.pp-h3 { color: var(--text); }
+.pp-list { color: var(--text); }
+.pp-code {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--amber);
+}
+.pp-footer {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.pp-btn {
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  color: var(--text);
+}
+.pp-btn:hover { border-color: var(--line-2); }
+.pp-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --------------------------------------------------------------------------
+   25. RUN LIST
+   -------------------------------------------------------------------------- */
+.rl-root {
+  color: var(--text);
+  background: var(--panel);
+}
+.rl-earlier {
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.rl-earlier:hover { border-color: var(--line-2); }
+.rl-turn { border-bottom: 1px solid var(--line); }
+.rl-turn.rl-dim { opacity: .45; }
+.rl-turn-head:hover { background: var(--panel-2); }
+.rl-caret { color: var(--dim); }
+.rl-dot { background: var(--dim); }
+.rl-dot-ok { background: var(--green); }
+.rl-dot-warn { background: var(--amber); }
+.rl-dot-error { background: var(--red); }
+.rl-dot-running { background: var(--accent); }
+.rl-turn-label { color: var(--text); }
+.rl-turn-summary { color: var(--muted); }
+.rl-pill {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.rl-steps { background: var(--panel-2); }
+.rl-step { border-left: 2px solid transparent; }
+.rl-step:hover { background: var(--panel); }
+.rl-step.rl-selected {
+  background: var(--panel);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.rl-step-icon { color: var(--muted); }
+.rl-step-label { color: var(--text); }
+.rl-step-detail { color: var(--muted); }
+.rl-step-dur { color: var(--dim); }
+.rl-now-line {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   26. SETTINGS PANEL
+   -------------------------------------------------------------------------- */
+.sp-backdrop { background: rgba(0, 0, 0, .6); }
+.sp-dialog {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: var(--shadow-float);
+}
+.sp-dialog h3 { color: var(--text); }
+.sp-close {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--muted);
+}
+.sp-row select {
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--text);
+}
+.sp-muted { color: var(--muted); }
+.sp-commands code {
+  background: var(--panel);
+  color: var(--text);
+}
+.sp-link {
+  border: 0;
+  background: none;
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   27. TIME VIEW — charts
+   -------------------------------------------------------------------------- */
+.tv-root {
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.tv-findings { border-bottom: 1px solid var(--line); }
+.tv-findings-empty { color: var(--muted); }
+.tv-finding { color: var(--text); }
+.tv-zoom-label { color: var(--muted); }
+.tv-zoom-val { color: var(--text); }
+.tv-scroll {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.tv-axis-row { border-bottom: 1px solid var(--line); }
+.tv-axis-label {
+  background: var(--panel-2);
+  border-right: 1px solid var(--line);
+}
+.tv-tick-line { background: var(--line-2); }
+.tv-tick-text { color: var(--dim); }
+.tv-lane-row { border-bottom: 1px solid var(--line); }
+.tv-lane-label {
+  background: var(--panel-2);
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+}
+.tv-bar-llm { background: var(--chart-model); opacity: .85; }
+.tv-bar-tool { background: var(--chart-tool); opacity: .9; }
+.tv-bar-helper { background: var(--chart-tool); opacity: .85; }
+.tv-bar-error { background: var(--chart-fail) !important; opacity: .95; }
+.tv-bar-running {
+  opacity: .5;
+  border: 1px dashed var(--muted);
+}
+.tv-bar-fallback { outline: 1px dashed var(--amber); }
+.tv-tick-mark { background: var(--red); }
+
+/* --------------------------------------------------------------------------
+   28. TOKENS VIEW
+   -------------------------------------------------------------------------- */
+.tk-root { color: var(--text); }
+.tk-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.tk-stat-lbl { color: var(--muted); }
+.tk-dot { color: var(--dim); }
+.tk-cyan { color: var(--chart-model); }
+.tk-amber { color: var(--amber); }
+.tk-green { color: var(--green); }
+.tk-muted { color: var(--muted); }
+.tk-stackbar {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.tk-seg-cached { background: var(--chart-model); }
+.tk-seg-fresh { background: var(--chart-tool); }
+.tk-seg-output { background: var(--green); }
+
+.tk-notes {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.tk-note { color: var(--text); }
+.tk-note::before { color: var(--muted); }
+
+.tk-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.tk-h { color: var(--muted); }
+.tk-bar-row {
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+.tk-bar-row:hover { background: var(--panel-2); }
+.tk-bar-model { color: var(--text); }
+.tk-badge {
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.tk-badge-background {
+  color: var(--amber);
+  border-color: rgba(201, 163, 90, .5);
+}
+.tk-badge-helper {
+  color: var(--muted);
+  border-color: var(--line-2);
+}
+.tk-bar-track { background: var(--panel-2); }
+.tk-bar-right { color: var(--muted); }
+.tk-empty { color: var(--dim); }
+
+.tk-table-wrap { border: 1px solid var(--line); }
+.tk-table th, .tk-table td { border-bottom: 1px solid var(--line); }
+.tk-table thead th {
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.tk-table tbody tr:last-child td { border-bottom: none; }
+.tk-model { color: var(--text); }
+
+/* --------------------------------------------------------------------------
+   29. TOOLS VIEW
+   -------------------------------------------------------------------------- */
+.tl-wrap { color: var(--text); }
+.tl-empty { color: var(--muted); }
+.tl-note { color: var(--muted); }
+.tl-server {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.tl-server-name { color: var(--text); }
+.tl-server-count { color: var(--muted); }
+.tl-server-fail { color: var(--red); }
+.tl-table {
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.tl-head {
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line-2);
+  color: var(--dim);
+}
+.tl-row {
+  border-bottom: 1px solid var(--line);
+  outline: none;
+}
+.tl-row:last-child { border-bottom: none; }
+.tl-row:hover, .tl-row:focus-visible { background: var(--panel-2); }
+.tl-fail { color: var(--red); }
+.tl-name { color: var(--text); }
+.tl-pill {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+}
+.tl-bar-track {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.tl-bar-fill { background: var(--green); }
+.tl-bar-label { color: var(--muted); }
+.tl-args { color: var(--muted); }
+.tl-dim { color: var(--dim); }
+.tl-failbtn {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--amber);
+}
+.tl-failbtn:hover { border-color: rgba(201, 163, 90, .5); }
+
+/* --------------------------------------------------------------------------
+   30. FOCUS — single brass ring, 2px, offset 2px
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Idle is not an alarm: "No recent activity" (recorded, not live) is neutral ink. */
+.live-badge.is-recorded {
+  color: var(--muted);
+  border-color: var(--line-2);
+  background: transparent;
+}
+.live-badge.is-recorded .live-dot {
+  background: var(--dim);
+  box-shadow: none;
+}

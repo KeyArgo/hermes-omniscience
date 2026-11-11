@@ -1,0 +1,109 @@
+{
+  "hook": "pre_api_request",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["agent/turn_api_request.py:70-105"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "task_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:1",
+        "user_message": "Summarize the repository layout.",
+        "conversation_history": [{"role": "user", "content": "Summarize the repository layout."}],
+        "platform": "cli",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "provider": "custom",
+        "base_url": "https://api.example.com/v1",
+        "api_mode": "chat_completions",
+        "api_call_count": 1,
+        "retry_count": 0,
+        "request_messages": [{"role": "user", "content": "Summarize the repository layout."}],
+        "system_prompt": "You are a helpful assistant.",
+        "message_count": 3,
+        "tool_count": 15,
+        "approx_input_tokens": 12971,
+        "request_char_count": 48213,
+        "max_tokens": 4096,
+        "started_at": 100.0,
+        "middleware_trace": [],
+        "request": {"model": "DeepSeek-V4.1-Flash-1017", "messages": []}
+      },
+      "expected": {
+        "kind": "llm.request",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:1",
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": null,
+        "attrs": {
+          "model": "DeepSeek-V4.1-Flash-1017",
+          "provider": "custom",
+          "api_mode": "chat_completions",
+          "api_call_count": 1,
+          "retry_count": 0,
+          "message_count": 3,
+          "tool_count": 15,
+          "approx_input_tokens": 12971,
+          "max_tokens": 4096,
+          "started_at": 100.0
+        }
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "task_id": "sa-0-2ad31b82",
+        "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+        "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:1",
+        "user_message": "Check the contract tests.",
+        "conversation_history": [{"role": "user", "content": "Check the contract tests."}],
+        "platform": "subagent",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "provider": "custom",
+        "base_url": "https://api.example.com/v1",
+        "api_mode": "chat_completions",
+        "api_call_count": 1,
+        "retry_count": 0,
+        "request_messages": [{"role": "user", "content": "Check the contract tests."}],
+        "system_prompt": "You are a helpful assistant.",
+        "message_count": 2,
+        "tool_count": 4,
+        "approx_input_tokens": 3210,
+        "request_char_count": 12044,
+        "max_tokens": 4096,
+        "started_at": 200.0,
+        "middleware_trace": [],
+        "request": {"model": "DeepSeek-V4.1-Flash-1017", "messages": []}
+      },
+      "expected": {
+        "kind": "llm.request",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+          "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:1",
+          "tool_call_id": null,
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": null,
+        "attrs": {
+          "model": "DeepSeek-V4.1-Flash-1017",
+          "provider": "custom",
+          "api_mode": "chat_completions",
+          "api_call_count": 1,
+          "retry_count": 0,
+          "message_count": 2,
+          "tool_count": 4,
+          "approx_input_tokens": 3210,
+          "max_tokens": 4096,
+          "started_at": 200.0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,104 @@
+.sp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
+}
+.sp-dialog {
+  width: min(560px, 100%);
+  padding: 16px 18px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+.sp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sp-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.sp-dialog h3 {
+  margin: 16px 0 8px;
+  color: var(--cyan);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.sp-close {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+.sp-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.sp-row select {
+  margin-left: auto;
+  padding: 3px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+}
+.sp-muted {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sp-commands {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.sp-commands code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--panel-2);
+  color: var(--cyan);
+  font-family: var(--mono);
+}
+.sp-link {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cyan);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* A quiet confirmation line under a setting that saves itself. */
+.sp-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted, #8a8478);
+}
+
+.sp-dialog section code {
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel-2, rgba(255, 255, 255, 0.06));
+}

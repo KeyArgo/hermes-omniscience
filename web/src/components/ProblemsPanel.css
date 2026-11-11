@@ -1,0 +1,124 @@
+/* Follow Problems: a pill in the corner, and the list only when asked for. */
+
+.pp-root {
+  position: fixed;
+  right: 18px;
+  bottom: 64px;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.pp-root > * { pointer-events: auto; }
+
+.pp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.pp-pill:hover { color: var(--text); border-color: var(--accent); }
+.pp-pill.has-problems { color: var(--text); border-color: #d97706; }
+
+.pp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4b5563;
+}
+.pp-pill.has-problems .pp-dot { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
+
+.pp-body {
+  width: min(420px, calc(100vw - 40px));
+  max-height: min(460px, 60vh);
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+.pp-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+.pp-head strong { font-size: 12.5px; }
+.pp-sub { color: var(--dim); font-size: 11px; }
+.pp-close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.pp-close:hover { color: var(--text); }
+
+.pp-empty { color: var(--dim); font-size: 12px; padding: 14px 12px; }
+.pp-list { list-style: none; margin: 0; padding: 0; }
+
+.pp-item { border-bottom: 1px solid var(--line); }
+.pp-item.is-open { background: rgba(61, 123, 255, 0.06); }
+
+.pp-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.pp-row:hover { background: rgba(255, 255, 255, 0.04); }
+.pp-title { flex: 1; line-height: 1.35; }
+.pp-when { color: var(--dim); font-size: 11px; white-space: nowrap; }
+
+.pp-detail { padding: 0 12px 10px 22px; }
+.pp-why { margin: 0 0 6px; padding-left: 14px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.pp-actions { margin: 0; padding-left: 18px; color: var(--text); font-size: 11.5px; line-height: 1.5; }
+
+.pp-foot {
+  display: flex;
+  gap: 8px;
+  padding: 9px 12px;
+  position: sticky;
+  bottom: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.pp-btn {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pp-btn:hover:not(:disabled) { border-color: var(--accent); }
+.pp-btn:disabled { opacity: 0.45; cursor: default; }

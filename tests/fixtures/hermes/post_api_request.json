@@ -1,0 +1,129 @@
+{
+  "hook": "post_api_request",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["agent/turn_response_intake.py:75-105"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "task_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:1",
+        "platform": "cli",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "provider": "custom",
+        "base_url": "https://api.example.com/v1",
+        "api_mode": "chat_completions",
+        "api_call_count": 1,
+        "api_duration": 2.5,
+        "started_at": 100.0,
+        "ended_at": 102.5,
+        "first_chunk_at": 100.75,
+        "finish_reason": "tool_calls",
+        "message_count": 3,
+        "response_model": "DeepSeek-V4.1-Flash-1017",
+        "response": {"model": "DeepSeek-V4.1-Flash-1017", "usage": {}},
+        "usage": {
+          "input_tokens": 12971,
+          "output_tokens": 144,
+          "cache_read_tokens": 512,
+          "cache_write_tokens": 128,
+          "reasoning_tokens": 32,
+          "total_tokens": 13115
+        },
+        "context_length": 131072,
+        "assistant_message": {"role": "assistant", "content": ""},
+        "assistant_content_chars": 0,
+        "assistant_tool_call_count": 1,
+        "moa_references": null
+      },
+      "expected": {
+        "kind": "llm.response",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "api_request_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2:api:1",
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": "ok",
+        "attrs": {
+          "duration_s": 2.5,
+          "started_at": 100.0,
+          "ended_at": 102.5,
+          "ttfb_s": 0.75,
+          "finish_reason": "tool_calls",
+          "response_model": "DeepSeek-V4.1-Flash-1017",
+          "usage": {
+            "input_tokens": 12971,
+            "output_tokens": 144,
+            "cache_read_tokens": 512,
+            "cache_write_tokens": 128,
+            "reasoning_tokens": 32,
+            "total_tokens": 13115
+          },
+          "tool_call_count": 1
+        }
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "task_id": "sa-0-2ad31b82",
+        "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+        "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:1",
+        "platform": "subagent",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "provider": "custom",
+        "base_url": "https://api.example.com/v1",
+        "api_mode": "chat_completions",
+        "api_call_count": 1,
+        "api_duration": 1.25,
+        "started_at": 200.0,
+        "ended_at": 201.25,
+        "first_chunk_at": 200.4,
+        "finish_reason": "stop",
+        "message_count": 2,
+        "response_model": "DeepSeek-V4.1-Flash-1017",
+        "response": {"model": "DeepSeek-V4.1-Flash-1017", "usage": {}},
+        "usage": {
+          "input_tokens": 3210,
+          "output_tokens": 88,
+          "total_tokens": 3298
+        },
+        "context_length": 131072,
+        "assistant_message": {"role": "assistant", "content": "Two tests fail: contract and viewer."},
+        "assistant_content_chars": 36,
+        "assistant_tool_call_count": 0,
+        "moa_references": null
+      },
+      "expected": {
+        "kind": "llm.response",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+          "api_request_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a:api:1",
+          "tool_call_id": null,
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": "ok",
+        "attrs": {
+          "duration_s": 1.25,
+          "started_at": 200.0,
+          "ended_at": 201.25,
+          "ttfb_s": 0.4,
+          "finish_reason": "stop",
+          "response_model": "DeepSeek-V4.1-Flash-1017",
+          "usage": {
+            "input_tokens": 3210,
+            "output_tokens": 88,
+            "total_tokens": 3298
+          },
+          "tool_call_count": 0
+        }
+      }
+    }
+  }
+}

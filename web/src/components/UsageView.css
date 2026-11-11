@@ -1,0 +1,449 @@
+/* The Usage page — a destination, not a panel. It gets its own heading and room to breathe. */
+
+.us-root {
+  padding: 16px 20px 28px;
+  max-width: 1180px;
+  font-size: 12px;
+  color: var(--text);
+  /* The shell is a 100vh grid with overflow hidden; without this the page simply ends at the fold
+     and everything below it — the harness table, the sources panel — is painted out of reach. */
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+/* The heading stays while the report scrolls under it. */
+.us-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: linear-gradient(180deg, var(--bg) 78%, transparent);
+  padding-top: 4px;
+}
+
+.us-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.us-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 3px;
+  letter-spacing: -0.01em;
+}
+
+.us-lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 62ch;
+}
+
+.us-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.us-periods {
+  display: inline-flex;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.us-period {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 9px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 0;
+  border-right: 1px solid var(--line-2);
+  cursor: pointer;
+}
+
+.us-period:last-child { border-right: 0; }
+.us-period:hover { color: var(--text); }
+.us-period.is-active { color: var(--text); background: var(--line-2); font-weight: 600; }
+
+.us-retry {
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.us-retry:hover { color: var(--text); border-color: var(--accent); }
+
+/* ---- headline numbers ---- */
+
+.us-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.us-stat {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.us-stat-label {
+  font-size: 10.5px;
+  color: var(--dim);
+  line-height: 1.3;
+}
+
+.us-stat-value {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- panels ---- */
+
+.us-panel {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 11px 12px 13px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.us-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.us-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 9px;
+  cursor: help;
+}
+
+.us-sub {
+  margin: 14px 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.us-note {
+  margin: 8px 0 0;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.us-empty, .us-error { color: var(--muted); padding: 20px 0; }
+.us-error { color: var(--danger, #f87171); }
+
+/* ---- calendar: one column per week, seven rows ---- */
+
+/* A real calendar: seven columns, one per weekday, and a cell that starts on its own day.
+   A vertical strip of squares says nothing; where a gap sits in the week is the useful part. */
+.us-weekdays {
+  max-width: 460px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 9.5px;
+  color: var(--dim);
+  text-align: center;
+}
+
+.us-calendar {
+  max-width: 460px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* The grid item is the tooltip wrapper; it has to fill its column or the cell is 0 px wide. */
+.us-calendar > .tip { display: block; width: 100%; min-width: 0; }
+
+.us-cell {
+  width: 100%;
+  height: 26px;
+  border-radius: 3px;
+  background: var(--line);
+  display: block;
+}
+
+.us-shade-0 { background: var(--line); }
+.us-shade-1 { background: color-mix(in oklab, var(--accent) 22%, transparent); }
+.us-shade-2 { background: color-mix(in oklab, var(--accent) 45%, transparent); }
+.us-shade-3 { background: color-mix(in oklab, var(--accent) 70%, transparent); }
+.us-shade-4 { background: var(--accent); }
+
+/* ---- daily bars ---- */
+
+.us-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  /* Fills the frame it lives in: the frame publishes the measured body height. A percentage here
+     would resolve against an auto-height box and collapse to the labels' height. */
+  height: calc(var(--pf-body-h, 240px) - 44px);
+  min-height: 70px;
+  padding-top: 4px;
+}
+
+.us-bar-col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.us-bar {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.us-band { display: block; width: 100%; flex-basis: 0; min-height: 1px; }
+.us-band-0 { background: var(--accent); }
+.us-band-1 { background: #7aa7ff; }
+.us-band-2 { background: #b6c7e6; }
+.us-band-3 { background: #6f7d94; }
+.us-band-4 { background: #4b5568; }
+.us-band-5 { background: #3a4152; }
+
+.us-bar-day {
+  font-size: 9.5px;
+  color: var(--dim);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.us-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.us-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.us-swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* ---- tables ---- */
+
+.us-table-wrap { overflow-x: auto; }
+
+.us-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.us-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--dim);
+  font-size: 10.5px;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+
+.us-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.us-table tbody tr:last-child td { border-bottom: 0; }
+.us-num { text-align: right; font-variant-numeric: tabular-nums; }
+.us-shape { color: var(--muted); }
+.us-chatrow { cursor: pointer; }
+.us-chatrow:hover td { background: var(--line); }
+
+/* ---- cache ---- */
+
+.us-cachebar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.us-cache-read {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.us-cachefacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.us-cachefacts strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---- context ---- */
+
+.us-histogram { display: flex; flex-direction: column; gap: 3px; }
+
+.us-hist-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 8px;
+}
+
+.us-hist-label { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.us-hist-track { height: 8px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.us-hist-fill { display: block; height: 100%; background: var(--accent); }
+.us-hist-count { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.us-compactions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.us-compactions li { display: flex; gap: 10px; align-items: baseline; color: var(--muted); }
+
+.us-link {
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.us-link:hover { text-decoration: underline; }
+
+.us-footer {
+  margin: 14px 0 0;
+  color: var(--dim);
+  font-size: 10.5px;
+}
+
+@media (max-width: 700px) {
+  .us-root { padding: 12px 12px 20px; }
+  .us-hist-row { grid-template-columns: 64px minmax(0, 1fr) 44px; }
+  .us-bars { height: 90px; }
+}
+
+/* A small qualifier after a heading or a label: "5 models", "2 switched on". */
+.us-hint-inline {
+  font-size: 11px;
+  font-weight: 450;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.us-notes {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 78ch;
+  margin: 0 0 12px;
+}
+
+/* By-harness share: a bar that reads as a proportion, not a second number to compare. */
+.us-share {
+  display: inline-block;
+  width: 84px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  margin-right: 8px;
+  vertical-align: middle;
+  overflow: hidden;
+}
+.us-share-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+/* Weekday × hour heatmap: 24 cells per row, one row per weekday. */
+.us-heat { display: grid; gap: 3px; margin-top: 4px; }
+.us-heat-row { display: grid; grid-template-columns: 34px repeat(24, 1fr); gap: 3px; align-items: center; }
+.us-heat-day { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.us-heat-cell {
+  display: block;
+  height: 16px;
+  min-width: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.07;
+}
+.us-heat-cell.is-on { background: var(--accent); }
+.us-heat-axis {
+  display: grid;
+  grid-template-columns: 34px repeat(24, 1fr);
+  gap: 3px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.us-heat-axis span:first-child { grid-column: 2; }
+.us-heat-axis span:not(:first-child) { grid-column: span 6; }
+
+/* Consent switches: one row per harness, with what it would read. */
+.us-source-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.us-source { padding: 8px 10px; border-radius: 6px; border: 1px solid transparent; }
+.us-source.is-on { border-color: var(--border); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.us-source-main { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.us-source-main input { accent-color: var(--accent); }
+.us-source-name { font-size: 13px; font-weight: 560; }
+.us-source-state { margin-left: auto; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.us-source-state.is-off { opacity: 0.7; }
+.us-source-note { display: block; font-size: 11px; line-height: 1.45; color: var(--muted); margin: 4px 0 0 28px; }
+.us-source-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* In focus the frame is the window, so the chart takes the window's height too. */
+.pf.is-focused .us-bars { height: calc(100vh - 260px); min-height: 240px; }
+
+.us-updated { color: var(--dim); font-size: 11px; align-self: center; margin-left: 8px; }

@@ -1,0 +1,37 @@
+{
+  "hook": "subagent_start",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["tools/delegate_tool.py:353-359"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "parent_session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "parent_turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "parent_subagent_id": null,
+        "child_session_id": "20261105_234903_b11152",
+        "child_subagent_id": "sa-0-2ad31b82",
+        "child_role": "leaf",
+        "child_goal": "Inspect tests/ and report failing cases."
+      },
+      "expected": {
+        "kind": "subagent.start",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": null,
+        "attrs": {
+          "child_session_id": "20261105_234903_b11152",
+          "child_subagent_id": "sa-0-2ad31b82",
+          "parent_turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+          "role": "leaf",
+          "goal_chars": 40
+        }
+      }
+    }
+  }
+}

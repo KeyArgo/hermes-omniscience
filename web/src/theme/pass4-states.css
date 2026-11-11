@@ -1,0 +1,19 @@
+/* Pass 4 states: the page always says what is going on (offline, not recorded yet). */
+.stage-state {
+  margin: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-2);
+  border-left: 2px solid var(--dim);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+.stage-state strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.stage-state.is-offline {
+  border-left-color: var(--red);
+}

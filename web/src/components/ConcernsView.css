@@ -1,0 +1,26 @@
+/* The Concerns page: counts always, prose only when asked. */
+
+.cv-root { height: 100%; min-height: 0; overflow-y: auto; padding: 18px 22px 40px; color: var(--text); }
+.cv-head h2 { margin: 0 0 6px; font-family: var(--font-serif); font-size: 20px; font-weight: 500; }
+.cv-sub { margin: 0 0 14px; max-width: 92ch; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.cv-periods { display: flex; gap: 4px; flex-wrap: wrap; }
+.cv-period { border: 1px solid var(--line-2); background: var(--panel-2); color: var(--muted); border-radius: 999px; padding: 3px 11px; font-size: 11.5px; cursor: pointer; }
+.cv-period:hover { color: var(--text); }
+.cv-period.is-on { color: var(--text); border-color: var(--accent); background: rgba(61, 123, 255, 0.14); }
+.cv-counts { margin: 10px 0 12px; color: var(--dim); font-size: 11.5px; }
+.cv-error { color: #f87171; font-size: 12.5px; margin: 6px 0; }
+.cv-empty { color: var(--dim); font-size: 13px; padding: 16px 0; }
+
+.cv-ai { margin: 0 0 16px; }
+.cv-ask { border: 1px solid var(--line-2); background: var(--panel-2); color: var(--text); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.cv-ask:hover:not(:disabled) { border-color: var(--accent); }
+.cv-ask:disabled { opacity: 0.5; cursor: default; }
+.cv-answer { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; max-width: 92ch; }
+
+.cv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cv-item { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--panel-2); }
+.cv-item.is-high { box-shadow: inset 2px 0 0 #3d7bff; }
+.cv-item-main { display: flex; align-items: baseline; gap: 10px; }
+.cv-label { font-size: 12.5px; }
+.cv-meta { color: var(--dim); font-size: 11.5px; margin-left: auto; }
+.cv-tools { color: var(--muted); font-family: var(--font-mono); font-size: 11px; margin-top: 3px; }

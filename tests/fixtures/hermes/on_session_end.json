@@ -1,0 +1,65 @@
+{
+  "hook": "on_session_end",
+  "hermes_version": "0.23.0 (2bd378ed1b)",
+  "sources": ["agent/turn_finalizer.py:887", "hermes_cli/cli_shutdown.py:200"],
+  "cases": {
+    "root": {
+      "kwargs": {
+        "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "task_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+        "turn_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12:a870a1a2",
+        "completed": true,
+        "failed": false,
+        "interrupted": false,
+        "turn_exit_reason": "completed",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "platform": "cli"
+      },
+      "expected": {
+        "kind": "session.end",
+        "ids": {
+          "session_id": "local-ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12",
+          "parent_session_id": null,
+          "turn_id": null,
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": null
+        },
+        "status": "completed",
+        "attrs": {
+          "completed": true,
+          "interrupted": false
+        }
+      }
+    },
+    "subagent": {
+      "kwargs": {
+        "session_id": "20261105_234903_b11152",
+        "task_id": "sa-0-2ad31b82",
+        "turn_id": "20261105_234903_b11152:sa-0-2ad31b82:280dbf1a",
+        "completed": true,
+        "failed": false,
+        "interrupted": false,
+        "turn_exit_reason": "completed",
+        "model": "DeepSeek-V4.1-Flash-1017",
+        "platform": "subagent"
+      },
+      "expected": {
+        "kind": "session.end",
+        "ids": {
+          "session_id": "20261105_234903_b11152",
+          "parent_session_id": null,
+          "turn_id": null,
+          "api_request_id": null,
+          "tool_call_id": null,
+          "subagent_id": "sa-0-2ad31b82"
+        },
+        "status": "completed",
+        "attrs": {
+          "completed": true,
+          "interrupted": false
+        }
+      }
+    }
+  }
+}

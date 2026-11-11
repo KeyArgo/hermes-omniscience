@@ -1,0 +1,77 @@
+.ms-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+.ms-head {
+  flex: none;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ms-select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  padding: 4px 6px;
+  appearance: none;
+}
+
+.ms-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ms-tabs {
+  flex: none;
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+
+.ms-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  padding: 6px 0 5px;
+  cursor: pointer;
+  transition: color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ms-tab:hover {
+  color: var(--text);
+}
+
+.ms-tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.ms-tab:focus-visible {
+  outline: none;
+  color: var(--text);
+}
+
+.ms-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}

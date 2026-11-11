@@ -1,0 +1,89 @@
+/* The Privacy page: the permanent record behind the strip. It owns its scrolling like Usage does. */
+
+.pv-root {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px 40px;
+  color: var(--text);
+}
+
+.pv-head h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.pv-sub {
+  margin: 0 0 14px;
+  max-width: 92ch;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.pv-periods { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.pv-period {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pv-period:hover { color: var(--text); }
+.pv-period.is-on { color: var(--text); border-color: var(--accent); background: rgba(61, 123, 255, 0.14); }
+
+.pv-counts { margin: 10px 0 14px; color: var(--dim); font-size: 11.5px; }
+.pv-error { color: #f87171; font-size: 12.5px; }
+.pv-note { color: var(--muted); font-size: 12px; }
+.pv-empty { color: var(--dim); font-size: 13px; padding: 18px 0; }
+
+.pv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.pv-table th {
+  text-align: left;
+  color: var(--dim);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+}
+.pv-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.pv-table tr.is-high td:first-child { box-shadow: inset 2px 0 0 #3d7bff; }
+.pv-tool { font-family: var(--font-mono); color: var(--muted); }
+
+.pv-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+.pv-link:hover { text-decoration: underline; }
+
+.pv-flag {
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pv-flag:hover:not(:disabled) { border-color: var(--accent); }
+.pv-flag:disabled { opacity: 0.45; cursor: default; }
+
+.pv-flags { margin-top: 22px; }
+.pv-flags h3 { font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+.pv-flags ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+.pv-flags li { margin: 2px 0; }

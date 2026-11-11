@@ -1,0 +1,46 @@
+name: polling guard
+
+# POLL_INTERVAL_S regressed to 0.25 s twice, taking the viewer from 28% of a core to 41% — on a
+# loaded machine that reads as "the system is unresponsive". The rule is one line:
+#     POLL_INTERVAL_S = float(os.environ.get("OMNISCIENCE_POLL_INTERVAL_S", "1.0"))
+# tests/test_polling_interval.py enforces the same thing in the ordinary suite; this job exists so
+# a pull request shows the violation without anyone having to read a diff.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  interval:
+    name: polling interval is env-based with a 1.0 s default
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No hardcoded interval in either copy
+        run: |
+          fail=0
+          for f in viewer/omniscience_viewer/app.py viewer_app/omniscience_viewer/app.py; do
+            if [ ! -f "$f" ]; then echo "::error file=$f::missing"; fail=1; continue; fi
+            if grep -nE '^[[:space:]]*POLL_INTERVAL_S[[:space:]]*=[[:space:]]*[^[:space:]fF]' "$f"; then
+              echo "::error file=$f::POLL_INTERVAL_S is assigned a literal. Use float(os.environ.get(\"OMNISCIENCE_POLL_INTERVAL_S\", \"1.0\"))"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: The env-var form is present, untouched
+        run: |
+          want='POLL_INTERVAL_S = float(os.environ.get("OMNISCIENCE_POLL_INTERVAL_S", "1.0"))'
+          grep -Fq "$want" viewer/omniscience_viewer/app.py || {
+            echo "::error file=viewer/omniscience_viewer/app.py::expected: $want"; exit 1; }
+          grep -Fq "$want" viewer_app/omniscience_viewer/app.py || {
+            echo "::error file=viewer_app/omniscience_viewer/app.py::expected: $want"; exit 1; }
+
+      - name: Both copies agree
+        run: |
+          a=$(grep 'POLL_INTERVAL_S' viewer/omniscience_viewer/app.py)
+          b=$(grep 'POLL_INTERVAL_S' viewer_app/omniscience_viewer/app.py)
+          if [ "$a" != "$b" ]; then
+            echo "::error::viewer/ and viewer_app/ disagree about POLL_INTERVAL_S"; diff <(echo "$a") <(echo "$b"); exit 1
+          fi

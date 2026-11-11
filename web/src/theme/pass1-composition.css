@@ -1,0 +1,322 @@
+/* ============================================================================
+   Omniscience viewer — PASS 1: COMPOSITION ONLY
+   Loaded AFTER styles.css. Layout only: grid, sizes, spacing, density,
+   order, visibility, overflow. No colors / fonts / font-sizes / borders /
+   shadows / backdrop-filter. Behaviour frozen. Spacing scale: 4/8/12/16/24/32.
+   ========================================================================== */
+
+/* ---- 1. Focal point: stage gets the most width; right rail is secondary ---- */
+
+/* Right rail widths (base / >=1180 / 900-1179). Collapsed strip stays 28px. */
+.workspace {
+  grid-template-columns: 270px minmax(0, 1fr) 300px;
+}
+.workspace.left-collapsed {
+  grid-template-columns: 28px minmax(0, 1fr) 300px;
+}
+.workspace.right-collapsed {
+  grid-template-columns: 270px minmax(0, 1fr) 28px;
+}
+.workspace.left-collapsed.right-collapsed {
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+}
+
+@media (min-width: 1180px) {
+  .workspace {
+    grid-template-columns: 270px minmax(0, 1fr) 300px;
+  }
+  .workspace.left-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr) 300px;
+  }
+  .workspace.right-collapsed {
+    grid-template-columns: 270px minmax(0, 1fr) 28px;
+  }
+  .workspace.left-collapsed.right-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr) 28px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1179px) {
+  .workspace {
+    grid-template-columns: 220px minmax(0, 1fr) 280px;
+  }
+  .workspace.left-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr) 280px;
+  }
+  .workspace.right-collapsed {
+    grid-template-columns: 220px minmax(0, 1fr) 28px;
+  }
+  .workspace.left-collapsed.right-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr) 28px;
+  }
+}
+
+/* ---- 2. <=1100 (720 split): default right rail to collapsed strip,
+        but NEVER hide content the user opened (.has-selection). ---- */
+@media (max-width: 1100px) {
+  .workspace:not(.right-collapsed) .rail-right:not(.has-selection) {
+    display: none;
+  }
+  .workspace:not(.right-collapsed):not(.left-collapsed) {
+    grid-template-columns: 270px minmax(0, 1fr);
+  }
+  .workspace:not(.right-collapsed).left-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .workspace:not(.right-collapsed).right-collapsed {
+    grid-template-columns: 270px minmax(0, 1fr) 28px;
+  }
+  .workspace:not(.right-collapsed).left-collapsed.right-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr) 28px;
+  }
+}
+
+/* ---- 3. 720px: two columns max; left rail collapses to 28px strip so the
+        list gets >= 600px. (701..900 band.) ---- */
+@media (min-width: 701px) and (max-width: 900px) {
+  /* Two columns; the chat list keeps the user's open/collapsed choice. The right rail returns
+     only when the user opened a step (has-selection). */
+  .workspace,
+  .workspace.right-collapsed {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+  .workspace.left-collapsed,
+  .workspace.left-collapsed.right-collapsed {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .workspace:has(.rail-right.has-selection) {
+    grid-template-columns: 200px minmax(0, 1fr) 280px;
+  }
+  .workspace.left-collapsed:has(.rail-right.has-selection) {
+    grid-template-columns: 28px minmax(0, 1fr) 280px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .stage-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .stage-toolbar .chips,
+  .stage-toolbar .view-switch {
+    flex-wrap: wrap;
+    overflow: visible;
+    row-gap: 4px;
+  }
+}
+
+/* ---- 4. <=1100: neutralise the hover-widen so the stage keeps its width. ---- */
+@media (max-width: 1100px) {
+  .rail-right:not(.is-collapsed):hover,
+  .rail-left:not(.is-collapsed):hover {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* ---- 5. Focal emphasis: verdict + list are the primary centre content. ---- */
+.vh-container {
+  margin: 8px 12px 8px;
+}
+.graph-surface {
+  min-height: 0;
+}
+
+/* ---- 6. Legend: compact single line, overflow hidden (view state is not
+        visible to CSS — see note below for the later JSX change). ---- */
+.legend {
+  min-height: 22px;
+  padding: 4px 12px;
+  gap: 8px;
+  overflow: hidden;
+}
+.legend-items {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ---- 7. Replay bar: lower height + tighter padding (inset needs JSX). ---- */
+.replay-bar {
+  min-height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+}
+
+/* ---- 8. Spacing scale (4/8/12/16/24/32) on the chrome we touch. ---- */
+.stage-toolbar {
+  padding: 0 12px;
+  gap: 8px;
+}
+.chips {
+  gap: 8px;
+}
+.view-switch {
+  gap: 4px;
+  margin-right: 8px;
+}
+.failure-nav {
+  margin: 0 12px 8px;
+  gap: 8px;
+}
+.summary-toggle {
+  padding: 4px 12px;
+  gap: 8px;
+}
+.summary-bar {
+  padding: 8px 12px;
+  gap: 8px;
+}
+.warnings {
+  padding: 8px 12px;
+}
+.slowest {
+  padding: 8px 12px;
+}
+.why {
+  padding: 8px 12px;
+}
+.inspector-scroll {
+  padding: 12px 16px 24px;
+}
+.inspector-empty {
+  padding: 16px;
+}
+.rail-empty {
+  padding: 12px 16px;
+}
+
+/* ============================================================================
+   416px full app (non-mini, narrow browser): top bar must not overflow,
+   chips wrap, and the list area (.graph-surface) must get the remaining
+   height (min-height: 50vh) instead of collapsing to 0.
+   ========================================================================== */
+@media (max-width: 480px) {
+  .app {
+    grid-template-rows: auto minmax(0, 1fr) 40px;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 4px 8px;
+    overflow: hidden;
+  }
+
+  .brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .top-metrics {
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+  .top-metrics::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stage-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 40px;
+    padding: 4px 8px;
+    gap: 4px 8px;
+  }
+  .stage-title {
+    flex: 1 1 100%;
+  }
+  .chips {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .view-switch {
+    flex-wrap: wrap;
+  }
+
+  .graph-surface {
+    min-height: 50vh;
+  }
+
+  .rail-right.has-selection {
+    max-height: 50vh;
+  }
+  .inspector-scroll {
+    max-height: calc(50vh - 40px);
+  }
+}
+
+/* ============================================================================
+   416px docked pane (.app-mini): leave content as-is, but fill height and
+   never overflow horizontally.
+   ========================================================================== */
+.app.app-mini {
+  height: 100%;
+  overflow: hidden;
+}
+.app.app-mini .stage {
+  min-height: 0;
+}
+.app.app-mini .graph-surface {
+  min-height: 0;
+}
+.app.app-mini .stage-toolbar,
+.app.app-mini .chips,
+.app.app-mini .view-switch,
+.app.app-mini .legend,
+.app.app-mini .legend-items,
+.app.app-mini .replay-bar {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+.app.app-mini .vh-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* The toolbar wraps under 1100px, so it must grow instead of overlapping the verdict. */
+@media (max-width: 1100px) {
+  .stage-toolbar {
+    height: auto;
+    min-height: 42px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+/* Header blocks above the list keep their natural height; only the list area scrolls
+   (at 200% zoom the stage is short and these were being squeezed). */
+.vh-container,
+.failure-nav,
+.stage-state,
+.summary-toggle,
+.stage-toolbar {
+  flex-shrink: 0;
+}
+
+/* Short windows (200% zoom, small laptops): the stage scrolls as a whole and the list keeps
+   a usable height instead of collapsing under the verdict. */
+@media (max-height: 620px) {
+  .stage {
+    overflow-y: auto;
+  }
+  .graph-surface {
+    min-height: 260px;
+    flex-shrink: 0;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "omniscience",
+  "label": "Omniscience",
+  "description": "Agent activity graph — live map and replay of sessions, turns, LLM calls and tools.",
+  "icon": "Eye",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/omniscience",
+    "position": "after:skills"
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}
