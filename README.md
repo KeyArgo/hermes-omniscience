@@ -7,11 +7,13 @@
 <p align="center"><em>See what your Hermes agent is doing, live. Every step on a map, with replay. Local, private, read-only.</em></p>
 
 <p align="center">
+  <a href="https://github.com/KeyArgo/hermes-omniscience/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/KeyArgo/hermes-omniscience?style=flat-square&color=0000F2"/></a>
   <img alt="Hermes plugin" src="https://img.shields.io/badge/Hermes-plugin-0000F2?style=flat-square"/>
   <img alt="Licence" src="https://img.shields.io/badge/licence-MIT-0000F2?style=flat-square"/>
   <img alt="Built by InovinLabs" src="https://img.shields.io/badge/built%20by-InovinLabs-0000F2?style=flat-square"/>
   <img alt="Tests" src="https://img.shields.io/badge/tests-805%20passed-2ea44f?style=flat-square"/>
   <img alt="Platforms" src="https://img.shields.io/badge/Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-verified-0000F2?style=flat-square"/>
+  <a href="https://github.com/KeyArgo/hermes-omniscience/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/KeyArgo/hermes-omniscience?style=social"/></a>
 </p>
 
 <p align="center">
