@@ -88,6 +88,7 @@ def test_sessions_content_labels_opt_in():
         os.unlink(db_path)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX file modes; the owner-only ACL is the OS's job there")
 def test_log_file_created_with_0600():
     """The launcher must create viewer.log with mode 0600."""
     from omniscience.viewer_launcher import ensure_viewer

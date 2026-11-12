@@ -26,7 +26,7 @@ def test_resolve_db_path_env():
 
 def test_resolve_db_path_hermes_home():
     assert resolve_db_path(None, {"HERMES_HOME": "/h"}) == (
-        "/h/plugin-data/omniscience/events.db",
+        os.path.join("/h", "plugin-data", "omniscience", "events.db"),
         "HERMES_HOME default",
     )
 

@@ -116,6 +116,7 @@ def test_token_none_open(tmp_path):
     assert resp.status_code == 200
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX file modes; the owner-only ACL is the OS's job there")
 def test_write_token_file_mode(tmp_path):
     path = os.path.join(str(tmp_path), TOKEN_FILE_NAME)
     token = write_token(path)
@@ -185,6 +186,7 @@ def test_page_is_never_served_stale(tmp_path):
     assert "immutable" in client.get("/assets/index-abc.js").headers["cache-control"]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX file modes; the owner-only ACL is the OS's job there")
 def test_key_survives_viewer_restart_but_not_loose_permissions(tmp_path):
     from omniscience_viewer.auth import ensure_token
 
@@ -199,6 +201,7 @@ def test_key_survives_viewer_restart_but_not_loose_permissions(tmp_path):
 # --- bug hunt round 4 (2026-11-09): the token file is written next to a group-writable dir ---
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need admin rights on Windows, and the check is a POSIX mode")
 def test_the_token_is_never_written_through_a_symlink(tmp_path):
     """write_token O_TRUNCs an existing path, so a symlink planted at viewer-token (the data
     directory is group-writable on some installs) received the key. It replaces the path now."""

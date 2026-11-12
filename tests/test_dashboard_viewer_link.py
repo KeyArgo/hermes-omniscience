@@ -123,6 +123,7 @@ def test_the_override_wins_over_the_profile_folder(api, tmp_path, monkeypatch):
     assert body["db_path"] == str(override)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="'?' is not allowed in a Windows file name")
 def test_a_database_name_with_uri_characters_still_opens(api, tmp_path, monkeypatch):
     """`?` and `#` end a URI; passed through raw they truncate the path."""
     odd = _db(tmp_path / "odd" / "events?#1.db", rows=4)

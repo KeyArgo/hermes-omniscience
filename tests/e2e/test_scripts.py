@@ -251,6 +251,9 @@ import sqlite3 as _sqlite3
 import subprocess as _sp
 from pathlib import Path as _P
 
+# These are bash dev scripts. On the Windows runner `bash` is the WSL launcher with no distro.
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="bash dev scripts; not run on Windows")
+
 _SCRIPTS = _P(__file__).resolve().parents[2] / "scripts"
 
 

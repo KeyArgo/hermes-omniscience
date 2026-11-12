@@ -19,7 +19,7 @@ def test_defaults_send_the_summary():
 
 
 def test_path_sits_next_to_the_database():
-    assert prefs.path_for("/data/omniscience/events.db") == "/data/omniscience/prefs.json"
+    assert prefs.path_for("/data/omniscience/events.db") == os.path.join(os.path.abspath("/data/omniscience"), "prefs.json")
     assert prefs.path_for(None).endswith(os.path.join("plugin-data", "omniscience", "prefs.json"))
 
 

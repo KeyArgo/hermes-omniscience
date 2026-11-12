@@ -1,5 +1,6 @@
 """Tests for the Omniscience privacy controls."""
 
+import sys
 import json
 import os
 import sqlite3
@@ -105,6 +106,7 @@ class TestPausedSessions:
         ps3 = PausedSessions(db_path)
         assert ps3.is_paused("session-1") is False
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX file modes; the owner-only ACL is the OS's job there")
     def test_file_mode_0600(self, tmp_path):
         """Paused sessions file has mode 0600."""
         db_path = str(tmp_path / "test.db")
