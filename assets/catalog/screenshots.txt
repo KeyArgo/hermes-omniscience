@@ -1,0 +1,5 @@
+docs/screenshots/hero.png
+docs/screenshots/list.png
+docs/screenshots/timeline.png
+docs/img/window-map.png
+docs/img/help.png
