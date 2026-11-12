@@ -105,6 +105,9 @@ def canonical_path(raw: str, counts: dict[str, int]) -> str:
     if not raw:
         return ""
     text = str(raw).replace("\\", "/")
+    # Home first: on Windows the home folder sits on a drive, and it should still read as `~`.
+    home = os.path.expanduser("~").replace("\\", "/").rstrip("/") + "/"
+    in_home = text.lower().startswith(home.lower())
     text = re.sub(r"^[A-Za-z]:", "<drive>", text)
     text = re.sub(r"^//[^/]+/[^/]+", "<unc>", text)
     # Resolve . and .. by text only: never touch the filesystem, never follow a symlink.
@@ -120,9 +123,7 @@ def canonical_path(raw: str, counts: dict[str, int]) -> str:
     if not parts:
         return ""
     name = parts[-1]
-    home = os.path.expanduser("~/")
-    lowered = text.lower()
-    if lowered.startswith(home.lower()):
+    if in_home:
         prefix = "~"
     elif text.startswith("<drive>"):
         prefix = "<drive>"

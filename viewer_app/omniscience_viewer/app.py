@@ -184,7 +184,8 @@ class _FreshStaticFiles(StaticFiles):
 
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
-        if path.startswith("assets/"):
+        # Starlette hands over an OS path: "assets\\index-abc.js" on Windows.
+        if path.replace("\\", "/").startswith("assets/"):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:
             # A stale document is what strands a tab on old code; forbid storing it at all.
