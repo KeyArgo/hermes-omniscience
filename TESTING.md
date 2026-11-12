@@ -1,45 +1,98 @@
-# Testing this plugin on another machine
+# Testing Omniscience
 
-Two ways in: run the script, or hand this file to an agent on that machine and let it follow the
-steps. Both end with a `RESULT.txt` you can send back.
+Applies to **Omniscience 1.0.0** · revised **2026-11-11**.
 
-## One command (Windows)
+This page lists every suite in the repo, how to run it, what CI runs, and the counts measured at
+this commit. Test counts come from a run, not from a badge.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\test-windows.ps1
-```
+## What CI runs
 
-It creates `.venv-win`, installs the declared dependencies plus pytest, finds every `tests` directory
-in the repo, runs each one, and writes `RESULT.txt`. It touches nothing outside this folder.
+The main workflow is [`.github/workflows/tests.yml`](.github/workflows/tests.yml). It runs one
+job per matrix entry:
 
-Prerequisite: Python 3.12 from python.org, installed with **"Add python.exe to PATH"** ticked.
+| Matrix | Values |
+|---|---|
+| OS | `ubuntu-latest`, `macos-latest`, `windows-latest` |
+| Python | `3.11`, `3.12` |
 
-## One command (Linux / macOS)
+Each job installs `requirements-dev.txt`, sets `PYTHONPATH=viewer`, and runs:
 
 ```bash
-bash scripts/test.sh
+python -m pytest tests -q -p no:cacheprovider
 ```
 
-## What a good run looks like
+Two additional workflows guard one design rule each and do not run the suite:
 
-- every suite reports `N passed`
-- exit code `0`
-- `RESULT.txt` lists the commit, the OS and the per-suite counts
+- [`polling-guard.yml`](.github/workflows/polling-guard.yml) checks that the live feed interval is
+  environment-based with a 1.0 s default.
+- [`polling-interval-guard.yml`](.github/workflows/polling-interval-guard.yml) checks that both
+  viewer copies agree on the interval.
 
-A failure is still a useful result — send it. A missing result scores the same as never testing.
+The platform badge says Linux, macOS and Windows because those are the CI matrix entries. This
+local run was made on Linux only; macOS and Windows are covered by the CI jobs above, not by a
+local measurement here.
 
-## If you are an agent on that machine, do this
+## Suites
 
-1. Confirm `python --version` is 3.10+; if not, stop and ask for Python to be installed.
-2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\test-windows.ps1`.
-3. Read `RESULT.txt`. Do not paraphrase it — quote the `suites:` lines verbatim.
-4. If a suite failed, capture the last 40 lines of that suite's output and the traceback.
-5. Report: host name, OS, python version, commit, and one line per suite.
+| Suite | What it covers | Command | Result at this commit |
+|---|---|---|---|
+| Python | Plugin hooks and sanitizers, store and writer, viewer REST/WS, contract and e2e tests, QA core, docs currency | `PYTHONPATH=viewer python3 -m pytest tests -q -p no:cacheprovider` | **805 passed**, 1 warning in 100.83 s |
+| Front end | Graph reduction, views, panels, help layer, privacy and problem state (vitest) | `cd web && npm test` | **56 files passed**, **595 tests passed** in 24.61 s |
+| Total | | | **1400 passed** |
 
-Do not install packages globally, do not modify source to make tests pass, and do not report a pass
-you did not see.
+Environment for the counts above: Linux, Python 3.13.13, Node 26.5.1, 2026-11-11. The Python
+suite contains no skips or expected failures in that run.
 
-## Why this matters
+Exact final lines:
 
-The scoring system reads a recorded suite result at a commit as proof the code runs. A Windows result
-is the evidence that turns "Windows untested" into a measured fact.
+```text
+805 passed, 1 warning in 100.83s (0:01:40)
+```
+
+```text
+ Test Files  56 passed (56)
+      Tests  595 passed (595)
+```
+
+The warning is a `StarletteDeprecationWarning` from the installed FastAPI test client
+(`httpx`/`starlette.testclient`), not a test failure.
+
+## First run
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt
+PYTHONPATH=viewer python3 -m pytest tests -q -p no:cacheprovider
+cd web && npm ci && npm test
+```
+
+`npm ci` installs the locked front-end dependencies. `requirements-dev.txt` is the only Python
+dependency file; CI uses it too.
+
+## What is in `tests/`
+
+| Path | Contents |
+|---|---|
+| `tests/test_*.py` | Unit and integration tests for recording, sanitizing, storage, viewer routes, commands, privacy, export, usage, bundle, brake and versioning |
+| `tests/contract/` | Hermes hook and source-contract tests |
+| `tests/e2e/` | The live-path test and the helper-script tests |
+| `tests/qa_core/` | QA analysis, sanitizer, store and viewer checks |
+| `tests/fixtures/hermes/` | Recorded Hermes hook payloads used by the contract tests |
+
+## Other checks
+
+- `python3 scripts/docs-stamp.py --check` verifies every guide in `docs/` still matches the build
+  it claims to describe. The Python suite runs this as `tests/test_docs_currency.py`, so an edited
+  doc with a stale stamp fails the suite. Fix with `python3 scripts/docs-stamp.py --write`.
+- `scripts/test.sh` (Linux/macOS) and `scripts/test-windows.ps1` (Windows) run each `tests`
+  directory and write `RESULT.txt`. They are convenience wrappers for another machine, not the CI
+  path.
+- `dev/desktop-plugin-harness.test.mjs` is a manual harness for the desktop plugin. Its header
+  names `dev/vitest.harness.config.mjs`, which is not present in the repo, so it was **not run**
+  for these counts. CI does not run it either.
+
+## Reporting a result
+
+If you run the suite on another machine, send the exact final summary line and the commit. Do not
+paraphrase it, and do not report a pass you did not see. See [docs/INSTALL.md](docs/INSTALL.md) for
+install steps and [VERIFY.md](VERIFY.md) for a quick install check.
