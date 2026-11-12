@@ -46,16 +46,43 @@ def test_build_info_dirty_flag_is_believed_even_when_git_is_clean(build_info, mo
     assert version_stamp.as_dict()["dirty"] is True
 
 
-def test_git_is_used_when_there_is_no_build_info(build_info, monkeypatch):
-    def fake_git(*args):
-        return {"rev-parse": "deadbeefcafe", "status": "", "log": "2026-11-01T09:00:00-07:00"}.get(args[0], "")
+def _fake_git(tag="", shallow="false", count="42"):
+    answers = {"rev-parse": "deadbeefcafe", "status": "", "log": "2026-11-01T09:00:00-07:00",
+               "describe": tag, "rev-list": count}
 
-    monkeypatch.setattr(version_stamp, "_git", fake_git)
+    def fake_git(*args):
+        if args[:2] == ("rev-parse", "--is-shallow-repository"):
+            return shallow
+        return answers.get(args[0], "")
+    return fake_git
+
+
+def test_git_is_used_when_there_is_no_build_info(build_info, monkeypatch):
+    monkeypatch.setattr(version_stamp, "_git", _fake_git(tag="v1.0.0"))
     monkeypatch.setattr(version_stamp, "_declared_version", lambda: "1.0.0")
+    monkeypatch.setattr(version_stamp, "_catalog_pin", lambda: "")
     info = version_stamp.as_dict()
     assert info["commit_short"] == "deadbeef"
     assert info["source"] == "git"
-    assert info["version"] == "1.0.0"
+    assert info["version"] == "1.0.0"  # HEAD is the v1.0.0 tag: the release itself
+
+
+def test_an_untagged_checkout_reads_dev(build_info, monkeypatch):
+    monkeypatch.setattr(version_stamp, "_declared_version", lambda: "1.0.0")
+    monkeypatch.setattr(version_stamp, "_catalog_pin", lambda: "")
+    monkeypatch.setattr(version_stamp, "_git", _fake_git())
+    assert version_stamp.as_dict()["version"] == "1.0.0-dev.42"
+    monkeypatch.setattr(version_stamp, "_git", _fake_git(shallow="true"))
+    assert version_stamp.as_dict()["version"] == "1.0.0-dev"  # a shallow count means nothing
+
+
+def test_a_catalog_install_of_the_pinned_commit_reads_the_release(build_info, monkeypatch):
+    monkeypatch.setattr(version_stamp, "_declared_version", lambda: "1.0.0")
+    monkeypatch.setattr(version_stamp, "_git", _fake_git(shallow="true"))
+    monkeypatch.setattr(version_stamp, "_catalog_pin", lambda: "deadbeefcafe")
+    assert version_stamp.as_dict()["version"] == "1.0.0"
+    monkeypatch.setattr(version_stamp, "_catalog_pin", lambda: "0123456789ab")
+    assert version_stamp.as_dict()["version"] == "1.0.0-dev"  # pinned elsewhere: not this release
 
 
 def test_a_dirty_checkout_is_reported_as_modified(build_info, monkeypatch):
