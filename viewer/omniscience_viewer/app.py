@@ -9,6 +9,8 @@ import logging
 import os
 import re
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 
@@ -192,18 +194,70 @@ class _FreshStaticFiles(StaticFiles):
 
 
 
+def _pid_alive_windows(pid: int) -> bool:
+    """Windows has no /proc or signal 0, so ask the kernel for the exit code."""
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return False
+    try:
+        code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return False
+        return code.value == STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _pid_state_from_ps(pid: int) -> bool:
+    """POSIX without /proc (macOS, BSD): `ps` reports Z for a zombie."""
+    try:
+        proc = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True  # cannot check it, so do not close a viewer that may still be needed
+    state = proc.stdout.strip()
+    if not state:
+        return False
+    return not state.startswith("Z")
+
+
 def _pid_alive(pid: int) -> bool:
     """Is this process still running (not gone, not a zombie)?
 
     os.kill(pid, 0) succeeds for a zombie, and a parent that exited without being reaped stays a
     zombie for as long as its own parent lives — which is how a watcher that only asks "does this
-    pid exist" keeps serving for hours after the app closed. Read the state instead.
+    pid exist" keeps serving for hours after the app closed. Read the state instead, portably:
+    /proc on Linux, `ps` on macOS/BSD, OpenProcess on Windows.
     """
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        return _pid_alive_windows(pid)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
     try:
         with open(f"/proc/{pid}/stat", "rb") as handle:
             state = handle.read().rsplit(b") ", 1)[1].split(b" ", 1)[0]
+    except FileNotFoundError:
+        return _pid_state_from_ps(pid)
     except (OSError, IndexError):
-        return False
+        return True
     return state not in (b"Z", b"X")
 
 

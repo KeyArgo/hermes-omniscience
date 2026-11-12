@@ -10,6 +10,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "viewer"))
 
@@ -24,6 +26,7 @@ def test_a_pid_nobody_has_is_dead():
     assert _pid_alive(999_999_999) is False
 
 
+@pytest.mark.skipif(os.name == "nt", reason="os.fork is POSIX-only")
 def test_a_reaped_child_is_dead():
     pid = os.fork()
     if pid == 0:  # pragma: no cover - the child only exits
@@ -33,6 +36,7 @@ def test_a_reaped_child_is_dead():
     assert _pid_alive(pid) is False
 
 
+@pytest.mark.skipif(os.name == "nt", reason="os.fork is POSIX-only")
 def test_a_zombie_child_is_dead_too():
     pid = os.fork()
     if pid == 0:  # pragma: no cover - the child only exits
