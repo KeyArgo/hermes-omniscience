@@ -1,5 +1,7 @@
 {
-  "mirrors": [],
+  "mirrors": [
+    "dashboard/manifest.json"
+  ],
   "prepare": [
     "python3 scripts/docs-stamp.py --write"
   ]
