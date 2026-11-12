@@ -1,6 +1,29 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 1.0.0 — 2026-11-11
+
+First public release.
+
+- Metadata-only recorder for 14 Hermes observer hooks: sessions, turns, model calls, tools,
+  helper agents, auxiliary calls, skill events and conversation deletes.
+- Live execution graph and deterministic replay in a local, read-only viewer on `127.0.0.1:8797`.
+- List, Map, Time, Tokens, Usage, Flame, Tools, Context, Helpers, Coverage, Latency, Concerns and
+  Privacy views.
+- Plain-English triage: verdict, where the time went, failures, warnings, lost-record markers and a
+  scoped replay bar.
+- In-chat turn summary with `brief`, `standard` and `full` detail levels; `/omni` command for
+  triage, usage, privacy pause, and deleting a chat's recording.
+- Optional in-chat cost reminders and live notices for rate limits, fallbacks and repeated tool
+  failures.
+- Usage page with tokens per call, cache share, model and provider tables, compactions and Hermes'
+  own cost estimate; optional opt-in token import from other harnesses.
+- CSV export, redacted problem bundles, privacy dossiers, and an opt-in brake that can ask Hermes'
+  own run API to stop a chat.
+- Hermes dashboard tab and desktop surface.
+- 805 Python tests and 595 front-end tests passing at release; CI matrix on Linux, macOS and
+  Windows with Python 3.11 and 3.12.
+
+## 0.1.0 (pre-release)
 
 - **Version chip is its own element.** The running build's version line now renders in every layout
   whether or not the telemetry strip is shown, so the Panels entry is "Telemetry strip (events,

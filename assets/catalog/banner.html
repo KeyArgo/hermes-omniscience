@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--blue:#2f6bff;--cyan:#22d3ee;--ink:#e8eefc}
+*{box-sizing:border-box}
+body{margin:0;width:1200px;height:600px;overflow:hidden;background:#070a10;font-family:Inter,DejaVu Sans,Helvetica,Arial,sans-serif;color:var(--ink)}
+.bg{position:absolute;inset:0;background:
+ radial-gradient(900px 500px at 85% 20%, rgba(47,107,255,.28), transparent 60%),
+ radial-gradient(700px 420px at 50% 110%, rgba(34,211,238,.12), transparent 60%),
+ linear-gradient(135deg,#070a10 0%,#0a0f1b 55%,#080b12 100%);}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 85%)}
+.left{position:absolute;left:58px;top:96px;width:330px}
+.mark{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#2f6bff,#22d3ee);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(47,107,255,.5)}
+.mark svg{width:26px;height:26px}
+.kicker{margin-top:26px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#7fa6ff;font-weight:700}
+h1{margin:10px 0 12px;font-size:44px;line-height:1.02;letter-spacing:-.02em;font-weight:800}
+.tag{margin:0;font-size:19px;line-height:1.45;color:#c3d2ef}
+.sub{margin-top:18px;font-size:13px;color:#8ea2c4;letter-spacing:.04em}
+.dot{color:#22d3ee}
+.right{position:absolute;left:450px;top:74px;width:714px;height:474px;border-radius:14px;overflow:hidden;border:1px solid rgba(120,160,255,.35);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 6px rgba(47,107,255,.08)}
+.bar{height:26px;background:#0d1420;display:flex;align-items:center;gap:6px;padding-left:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.tl{width:8px;height:8px;border-radius:50%;background:#ff5f57}.ty{background:#febc2e}.tg{background:#28c840}
+.addr{margin-left:12px;font-size:10px;color:#64789b;letter-spacing:.03em}
+img{display:block;width:100%;height:calc(100% - 26px);object-fit:cover;object-position:top center}
+.footer{position:absolute;left:58px;bottom:22px;font-size:12px;color:#7f92b3;letter-spacing:.04em}
+.footer b{color:#a9c1ea}
+</style></head><body>
+<div class="bg"></div><div class="grid"></div>
+<div class="left">
+  <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></div>
+  <div class="kicker">Hermes Agent plugin</div>
+  <h1>Omniscience</h1>
+  <p class="tag">See what your Hermes agent is doing, live. Every step on a map, with replay.</p>
+  <div class="sub">Local <span class="dot">·</span> private <span class="dot">·</span> read-only</div>
+</div>
+<div class="right">
+  <div class="bar"><span class="tl"></span><span class="tl ty"></span><span class="tl tg"></span><span class="addr">127.0.0.1:8797 · live run</span></div>
+  <img src="../../docs/screenshots/hero.png" alt="Omniscience live graph"/>
+</div>
+<div class="footer">Metadata only · <b>no prompts or tool output</b></div>
+</body></html>

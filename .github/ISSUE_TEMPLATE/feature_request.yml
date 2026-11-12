@@ -1,0 +1,23 @@
+name: Feature request
+description: An idea that would make Omniscience more useful
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you want solved
+      description: What are you trying to do, and where does it get in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like to happen
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you have tried instead
+    validations:
+      required: false
