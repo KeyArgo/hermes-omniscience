@@ -18,8 +18,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/hero.png" alt="A recorded Hermes run drawn as a graph of sessions, turns, model calls, tools and a helper agent" width="900"/>
-  <br/><sub>A recorded run: sessions, turns, model calls, tools, a helper agent and a lost-event gap, on one map.</sub>
+  <img src="docs/media/omniscience-demo.gif" alt="Omniscience inside Hermes Desktop watching a real agent session: the live map, then the timeline" width="900"/>
+  <br/><sub><b>Omniscience inside Hermes Desktop</b>, watching a real agent session. <a href="https://x.com/MHArgonaut/status/2120633813705363663">Watch the full demo ▶</a></sub>
 </p>
 
 <p align="center">
@@ -68,6 +68,14 @@ The graph is live and the replay is deterministic. Other tools import a finished
       <img src="docs/screenshots/list.png" alt="List view showing model calls and tool rows in order" width="100%"/>
       <br/><sub><b>List.</b> One row per step in order, with durations, token counts and error types.</sub>
     </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshots/desktop-briefing.png" alt="The briefing explaining each failure and what to do next" width="100%"/><br/><sub><b>Briefing.</b> Each failure in plain English, and what to do next.</sub></td>
+    <td width="50%" align="center"><img src="docs/screenshots/desktop-concerns.png" alt="Concerns view listing what slowed the run down" width="100%"/><br/><sub><b>Concerns.</b> What slowed things down, in plain English.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/screenshots/desktop-usage.png" alt="Usage page with tokens, cache share and estimated cost across agents" width="100%"/><br/><sub><b>Usage.</b> Tokens, cache share and Hermes' cost estimate across your agents.</sub></td>
+    <td width="50%" align="center"><img src="docs/screenshots/desktop-privacy.png" alt="Privacy view listing every browser and network action" width="100%"/><br/><sub><b>Privacy.</b> Every time the agent drove a browser or reached the network.</sub></td>
   </tr>
   <tr>
     <td colspan="2" align="center">
