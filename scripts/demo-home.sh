@@ -19,18 +19,36 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_SRC="$REPO"
 
+# Absolute, symlink-resolved path for $1. GNU `readlink -m` is not on macOS and BSD
+# `readlink` has no -m/-f either; use Python when present, then a plain-cd fallback.
+abspath() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"
+    return 0
+  fi
+  local p="$1" rest="" base
+  case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+  while [ ! -e "$p" ] && [ "$p" != "/" ]; do
+    rest="/${p##*/}$rest"
+    p="${p%/*}"
+    [ -n "$p" ] || p="/"
+  done
+  base="$(cd -P -- "$p" 2>/dev/null && pwd -P)" || base="$p"
+  printf '%s%s\n' "$base" "$rest"
+}
+
 log()  { printf '[demo-home] %s\n' "$*"; }
 warn() { printf '[demo-home] WARN: %s\n' "$*" >&2; }
 die()  { printf '[demo-home] REFUSED: %s\n' "$*" >&2; exit 2; }
 
 # ---------------------------------------------------------------- resolve target
 raw="${OMNI_DEMO_HOME:-$REPO/.demo-home}"
-# Expand a leading ~ against $HOME (readlink will not do it for us).
+# Expand a leading ~ against $HOME (abspath does not do it for us).
 case "$raw" in
   "~")   raw="$HOME" ;;
   "~/"*) raw="$HOME/${raw#\~/}" ;;
 esac
-ABS="$(readlink -m -- "$raw")"
+ABS="$(abspath "$raw")"
 
 # ---------------------------------------------------------------- safety rail
 # Never let an isolated demo home collide with a real Hermes profile.
@@ -92,7 +110,7 @@ fi
 mkdir -p "$ABS/plugins"
 link="$ABS/plugins/omniscience"
 if [ -L "$link" ]; then
-  cur="$(readlink -- "$link")"
+  cur="$(readlink "$link")"
   if [ "$cur" = "$PLUGIN_SRC" ]; then
     log "plugin already linked: plugins/omniscience -> $cur"
   else

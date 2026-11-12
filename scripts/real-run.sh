@@ -22,12 +22,30 @@ set -uo pipefail   # intentionally NOT -e: we must always print the DB summary.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Absolute, symlink-resolved path for $1. GNU `readlink -m` is not on macOS and BSD
+# `readlink` has no -m/-f either; use Python when present, then a plain-cd fallback.
+abspath() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"
+    return 0
+  fi
+  local p="$1" rest="" base
+  case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+  while [ ! -e "$p" ] && [ "$p" != "/" ]; do
+    rest="/${p##*/}$rest"
+    p="${p%/*}"
+    [ -n "$p" ] || p="/"
+  done
+  base="$(cd -P -- "$p" 2>/dev/null && pwd -P)" || base="$p"
+  printf '%s%s\n' "$base" "$rest"
+}
+
 DEMO_HOME="${OMNI_DEMO_HOME:-$REPO/.demo-home}"
 case "$DEMO_HOME" in
   "~")   DEMO_HOME="$HOME" ;;
   "~/"*) DEMO_HOME="$HOME/${DEMO_HOME#\~/}" ;;
 esac
-DEMO_HOME="$(readlink -m -- "$DEMO_HOME")"
+DEMO_HOME="$(abspath "$DEMO_HOME")"
 
 # Safety rail (same rules as demo-home.sh), enforced on EVERY run — not only when the home is new.
 refuse() { printf '[real-run] REFUSED: %s\n' "$*" >&2; exit 2; }

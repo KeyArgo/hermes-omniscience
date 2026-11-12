@@ -18,6 +18,17 @@ listening() {
   ss -ltn 2>/dev/null | grep -qE ":$PORT[[:space:]]"
 }
 
+# GNU date uses -d @epoch; BSD/macOS date uses -r epoch. Neither flag exists on the other.
+show_epoch() {
+  if date -d "@$1" '+%F %T' >/dev/null 2>&1; then
+    date -d "@$1" '+%F %T'
+  elif date -r "$1" '+%F %T' >/dev/null 2>&1; then
+    date -r "$1" '+%F %T'
+  else
+    printf '%s' "$1"
+  fi
+}
+
 stop_viewer() {
   local pid
   pid="$(ss -ltnp 2>/dev/null | grep -E ":$PORT[[:space:]]" | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2 || true)"
@@ -57,7 +68,7 @@ PY
     fi
     ;;
   status)
-    if [ -f "$MARKER" ]; then echo "paused since $(date -d @"$(cat "$MARKER")" '+%F %T' 2>/dev/null || cat "$MARKER")"; else echo "not paused"; fi
+    if [ -f "$MARKER" ]; then echo "paused since $(show_epoch "$(cat "$MARKER")")"; else echo "not paused"; fi
     if listening; then echo "viewer listening on $PORT"; else echo "viewer not listening on $PORT"; fi
     ;;
   *)

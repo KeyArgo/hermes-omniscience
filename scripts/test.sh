@@ -11,7 +11,8 @@ for f in requirements.txt requirements-dev.txt; do [[ -f $f ]] && "$py" -m pip i
 [[ -f pyproject.toml ]] && "$py" -m pip install --quiet -e . 2>/dev/null
 "$py" -m pip install --quiet pytest
 
-mapfile -t suites < <(find . -type d -name tests -not -path "*/.venv*" -not -path "*/node_modules/*" -not -path "*/__pycache__/*" | sort)
+suites=()
+while IFS= read -r s; do suites+=("$s"); done < <(find . -type d -name tests ! -path "*/.venv*" ! -path "*/node_modules/*" ! -path "*/__pycache__/*" | sort)
 overall=0; rows=()
 for s in "${suites[@]}"; do
   out=$("$py" -m pytest "$s" -o addopts="" -q -p no:cacheprovider 2>&1); code=$?
@@ -27,6 +28,6 @@ done
   echo "exit:      $overall"
   echo "suites:"
   for r in "${rows[@]}"; do echo "  $r"; done
-  echo "run at:    $(date -Iseconds)"
+  echo "run at:    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } | tee RESULT.txt
 exit $overall
