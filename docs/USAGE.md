@@ -1,7 +1,8 @@
 # Usage
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 8a4b27ff
+> **Applies to:** Omniscience 1.0.0 · written at commit aec782c
+> **Revised:** 2026-11-11 · **Body hash:** 38a1831e
+
 
 
 A short walkthrough of the viewer and the `/omni` command. For the full reading guide, including
@@ -114,6 +115,14 @@ locally, the reply includes a link to the exact chat or usage period.
 - **Actions → Bundle** builds a redacted JSON problem bundle. You see the exact object in a preview
   before anything is written; identifiers are replaced with synthetic ones and timestamps become
   offsets.
+
+## Help on screen
+
+![What am I looking at](img/help.png)
+
+**Help → What Am I Looking At?** explains every box, colour and control, with worked examples. **Help
+→ Take the Tour** walks five stops in about 30 seconds and resets the layout to its defaults first.
+Tooltips appear on hover or keyboard focus, and `?` opens the help sheet.
 
 ## The dashboard tab
 

@@ -140,6 +140,7 @@ Named modules: `__init__.py`, `sanitize.py`, `store.py`, `schema.py` for recordi
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, data flow, event contract, on-disk data |
 | [docs/INSTALL.md](docs/INSTALL.md) | Install, upgrade, uninstall, viewer flags |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every environment variable and stored setting |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Repository layout, suites, CI and documentation stamps |
 | [docs/USAGE.md](docs/USAGE.md) | A walkthrough of the viewer and the `/omni` command |
 | [docs/REFERENCE.md](docs/REFERENCE.md) | Hooks, events, HTTP routes, CLI, rules and config keys |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Real failure modes and what to do |

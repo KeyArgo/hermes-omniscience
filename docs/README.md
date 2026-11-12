@@ -1,7 +1,8 @@
 # Omniscience documentation
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 0d57cf14
+> **Applies to:** Omniscience 1.0.0 · written at commit aec782c
+> **Revised:** 2026-11-11 · **Body hash:** e5d4b925
+
 
 
 The index of every guide in this folder. Start with [INSTALL](INSTALL.md) if you are installing,
@@ -19,6 +20,7 @@ or [USAGE](USAGE.md) if you already have a recording and want to read it.
 | [TROUBLESHOOTING](TROUBLESHOOTING.md) | Something is not working |
 | [CONFIGURATION](CONFIGURATION.md) | You need an environment variable or stored setting |
 | [REFERENCE](REFERENCE.md) | You need hooks, event kinds, routes, CLI flags or rule thresholds |
+| [DEVELOPMENT](DEVELOPMENT.md) | You are changing the code, tests or docs stamps |
 
 ## How it works, and what it stores
 

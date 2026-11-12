@@ -36,8 +36,8 @@ local measurement here.
 
 | Suite | What it covers | Command | Result at this commit |
 |---|---|---|---|
-| Python | Plugin hooks and sanitizers, store and writer, viewer REST/WS, contract and e2e tests, QA core, docs currency | `PYTHONPATH=viewer python3 -m pytest tests -q -p no:cacheprovider` | **805 passed**, 1 warning in 100.83 s |
-| Front end | Graph reduction, views, panels, help layer, privacy and problem state (vitest) | `cd web && npm test` | **56 files passed**, **595 tests passed** in 24.61 s |
+| Python | Plugin hooks and sanitizers, store and writer, viewer REST/WS, contract and e2e tests, QA core, docs currency | `PYTHONPATH=viewer python3 -m pytest tests -q -p no:cacheprovider` | **805 passed**, 1 warning in 77.72 s |
+| Front end | Graph reduction, views, panels, help layer, privacy and problem state (vitest) | `cd web && npm test` | **56 files passed**, **595 tests passed** in 22.09 s |
 | Total | | | **1400 passed** |
 
 Environment for the counts above: Linux, Python 3.13.13, Node 26.5.1, 2026-11-11. The Python
@@ -46,7 +46,7 @@ suite contains no skips or expected failures in that run.
 Exact final lines:
 
 ```text
-805 passed, 1 warning in 100.83s (0:01:40)
+805 passed, 1 warning in 77.72s (0:01:17)
 ```
 
 ```text
