@@ -1,16 +1,6 @@
 # Changelog
 
-## Unreleased
-
-- **Works on macOS and Windows.** The viewer now notices that Hermes has closed on macOS and Windows as well as Linux, and the helper scripts no longer need GNU-only `readlink -m`.
-- **Windows: hashed web assets are cached.** The asset rule compared an OS path with `assets/`, so on Windows nothing was ever cached.
-- **Windows: problem bundles show your home folder as `~`.** The drive letter was replaced before the home-folder check, so a Windows home read as `<drive>/…`.
-- **CI is green on Linux, macOS and Windows** with Python 3.11 and 3.12. Tests that cannot apply on Windows (POSIX file modes, bash scripts, `?` in a file name) skip there with a stated reason.
-- **The version chip tells a release from a development build.** A catalog install of the pinned commit, or a checkout at the release tag, reads `X.Y.Z`; any other build reads `X.Y.Z-dev`. `tools/release_check.py` and the release workflow keep the version, the changelog, the tag and the GitHub release in step.
-- **Documentation:** a rebuilt README with a recorded demo and current Hermes Desktop screenshots, and a full docs set (usage, reference, architecture, configuration, troubleshooting, FAQ, development and testing).
-- **Project files:** contributing guide, code of conduct, security policy, issue and pull request templates, and CODEOWNERS.
-
-## 1.0.0 — 2026-11-11
+## 1.0.0 — in catalog review
 
 First public release.
 
@@ -30,8 +20,19 @@ First public release.
 - CSV export, redacted problem bundles, privacy dossiers, and an opt-in brake that can ask Hermes'
   own run API to stop a chat.
 - Hermes dashboard tab and desktop surface.
-- 805 Python tests and 595 front-end tests passing at release on Linux. (The macOS and Windows CI
-  jobs were not green until 1.0.1.)
+- 805 Python tests and 595 front-end tests; CI on Linux, macOS and Windows with Python 3.11 and 3.12.
+
+### After the hackathon submission
+
+The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](https://github.com/NousResearch/hermes-agent/pull/154025), tag `hackathon-submission`). 1.0.0 is the commit the catalog accepts; these changes came after the submission:
+
+- **Works on macOS and Windows.** The viewer now notices that Hermes has closed on macOS and Windows as well as Linux, and the helper scripts no longer need GNU-only `readlink -m`.
+- **Windows: hashed web assets are cached.** The asset rule compared an OS path with `assets/`, so on Windows nothing was ever cached.
+- **Windows: problem bundles show your home folder as `~`.** The drive letter was replaced before the home-folder check, so a Windows home read as `<drive>/…`.
+- **CI is green on Linux, macOS and Windows** with Python 3.11 and 3.12. Tests that cannot apply on Windows (POSIX file modes, bash scripts, `?` in a file name) skip there with a stated reason.
+- **The version chip tells a release from a development build.** A catalog install of the pinned commit, or a checkout at the release tag, reads `X.Y.Z`; any other build reads `X.Y.Z-dev`. `tools/release_check.py` and the release workflow keep the version, the changelog, the tag and the GitHub release in step.
+- **Documentation:** a rebuilt README with a recorded demo and current Hermes Desktop screenshots, and a full docs set (usage, reference, architecture, configuration, troubleshooting, FAQ, development and testing).
+- **Project files:** contributing guide, code of conduct, security policy, issue and pull request templates, and CODEOWNERS.
 
 ## 0.1.0 (pre-release)
 

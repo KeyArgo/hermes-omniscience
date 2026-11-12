@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/KeyArgo/hermes-omniscience/actions/workflows/tests.yml"><img alt="CI" src="https://github.com/KeyArgo/hermes-omniscience/actions/workflows/tests.yml/badge.svg?branch=main"/></a>
   <a href="TESTING.md"><img alt="Tests" src="https://img.shields.io/badge/tests-1400%20passing-2ea44f?style=flat-square"/></a>
-  <a href="https://github.com/KeyArgo/hermes-omniscience/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/KeyArgo/hermes-omniscience?style=flat-square&color=2f6bff"/></a>
+  <a href="https://github.com/NousResearch/hermes-agent/pull/154025"><img alt="Hermes plugin catalog: in review" src="https://img.shields.io/badge/plugin%20catalog-in%20review-f59e0b?style=flat-square"></a>
   <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/license-MIT-2f6bff?style=flat-square"/></a>
   <a href="https://github.com/NousResearch/hermes-agent"><img alt="Hermes Agent" src="https://img.shields.io/badge/Hermes%20Agent-%E2%89%A5%200.23.0-7c3aed?style=flat-square"/></a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-555?style=flat-square"/>
