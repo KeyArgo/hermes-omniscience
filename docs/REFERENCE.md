@@ -1,7 +1,8 @@
 # Reference
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 781b5fbc
+> **Applies to:** Omniscience 1.0.0 · written at commit 4ba0b9e
+> **Revised:** 2026-11-11 · **Body hash:** a583b6ae
+
 
 
 Every hook, event kind, HTTP route, command, configuration key and analysis rule in Omniscience
@@ -33,6 +34,12 @@ block a tool. See [COVERAGE](COVERAGE.md) for the full list and the reasons.
 
 `usage` keys allowed through: `input_tokens`, `output_tokens`, `cache_read_tokens`,
 `cache_write_tokens`, `reasoning_tokens`, `prompt_tokens`, `total_tokens`.
+
+## Tools and middleware
+
+The plugin registers **no Hermes tools** and **no middleware**. Its only registrations are the
+hooks above and the `/omni` command. The desktop/dashboard surfaces are separate files
+(`desktop/plugin.js`, `dashboard/`), not registered tools.
 
 ## Event database
 
