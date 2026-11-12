@@ -1,7 +1,9 @@
 # Install & operate Hermes Omniscience
 
-> **Applies to:** Omniscience 1.0.0 · written at commit bd88f4b
-> **Revised:** 2026-11-11 · **Body hash:** e7f4d090
+> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
+> **Revised:** 2026-11-11 · **Body hash:** 6ef3aaab
+
+
 
 
 
@@ -57,23 +59,20 @@ Notes:
 
 ## 1. Install the plugin
 
-The plugin does **not** sit at the repo root. Omniscience is a monorepo, and the plugin lives in the
-**repo root** (`plugin.yaml` + `__init__.py` + `schema.py`, `sanitize.py`,
+The plugin lives at the **repo root** (`plugin.yaml` + `__init__.py` + `schema.py`, `sanitize.py`,
 `store.py`). Hermes discovers a plugin at `<HERMES_HOME>/plugins/<name>/` containing `plugin.yaml`,
-so whatever you install has to place **that subdirectory** at `<HERMES_HOME>/plugins/omniscience/`.
+so the install places that folder at `<HERMES_HOME>/plugins/omniscience/`. Hermes also supports a
+repository **subdirectory** install (`owner/repo/path/to/plugin`); this repository keeps the plugin
+at the root, so no subdirectory is used.
 
 ### Option A — from GitHub
 
-Hermes installs a plugin from a repo subfolder with `owner/repo/path` (verified in Hermes v0.23.0,
-`website/docs/user-guide/features/plugins.md:190-191` — "A subdirectory install (owner/repo/path/to/plugin)
-downloads only that folder's files"):
-
 ```bash
-hermes plugins install KeyArgo/hermes-omniscience
+hermes plugins install KeyArgo/hermes-omniscience --yes-deps --enable
 ```
 
-The repo is private for now, so this needs GitHub access to it. Pin an auditable commit with
-`--ref <40-char sha>`. Add `--enable` to skip the enable prompt.
+Pin an auditable commit with `--ref <40-char sha>` if you want a fixed build. `--enable` skips the
+enable prompt.
 
 ### Option B — local checkout via symlink (what the e2e scripts do)
 
@@ -177,7 +176,20 @@ PYTHONPATH=viewer OMNISCIENCE_DB="$PWD/.demo-home/plugin-data/omniscience/events
 
 ---
 
-## 6. Uninstall & data removal
+## 6. Upgrade
+
+```bash
+hermes plugins install KeyArgo/hermes-omniscience --yes-deps --enable
+# restart the gateway once (owner action)
+```
+
+The recording is kept: `events.db`, `prefs.json` and `usage.db` live under
+`<HERMES_HOME>/plugin-data/omniscience/` and are not part of the plugin install. The version chip in
+the viewer header, `python -m omniscience_viewer --version`, and `GET /api/v1/version` report the
+build that is actually running. If the chip still shows the old build, reload the page; the page
+also notices a changed build and offers a reload.
+
+## 7. Uninstall & data removal
 
 Follow these in order (matches [SECURITY.md §Uninstall](SECURITY.md)):
 
@@ -198,7 +210,7 @@ To delete all stored events, remove the `plugin-data/omniscience` folder inside 
 
 ---
 
-## 7. e2e helper scripts
+## 8. e2e helper scripts
 
 These are for testing/demo, and **never** operate on the real `~/.hermes` (`demo-home.sh` refuses any
 `*/.hermes` target):

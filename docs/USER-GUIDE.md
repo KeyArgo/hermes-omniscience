@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3368854
-> **Revised:** 2026-11-10 · **Body hash:** a7505ef4
+> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
+> **Revised:** 2026-11-11 · **Body hash:** ec557d3f
+
 
 
 
@@ -30,7 +31,7 @@ Omniscience is a Hermes Agent plugin that records metadata about what happens in
 
 1. In Hermes desktop, open **Settings → Plugins** and switch **Omniscience** on. Hermes keeps plugin desktop parts off until you enable them.
 2. After enabling, an **Omniscience** row appears in the left sidebar. It opens on the chat you were in.
-3. To open the viewer in a browser, run `python -m omniscience_viewer` (from the repo: `scripts/run-viewer-live.sh`). It serves a local page on `127.0.0.1:8797`.
+3. To open the viewer in a browser, run `PYTHONPATH=viewer python3 -m omniscience_viewer` (add `--static viewer_app/static` when running from a checkout). It serves a local page on `127.0.0.1:8797`.
 4. The viewer requires a per-launch key. It is written to `viewer-token` next to the database and is readable only by you.
 
 ## Grouping the chat list

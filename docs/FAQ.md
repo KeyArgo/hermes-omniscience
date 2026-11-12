@@ -1,7 +1,8 @@
 # FAQ
 
-> **Applies to:** Omniscience 1.0.0 · commit 12e8535
-> **Revised:** 2026-11-09 · **Body hash:** 73dbc7b6
+> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
+> **Revised:** 2026-11-11 · **Body hash:** ec7bbbe6
+
 
 
 ### Why does the top bar say OFFLINE?
@@ -17,8 +18,10 @@ and your agent keeps running.
 
 ### Does it send data anywhere?
 
-No. Everything stays in a SQLite file on your machine. The viewer only reads that file. No cloud
-service, no LLM calls, no telemetry endpoint.
+The recorder makes no network calls. Everything is stored in a SQLite file on your machine, and the
+viewer reads it locally. Two opt-in features can reach the network: **Ask a Model** sends a
+metadata-only digest to a provider you pick, and the **DGX Sparks** usage source polls the hosts you
+configure. Neither runs unless you turn it on. There is no telemetry endpoint.
 
 ### Where is the data?
 

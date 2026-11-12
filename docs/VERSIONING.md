@@ -10,18 +10,17 @@ There are two numbers, and confusing them is what makes "is it 1.0.0?" unanswera
 
 | | Value today | Meaning |
 |---|---|---|
-| **Release the tree targets** | `1.0.0` (in `plugin.yaml`) | the number that will be tagged when the release is published |
-| **This build** | `1.0.0-dev.183` (in `BUILD_INFO.json`) | pre-release: 183 commits into that target |
+| **Release the tree targets** | `1.0.0` (in `plugin.yaml`) | the number the `v1.0.0` tag carries |
+| **This build** | version + commit + date (in the chip and `/api/v1/version`) | the exact code answering |
 
-The build number is `git rev-list --count HEAD`, written by `deploy.sh` on every deploy. So no two
-builds share a name, a build never claims to be a release it is not, and the count only resets when
-a release is actually tagged. The header chip shows all three facts — `v1.0.0-dev.183 · 2026-11-09 ·
-ec95a4cb` — because a version without a date cannot say whether a screenshot is from this morning or
-last week.
+`deploy.sh` writes a build stamp when it installs a copy, because an installed plugin has no `.git`.
+The header chip shows all three facts — version, date and commit — because a version without a date
+cannot say whether a screenshot is from this morning or last week.
 
-**Nothing is tagged yet.** `git tag` currently holds one historic `v0.1.0` from an early branch, and
-no tag is an ancestor of `main`. Until `v1.0.0` is created, every build reads `-dev.N`, which is the
-honest answer to "is it released?".
+**The `v1.0.0` tag exists.** A checkout can be a few commits past it (documentation or CI changes,
+for example); the chip and `/api/v1/version` still report the exact commit, so a build after the tag
+does not claim to be the tag. The older `v0.1.0` tag is history from an early branch, not the public
+release.
 
 Alpha/beta labels are deliberately not used: a phase name says nothing about which code is running,
 and `-dev.183` does. If a freeze is wanted before the demo, `1.0.0-rc.1` is the SemVer-correct way to
@@ -97,8 +96,9 @@ is mechanical, not disciplinary.
 Every living guide opens with:
 
 ```
-> **Applies to:** Omniscience 1.0.0 · written at commit ec95a4c
-> **Revised:** 2026-11-09 · **Body hash:** a559900f
+> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
+> **Revised:** 2026-11-11 · **Body hash:** ecb0e585
+
 
 
 ```

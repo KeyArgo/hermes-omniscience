@@ -1,34 +1,57 @@
 # Roadmap
 
-> **Applies to:** Omniscience 1.0.0 · written at commit bd88f4b
-> **Revised:** 2026-11-11 · **Body hash:** 9a74e9e5
+> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
+> **Revised:** 2026-11-11 · **Body hash:** 3b1c33fc
 
 
+What is built in 1.0.0, what is next, and what is parked. Status is read from the code at this
+commit, not from intention.
 
-## Phase 1 — vertical slice (this milestone)
+## Phase 1 — vertical slice (done)
 
-Hook → sanitized event → SQLite → viewer → live graph.
+Hook to sanitized event to SQLite to viewer to live graph.
 
-| # | Deliverable | Acceptance test |
+| # | Deliverable | Status |
 |---|---|---|
-| 1.1 | `plugin/omniscience` schema + sanitize | pytest: each normalizer keeps only allowlisted keys; secret corpus never appears in output |
-| 1.2 | `EventStore` queue + writer | pytest: 10k events persisted; duplicate `event_id` ignored; full queue counts drops and writes `omni.dropped`; `put` never blocks (<1 ms p99) |
-| 1.3 | plugin `register(ctx)` | pytest with fake ctx: registers the 10 hooks, never `pre_tool_call`; callbacks swallow exceptions |
-| 1.4 | viewer REST + WS | pytest (TestClient): sessions, descendant-inclusive events, `after` cursor, WS delivers newly inserted rows |
-| 1.5 | web graph + reduce | vitest: reduce is pure/deterministic; subagent nests under parent turn; gap marker on seq jump |
-| 1.6 | synthetic demo | `demo/synth.py` writes a DB the viewer renders with no Hermes |
-| 1.7 | **real run** | isolated `HERMES_HOME`, `hermes -z` with a tool call + `delegate_task` → graph shows session→turn→llm→tool and child session, live |
+| 1.1 | Schema, sanitizers, redaction | Done — `schema.py`, `sanitize.py`; the Python suite covers allowlists and a secret corpus |
+| 1.2 | `EventStore` queue and writer | Done — bounded queue, writer thread, `omni.dropped`, idempotent inserts |
+| 1.3 | `register(ctx)` | Done — hooks registered, `pre_tool_call` never registered, callback exceptions swallowed |
+| 1.4 | Viewer REST and WebSocket | Done — `viewer/omniscience_viewer/app.py` |
+| 1.5 | Web graph and `reduce` | Done — `web/src/graph/reduce.ts`; determinism and property tests |
+| 1.6 | Synthetic demo | Done — `demo/synth.py` and `python -m omniscience_viewer --demo` |
+| 1.7 | Real run | Done — `scripts/real-run.sh` in an isolated `HERMES_HOME` |
 
-## Phase 2 — replay & dashboard
-Timeline scrubber + play/pause/speed; error inspector; `dashboard/` tab packaging (mount viewer router
-as `plugin_api.py`); install via `hermes plugins install KeyArgo/hermes-omniscience` (subdirectory).
+## Phase 2 — replay and dashboard (done)
 
-## Phase 3 — analysis & export
-Deterministic rules (configurable thresholds): repeated tool failure, loop (same tool+arg-names N×),
-stall (running > T), slow inference (p95), token spike. Run comparison (two graphs, diff). Read-only
-Hermes tools (`omni_query_events`, `omni_explain_failure` returning cited `event_id`s). Optional OTLP
-export (GenAI semconv) for Phoenix/any collector. Opt-in redacted previews.
+- Replay bar with 1×, 4× and 16× speeds and a step scrubber.
+- Failure inspector, "Why" and "Next failure" stepper.
+- `dashboard/` tab packaging (`manifest.json`, `dist/index.js`, `plugin_api.py`).
+- Install from the repository root with `hermes plugins install KeyArgo/hermes-omniscience`.
 
-## Dependencies / risks
-- Upstream (would need approval): fail-open `on_tool_start` observer; `child_subagent_id` on `subagent_stop`.
-- Desktop and messaging surfaces not yet run live (same process/code path — expected to work).
+## Phase 3 — analysis and export (partly done)
+
+| Item | Status |
+|---|---|
+| Deterministic rules (repeated tool failure, loop, stall, unanswered request, slow inference, token spike, lost events) | Done — `analysis/omniscience_analysis/rules.py`; endpoint `GET /api/v1/warnings` |
+| CSV export of steps, chats and models | Done — `viewer/omniscience_viewer/export.py` |
+| Redacted problem bundle | Done — preview and write routes |
+| Token usage from other harnesses, opt-in per source | Done — `viewer/omniscience_viewer/sources.py` |
+| Ask one of your own models to read the recording | Done — `insight.py`; metadata-only digest |
+| Run comparison (two graphs, diff) | Not built |
+| Read-only Hermes tools (`omni_query_events`, `omni_explain_failure`) | Not built; the `/omni` command covers chat triage today |
+| OTLP export | Not built |
+| Opt-in redacted previews of prompts or tool output | Not built; the recorder remains metadata-only |
+
+## Parked
+
+- A fail-open `on_tool_start` observer upstream. Without it, a running tool appears only when it
+  finishes.
+- `child_subagent_id` on `subagent_stop` upstream. Today helper stops join by `child_session_id`.
+- Desktop and messaging surfaces run in the same gateway and use the same hook path, but have not
+  each been exercised live in this repo.
+
+## Related
+
+- [DECISIONS](DECISIONS.md) — why the design looks like this.
+- [LIMITS](../LIMITS.md) — the deliberate limits.
+- [Documentation index](README.md)

@@ -1,7 +1,8 @@
 # Hermes Integration — verified hooks, payloads, limitations
 
-> **Applies to:** Omniscience 1.0.0 · commit 12e8535
-> **Revised:** 2026-11-09 · **Body hash:** 8e0eae98
+> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
+> **Revised:** 2026-11-11 · **Body hash:** 96125899
+
 
 
 Verified against Hermes Agent **v0.23.0**, git `2bd378ed1b` (2026-11-05), install at
@@ -72,6 +73,10 @@ Consequences:
 | `post_tool_call` | `model_tools.py:700-708` | ids, tool_name, duration_ms, status (ok/error/blocked/cancelled), error_type; **arg names only**, result length only | ✔ |
 | `subagent_start` | `tools/delegate_tool.py:353-359` | parent_session_id, parent_turn_id, parent_subagent_id, child_session_id, child_subagent_id, child_role (goal: length only) | ✔ |
 | `subagent_stop` | `tools/delegate_tool_results.py:380-389` | parent/child session ids, child_status, duration_ms, tool_call_history (already metadata-only per docs) | — |
+| `pre_auxiliary_call` | background/auxiliary call site | ids, aux_task, model, provider, api_mode, retry_count, message_count, tool_count, approx_input_tokens, plugin_id | — |
+| `post_auxiliary_call` | background/auxiliary call site | ids, aux_task, model, provider, finish_reason, response_model, error_type, duration, usage | — |
+| `on_skill_lifecycle` | skill lifecycle site | ids, action, skill_name (redacted), use_count, reused | — |
+| `on_session_delete` | committed delete or archive | deleted ids and reason; rows are purged or hidden | — |
 
 Deliberately **not** consumed: `pre_tool_call` (fails closed), `transform_*` (behavior-changing),
 `on_stream_delta` (token-rate firehose, would contain text), `on_kanban_dispatch_tick` (fires every
