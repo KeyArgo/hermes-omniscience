@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in Omniscience does not work as described
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove private data from logs and screenshots before posting. For a security
+        problem, use SECURITY.md instead of a public issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including any error text.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: e.g. Ubuntu 24.04, macOS 15, Windows 11
+    validations:
+      required: true
+  - type: input
+    id: hermes
+    attributes:
+      label: Hermes Agent version
+      description: Output of `hermes --version`
+    validations:
+      required: true
+  - type: input
+    id: omniscience
+    attributes:
+      label: Omniscience version
+      description: Shown in the plugin, or `python -m omniscience_viewer --version`
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove anything private first.
+    validations:
+      required: false

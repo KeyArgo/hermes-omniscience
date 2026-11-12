@@ -22,5 +22,9 @@ capabilities:
     - post_tool_call
     - subagent_start
     - subagent_stop
+    - pre_auxiliary_call
+    - post_auxiliary_call
+    - on_skill_lifecycle
+    - on_session_delete
   provides_middleware: []
   requires_env: []

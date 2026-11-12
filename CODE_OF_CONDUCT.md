@@ -5,6 +5,7 @@ Omniscience follows the [Contributor Covenant, version 2.1](https://www.contribu
 In short: be respectful, assume good faith, give and take feedback gracefully, and keep discussion
 about the work. Harassment, personal attacks and discriminatory language are not tolerated.
 
-To report a problem, open a private report through GitHub's **Security → Report a vulnerability**
-form on this repository, or contact the maintainer, @KeyArgo, on GitHub. Reports are handled
-confidentially.
+## Enforcement
+
+To report a problem, open a private report via GitHub's **Security → Report a vulnerability** form
+on this repository, or contact the maintainers through GitHub. Reports are handled confidentially.
