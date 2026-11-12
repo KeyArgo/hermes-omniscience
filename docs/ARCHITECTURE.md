@@ -1,7 +1,8 @@
 # Architecture
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 7cdae0d5
+> **Applies to:** Omniscience 1.0.0 · written at commit ad9c637
+> **Revised:** 2026-11-11 · **Body hash:** a5f5172d
+
 
 
 What runs, what it writes, and how an event becomes a box on the map. All paths are relative to the
@@ -10,26 +11,20 @@ repository root.
 ## 1. Components
 
 ```mermaid
-flowchart TB
-    subgraph Hermes["Hermes gateway process (one per profile)"]
-        H["observer hook callback"] --> N["normalize + sanitize<br/>sanitize.py, allowlist, bounded"]
-        N --> Q["bounded Queue(10,000)"]
-        Q -->|"full"| D["drop counter++"]
-        W["writer daemon thread"] <--> Q
-        W -->|"batch of 500 / 250 ms<br/>INSERT OR IGNORE, WAL, busy 5 s"| DB
-        D --> M["omni.dropped marker"]
-        M --> DB
-    end
-    DB[("<HERMES_HOME>/plugin-data/omniscience/events.db")]
-    DB -->|"read-only connection (mode=ro)"| V
-    subgraph Viewer["omniscience viewer (separate process, FastAPI, 127.0.0.1)"]
-        V["REST /api/v1/*<br/>WS /api/v1/live"]
-        V --> S["serves web/dist or viewer_app/static"]
-    end
-    S --> B["Browser: React + React Flow"]
-    B --> R["reduce.ts: events to nodes and edges"]
+flowchart LR
+    H["Hermes observer hook callback"] --> N["normalize + sanitize<br/>sanitize.py, allowlist, bounded"]
+    N --> Q["bounded Queue 10,000"]
+    Q -->|"full"| D["drop counter++"]
+    Q --> W["writer daemon thread"]
+    W -->|"batch of 500 / 250 ms<br/>INSERT OR IGNORE, WAL, busy 5 s"| DB[("events.db<br/>plugin-data/omniscience")]
+    D --> M["omni.dropped marker"]
+    M --> DB
+    DB -->|"read-only, mode=ro"| V["viewer process<br/>FastAPI on 127.0.0.1"]
+    V --> S["serves web/dist<br/>or viewer_app/static"]
+    S --> B["browser: React + React Flow"]
+    B --> R["reduce.ts<br/>events to nodes and edges"]
     R --> L["live: append + reduce"]
-    R --> P["replay: reduce(events[0..k])"]
+    R --> P["replay: reduce events 0..k"]
 ```
 
 There is no network hop inside the agent process. The plugin writes to SQLite from a background
