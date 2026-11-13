@@ -5,5 +5,9 @@
   "prepare": [
     "python3 scripts/docs-stamp.py --write"
   ],
-  "dev_base": 319
+  "dev_base": 319,
+  "private_ok": [
+    "tests/test_viewer_page_key.py:10.0.0.5",
+    "tests/test_viewer_page_key.py:192.168.1.20"
+  ]
 }
