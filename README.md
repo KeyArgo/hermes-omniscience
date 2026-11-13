@@ -17,9 +17,6 @@
   <a href="https://github.com/KeyArgo/hermes-omniscience/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/KeyArgo/hermes-omniscience?style=flat-square&color=f5b301"/></a>
 </p>
 
-<p align="center">
-  <img src="docs/media/omni-map.gif" width="100%" alt="Omniscience in Hermes Desktop: a run as a map of messages, model calls and tools, then the timeline">
-</p>
 
 <p align="center">
   <img src="docs/media/omniscience-demo.gif" alt="Omniscience inside Hermes Desktop watching a real agent session: the live map, then the timeline" width="900"/>
