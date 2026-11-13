@@ -41,7 +41,7 @@
       "items": [
         { "name": "List · Map · Time · Tokens · Usage", "what": "The five main views. More Views adds Flame, Tools, Context, Helpers, Coverage and Latency." },
         { "name": "Filters", "what": "Hide tool steps, hide model calls, or show errors only. The number on the button counts filters that are on." },
-        { "name": "Ask a Model", "what": "One of your own models reads this recording (tokens, timings, rate limits, context growth) and writes what to fix." },
+        { "name": "Writeup", "what": "The diagnosis Hermes wrote for this recording (tokens, timings, rate limits, context growth, what to fix). Run /omni insight in Hermes to write a fresh one; the viewer reads the saved report and never calls a model itself." },
         { "name": "Actions", "what": "Export CSV (timings, tokens, models, never message text), open Panels, or reset the view." }
       ]
     },

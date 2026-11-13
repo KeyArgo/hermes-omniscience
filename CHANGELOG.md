@@ -107,13 +107,11 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
   errors, compactions seen while that model was in use, and a last-call clock; a provider rollup
   answers "is this account throttled", the models table answers "which name is slow", and a short
   findings block says which is which in words. A period switch limits the page.
-- **Ask a model: one of your own models reads the recording and writes the diagnosis.** A new
-  panel offers every model Hermes is already authenticated for (read from `auth.json`,
-  `config.yaml` and `.env`, then each provider's model list), sends a metadata-only digest —
-  counts, tokens, timings, rate limits, compactions, chat labels — and returns a written report
-  with the money, the slow tail, the failures and five things to change. Keys never leave the
-  viewer; prompts and tool results are not stored, so they cannot be sent. `GET
-  /api/v1/insight/models`, `POST /api/v1/insight`.
+- **A written diagnosis of the recording.** One of your own models reads a metadata-only digest —
+  counts, tokens, timings, rate limits, compactions, chat labels — and returns a report with the
+  money, the slow tail, the failures and five things to change. It runs inside Hermes (`/omni
+  insight`, on the model you already use) and the viewer shows the saved report; prompts and tool
+  results are not stored, so they cannot be sent.
 - **Usage page** (`/omni tokens`): what this machine spent, measured per call — totals, a day
   calendar, tokens per day split by model, a model table with p50/p95 and time-to-first-word, the
   cache's share and what it saved at list price, the context each call carried with every

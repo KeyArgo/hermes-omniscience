@@ -1,7 +1,7 @@
 # Omniscience — a guide to the screen
 
-> **Applies to:** Omniscience 1.0.0 · written at commit a052322
-> **Revised:** 2026-11-10 · **Body hash:** d7aa7832
+> **Applies to:** Omniscience 1.0.0 · written at commit 48e2370
+> **Revised:** 2026-11-13 · **Body hash:** 8b22ed49
 
 
 Generated from `web/src/help/guide.json` by `web/scripts/gen-ui-guide.mjs`. The same text
@@ -27,7 +27,7 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 
 - **List · Map · Time · Tokens · Usage** — The five main views. More Views adds Flame, Tools, Context, Helpers, Coverage and Latency.
 - **Filters** — Hide tool steps, hide model calls, or show errors only. The number on the button counts filters that are on.
-- **Ask a Model** — One of your own models reads this recording (tokens, timings, rate limits, context growth) and writes what to fix.
+- **Writeup** — The diagnosis Hermes wrote for this recording (tokens, timings, rate limits, context growth, what to fix). Run /omni insight in Hermes to write a fresh one; the viewer reads the saved report and never calls a model itself.
 - **Actions** — Export CSV (timings, tokens, models, never message text), open Panels, or reset the view.
 
 ## The status band
