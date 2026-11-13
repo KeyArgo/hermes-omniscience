@@ -34,3 +34,13 @@ def test_external_links_open_through_the_plugin_sdk():
         assert receiver.replace("?.", ".") in ("ctx.os", "CTX.os"), (
             f"openExternal reached through {receiver}"
         )
+
+
+def test_the_viewer_key_comes_only_from_the_plugin_backend():
+    """Reading plugin-data through the desktop file bridge can reach other profiles' folders."""
+    text = source()
+    assert "readKeyFromDisk" not in text
+    assert "readFileText" not in text
+    assert "desktopPluginsRoot" not in text
+    assert "hermesDesktop" not in text
+    assert "rest('/viewer')" in text

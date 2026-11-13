@@ -51,38 +51,11 @@ function listenForOpenExternal() {
 
 let CTX = null
 
-// The viewer only answers with its per-launch key; Hermes hands it to us behind its own login.
-// Read it straight from disk through the desktop file bridge (works in every profile, no gateway
-// round trip); fall back to the plugin's Hermes route. The key belongs to the focused profile's
-// viewer, so resolve that profile's token first and only fall back to the default profile.
-async function readKeyFromDisk() {
-  const d = window.hermesDesktop
-  const rootFn = d?.desktopPluginsRoot || d?.fs?.desktopPluginsRoot
-  if (!d?.readFileText || !rootFn) return null
-  const root = String((await rootFn()) || '')
-  const home = root.replace(/[\\/]desktop-plugins[\\/]?$/, '')
-  if (!home) return null
-  let profile = null
-  try {
-    profile = host.state?.focusedSessionProfile?.get?.() || null
-  } catch {
-    profile = null
-  }
-  const candidates = []
-  if (profile && profile !== 'default') candidates.push(`${home}/profiles/${profile}/plugin-data/omniscience/viewer-token`)
-  candidates.push(`${home}/plugin-data/omniscience/viewer-token`)
-  for (const path of candidates) {
-    try {
-      const file = await d.readFileText(path)
-      const token = String(file?.text || '').trim()
-      if (token) return token
-    } catch {
-      /* try the next place */
-    }
-  }
-  return null
-}
-
+// The viewer answers only with its per-launch key, and Hermes hands it to us behind its own
+// login: the plugin's own backend reads it (GET /api/plugins/omniscience/viewer) and ctx.rest is
+// the only door to that namespace. The page must not read plugin-data itself — a file path it
+// can reach is a path that can reach another profile's folders, and the tracker above would not
+// see the read.
 async function viewerReachable() {
   try {
     await fetch(`${VIEWER_URL}/api/v1/ping`, { mode: 'no-cors', cache: 'no-store' })
@@ -99,9 +72,8 @@ function useViewerKey() {
     ;(async () => {
       const up = await viewerReachable()
       let token = null
-      if (up) {
-        token = await readKeyFromDisk().catch(() => null)
-        if (!token && CTX?.rest) token = await Promise.resolve(CTX.rest('/viewer')).then(r => (r && r.token) || null).catch(() => null)
+      if (up && CTX?.rest) {
+        token = await Promise.resolve(CTX.rest('/viewer')).then(r => (r && r.token) || null).catch(() => null)
       }
       if (alive) setState(prev => ({ ...prev, ready: true, token, up }))
     })()
