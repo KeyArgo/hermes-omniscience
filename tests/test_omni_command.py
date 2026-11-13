@@ -538,3 +538,25 @@ def test_insight_reports_a_failed_model_call_without_a_traceback(tmp_path, monke
     answer = omniscience._omni_command('insight', session_id=None)
     assert 'did not happen' in answer
     assert '429' in answer
+
+
+def test_insight_refuses_an_empty_recording_instead_of_spending_a_model_call(tmp_path, monkeypatch):
+    """A fresh profile has a database and no rows. A writeup of nothing costs a call and says nothing."""
+    from types import SimpleNamespace
+
+    db = tmp_path / 'events.db'
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table events (rowid integer primary key, event_id text, schema text, '
+                     'boot_id text, seq integer, ts real, kind text, session_id text, parent_session_id text, '
+                     'turn_id text, api_request_id text, tool_call_id text, subagent_id text, status text, attrs text)')
+    monkeypatch.setattr(omniscience, '_store', None)
+    monkeypatch.setenv('OMNISCIENCE_DB', str(db))
+
+    class Host:
+        def complete(self, **kwargs):
+            raise AssertionError('no model call should be made for an empty recording')
+
+    monkeypatch.setattr(omniscience, '_ctx', SimpleNamespace(llm=Host()))
+    answer = omniscience._omni_command('insight', session_id=None)
+    assert 'nothing recorded' in answer.lower()
+    assert not (tmp_path / 'insight.json').exists()

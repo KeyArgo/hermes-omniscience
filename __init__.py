@@ -356,6 +356,9 @@ def _insight_command(action: str) -> str:
     if module is None:
         return "Omniscience: the bundled insight module is missing from this install, so nothing was generated."
     db_path = _store.db_path if _store is not None else _db_path()
+    if not module.has_events(db_path):
+        return ("Omniscience: nothing recorded yet, so there is nothing to write up. The viewer shows "
+                "what has been recorded; /omni insight works once your agent has done something.")
     try:
         digest = module.build_digest(db_path, _state_db_path(), days)
         report = module.writeup(digest, llm.complete, days=days)

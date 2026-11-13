@@ -64,6 +64,27 @@ def _window_label(days: float) -> str:
     return f"the last {days:g} days"
 
 
+def has_events(db_path: str) -> bool:
+    """False only when the recording is readable and empty.
+
+    A fresh profile has the database and no rows; a digest of zeros is not a diagnosis, and
+    asking a model to write one up spends a call to say nothing. An unreadable database answers
+    True — that is a different problem, and the normal path reports it.
+    """
+    import sqlite3
+
+    if not db_path or not os.path.isfile(db_path):
+        return False
+    try:
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2)
+        try:
+            return con.execute("select 1 from events limit 1").fetchone() is not None
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return True
+
+
 def build_digest(db_path: str, state_db: Optional[str], days: float, now: Optional[float] = None) -> str:
     """A compact, metadata-only description of the recording, as text for the model."""
     now = time.time() if now is None else now
