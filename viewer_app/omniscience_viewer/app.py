@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+from typing import Any
 
 from urllib.parse import urlsplit
 
@@ -51,6 +52,68 @@ POLL_INTERVAL_S = float(os.environ.get("OMNISCIENCE_POLL_INTERVAL_S", "1.0"))
 IDLE_POLL_INTERVAL_S = float(os.environ.get("OMNISCIENCE_IDLE_POLL_INTERVAL_S", "4.0"))
 IDLE_AFTER = 3
 HEARTBEAT_INTERVAL_S = 10.0
+
+
+class SandboxedFrameCors:
+    """CORS for one origin only: the opaque origin of a sandboxed frame.
+
+    The desktop embeds this page with the SDK's ``SandboxedFrame``, whose guest has no origin of
+    its own and reports ``Origin: null``. A ``null`` origin is cross-origin to the viewer, so the
+    guest's ``fetch`` — which carries the ``X-Omni-Token`` header, so it is never a simple
+    request — needs a preflight answer, and its responses need the origin echoed or the browser
+    discards them.
+
+    Scoped deliberately: a real site gets no CORS headers at all, the allowed methods are the
+    ones the page uses, and every request on ``/api/`` is still gated by the token. Answering
+    only ``null`` keeps a random page's ``fetch`` exactly as blocked as it was.
+    """
+
+    ALLOWED_METHODS = b"GET, POST, OPTIONS"
+    ALLOWED_HEADERS = b"x-omni-token, content-type, accept"
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in (scope.get("headers") or [])
+        }
+        if not path.startswith("/api/") or headers.get("origin") != "null":
+            await self.app(scope, receive, send)
+            return
+
+        if scope.get("method", "").upper() == "OPTIONS":
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 204,
+                    "headers": [
+                        (b"access-control-allow-origin", b"null"),
+                        (b"access-control-allow-methods", self.ALLOWED_METHODS),
+                        (b"access-control-allow-headers", self.ALLOWED_HEADERS),
+                        (b"access-control-max-age", b"600"),
+                        (b"vary", b"origin"),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": b""})
+            return
+
+        async def with_cors(message: dict) -> None:
+            if message.get("type") == "http.response.start":
+                message = {
+                    **message,
+                    "headers": list(message.get("headers") or [])
+                    + [(b"access-control-allow-origin", b"null"), (b"vary", b"origin")],
+                }
+            await send(message)
+
+        await self.app(scope, receive, with_cors)
 
 
 LOCAL_HOSTS = ["127.0.0.1", "localhost", "[::1]", "::1"]
@@ -92,9 +155,17 @@ def _db_fingerprint(db_path: str) -> str:
 
 
 def _origin_allowed(origin: str | None, host_header: str | None) -> bool:
-    """Same-origin only: browsers let any site open a WebSocket to localhost, so check Origin."""
+    """Same-origin only: browsers let any site open a WebSocket to localhost, so check Origin.
+
+    The one exception is the opaque origin ("null") a sandboxed frame reports: the desktop embeds
+    this page in the SDK's SandboxedFrame, so the live feed has to open from there. What actually
+    protects the socket is the per-launch token in the subprotocol, which a hostile page cannot
+    read — the Origin check is defence in depth, not the lock.
+    """
     if not origin:
         return True  # non-browser client (curl, tests)
+    if origin == "null":
+        return True  # a sandboxed frame: opaque origin, token still required
     try:
         return urlsplit(origin).netloc == (host_header or "")
     except ValueError:
@@ -297,6 +368,9 @@ def create_app(db_path: str, static_dir: str | None = None,
     app.state.token_state = token_state
     app.state.token_middleware = None  # top-level registration below
     app.add_middleware(TokenMiddleware, token_state=token_state)
+    # Outermost (added last): a sandboxed frame preflights every API call, and the preflight
+    # carries no token, so it must be answered before TokenMiddleware sees it.
+    app.add_middleware(SandboxedFrameCors)
 
     def _build_id() -> str:
         """A cheap marker for the page that is installed right now.

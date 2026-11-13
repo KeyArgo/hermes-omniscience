@@ -79,6 +79,13 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
   opened, because the flexible surface was squeezed to 0 px. Page views (Usage, Latency) now own
   their scrollbar, take the full width, and suppress the chat-scoped chrome; the graph surfaces
   keep a 320 px floor and the stage scrolls around them.
+- **Embedded desktop page (review 4).** The viewer is embedded with the SDK's `SandboxedFrame`
+  instead of a raw `<iframe>`, so the page runs in the app's guest posture with an opaque origin:
+  it cannot reach the app's realm, storage or bridge. The panel reports `Origin: null` as a
+  result, which the viewer now expects — it answers that origin's CORS preflight, accepts it on
+  the live WebSocket (the per-launch token still gates both) and gives the page a memory-backed
+  stand-in for `localStorage`, which a sandboxed document cannot use. Messages from the page
+  (open full view, hide the pane, open in the browser) are recognised from that opaque origin.
 - **The writeup is written by Hermes, not by the viewer.** The diagnosis panel used to read
   `auth.json`, `config.yaml` and `.env` to find an endpoint and a key, then call the provider from
   the viewer process. It now asks Hermes through the plugin SDK's `ctx.llm` facade (`/omni insight`,

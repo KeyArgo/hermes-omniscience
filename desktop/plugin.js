@@ -2,7 +2,7 @@
  * Omniscience desktop page: embeds the standalone viewer (graph + replay) as a Hermes page
  * with a row in the left sidebar. The viewer runs separately on 127.0.0.1:8797.
  */
-import { host } from '@hermes/plugin-sdk'
+import { host, SandboxedFrame } from '@hermes/plugin-sdk'
 import { jsx } from 'react/jsx-runtime'
 import { useEffect, useState } from 'react'
 
@@ -27,12 +27,17 @@ function focusedChat() {
 
 // The embedded viewer asks us to open itself in the user's browser (its own window.open is blocked).
 // Only links back to the viewer itself are honoured.
+//
+// Origins: the page is embedded in the SDK's SandboxedFrame, so its origin is OPAQUE and arrives
+// as the string "null" — the viewer URL is what a browser tab reports, and both are the page we
+// embedded. Everything else is ignored, and the payload is validated below regardless.
+const VIEWER_ORIGINS = new Set([VIEWER_URL, 'null'])
 let externalListener = null
 function listenForOpenExternal() {
   if (externalListener) return
   externalListener = event => {
     const data = event.data
-    if (event.origin !== VIEWER_URL || !data) return
+    if (!VIEWER_ORIGINS.has(event.origin) || !data) return
     if (data.type === 'omniscience:open-full') {
       const session = typeof data.session === 'string' ? data.session : null
       host.navigate(session ? `/omniscience?session=${encodeURIComponent(session)}` : '/omniscience')
@@ -116,11 +121,12 @@ function OmnisciencePage() {
   const src = viewerSrc(session, key.token)
   return jsx('div', {
     style: { width: '100%', height: '100%', display: 'flex' },
-    children: jsx('iframe', {
+    // SandboxedFrame, not a raw <iframe>: the viewer is web content, so it gets the app's guest
+    // posture (an opaque origin, no bridge, no access to the app's storage). The page is built
+    // for that — it authenticates every call with its own key and asks for nothing else.
+    children: jsx(SandboxedFrame, {
       src,
       title: 'Omniscience viewer',
-      allow: 'fullscreen',
-      allowFullScreen: true,
       style: { flex: 1, border: 'none', display: 'block' },
     }),
   })
@@ -152,7 +158,7 @@ function LivePane() {
   return jsx('div', {
     style: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%' },
     children: [
-      jsx('iframe', {
+      jsx(SandboxedFrame, {
         key: session || 'none',
         src: viewerSrc(session, key.token, { mini: '1', actions: '0' }),
         title: 'Omniscience live',

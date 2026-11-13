@@ -136,3 +136,59 @@ def test_token_not_printed():
     bundled_source = inspect.getsource(bundled_main.main)
     assert "?t={token}" not in bundled_source
     assert "?t=" not in bundled_source
+
+
+def _token_client(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from omniscience_viewer.app import create_app
+
+    db = tmp_path / "events.db"
+    db.write_bytes(b"")
+    return TestClient(create_app(str(db), token="k"), base_url="http://127.0.0.1")
+
+
+def test_a_sandboxed_frame_can_reach_the_api(tmp_path):
+    """The desktop embeds the page in the SDK's SandboxedFrame, whose guest has an opaque origin.
+
+    A sandboxed frame sends ``Origin: null`` and preflights every API call because of the token
+    header, so the viewer has to answer the preflight and echo the origin — otherwise the
+    embedded page is blank and every request fails with a CORS error.
+    """
+    client = _token_client(tmp_path)
+    pre = client.options(
+        "/api/v1/sessions",
+        headers={
+            "origin": "null",
+            "access-control-request-method": "GET",
+            "access-control-request-headers": "x-omni-token",
+        },
+    )
+    assert pre.status_code in (200, 204)
+    assert pre.headers.get("access-control-allow-origin") == "null"
+    assert "x-omni-token" in pre.headers.get("access-control-allow-headers", "").lower()
+
+    got = client.get("/api/v1/sessions", headers={"origin": "null", "x-omni-token": "k"})
+    assert got.status_code == 200
+    assert got.headers.get("access-control-allow-origin") == "null"
+
+
+def test_a_foreign_site_is_not_granted_cors(tmp_path):
+    """Only the opaque origin of a sandboxed frame is allowed; a random site is not."""
+    client = _token_client(tmp_path)
+    pre = client.options(
+        "/api/v1/sessions",
+        headers={"origin": "https://evil.example", "access-control-request-method": "GET"},
+    )
+    assert pre.headers.get("access-control-allow-origin") in (None, "")
+    got = client.get("/api/v1/sessions", headers={"origin": "https://evil.example", "x-omni-token": "k"})
+    assert got.headers.get("access-control-allow-origin") in (None, "")
+
+
+def test_a_sandboxed_frame_may_open_the_live_feed():
+    """The WebSocket Origin check must accept the opaque origin the sandboxed frame reports."""
+    from omniscience_viewer.app import _origin_allowed
+
+    assert _origin_allowed("null", "127.0.0.1:8797") is True
+    assert _origin_allowed("http://127.0.0.1:8797", "127.0.0.1:8797") is True
+    assert _origin_allowed("https://evil.example", "127.0.0.1:8797") is False

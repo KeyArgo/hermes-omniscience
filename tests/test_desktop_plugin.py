@@ -44,3 +44,33 @@ def test_the_viewer_key_comes_only_from_the_plugin_backend():
     assert "desktopPluginsRoot" not in text
     assert "hermesDesktop" not in text
     assert "rest('/viewer')" in text
+
+
+def test_the_viewer_is_embedded_with_the_sdk_sandboxed_frame():
+    """A raw <iframe> inherits the app's realm; the SDK primitive gives the guest an opaque one."""
+    text = source()
+    assert "SandboxedFrame" in text
+    assert "jsx('iframe'" not in text
+    assert "allowFullScreen" not in text
+    # The SDK primitive is imported, not reached through the app's internals.
+    assert re.search(r"import\s*\{[^}]*SandboxedFrame[^}]*\}\s*from\s*'@hermes/plugin-sdk'", text)
+
+
+def test_the_sandboxed_embed_speaks_the_posture_the_viewer_needs():
+    """An opaque-origin guest is what the viewer must survive: it needs CORS and a null Origin."""
+    text = source()
+    # allow-same-origin would defeat the sandbox; the SDK drops it, and we must not ask for it.
+    assert "allow-same-origin" not in text
+
+
+def test_messages_from_the_sandboxed_viewer_are_recognised():
+    """A sandboxed frame reports an opaque origin ("null"), so the origin check must know it.
+
+    The page's own buttons (open full view, hide the pane, open in the browser) arrive as
+    postMessage; with the origin check pinned to the viewer URL every one of them is dropped and
+    the pane's buttons go dead.
+    """
+    text = source()
+    assert re.search(r"VIEWER_ORIGINS\s*=\s*new Set\(", text)
+    assert "'null'" in text
+    assert "event.origin !== VIEWER_URL" not in text
