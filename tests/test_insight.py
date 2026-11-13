@@ -242,15 +242,14 @@ def test_the_viewer_serves_the_saved_writeup_and_offers_no_credential_route(tmp_
                        headers=headers).status_code in (404, 405)
 
 
-def test_save_reports_a_write_it_could_not_make(tmp_path):
+def test_save_reports_a_write_it_could_not_make(tmp_path, monkeypatch):
     """An unwritable folder must not look like a saved report the viewer can show."""
-    import os
-
     db = tmp_path / "events.db"
     _events_db(db)
-    os.chmod(tmp_path, 0o500)
-    try:
+    def denied(*args, **kwargs):
+        raise PermissionError("write denied")
+
+    with monkeypatch.context() as patch:
+        patch.setattr("builtins.open", denied)
         assert insight.save(str(db), {"markdown": "# x"}) is None
-    finally:
-        os.chmod(tmp_path, 0o700)
     assert insight.load(str(db)) is None

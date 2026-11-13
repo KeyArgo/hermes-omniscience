@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { placeTip, tipTextFor } from './tipLayer';
+import { placeTip, tipTextFor } from './tipPlacement';
 
 type FakeEl = {
   attrs: Record<string, string>;

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { placeTip, SHOW_DELAY_FOCUS, SHOW_DELAY_HOVER, tipTextFor } from './tipLayer';
+import { placeTip, SHOW_DELAY_FOCUS, SHOW_DELAY_HOVER, tipTextFor } from './tipPlacement';
 import './TipLayer.css';
 
 type Shown = {
