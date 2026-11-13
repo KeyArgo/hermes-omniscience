@@ -25,6 +25,7 @@ def build_info(monkeypatch, tmp_path):
     monkeypatch.setattr(version_stamp, "_find_build_info", fake_build_info)
     monkeypatch.setattr(version_stamp, "_git", lambda *a: "")
     monkeypatch.setattr(version_stamp, "_declared_version", lambda: "")
+    monkeypatch.setattr(version_stamp, "_dev_base", lambda: 0)  # count tests below set their own
     return payload
 
 
@@ -141,3 +142,26 @@ def test_the_declared_version_survives_quotes_and_stops_at_the_colon(tmp_path, m
     monkeypatch.setattr(version_stamp, "_HERE", root / "viewer" / "omniscience_viewer")
     (root / "viewer" / "omniscience_viewer").mkdir(parents=True)
     assert version_stamp._declared_version() == "1.2.3-rc1"
+
+
+def test_dev_count_continues_from_the_dev_repo(build_info, monkeypatch):
+    """The public repo began with a fresh history; builds from the dev repo already read dev.319.
+    N = dev_base + commits, so a new build never reads older than one already installed."""
+    monkeypatch.setattr(version_stamp, "_git", _fake_git(count="23"))
+    monkeypatch.setattr(version_stamp, "_declared_version", lambda: "1.0.0")
+    monkeypatch.setattr(version_stamp, "_dev_base", lambda: 319)
+    assert version_stamp.as_dict()["version"] == "1.0.0-dev.342"
+
+
+def test_the_repo_records_a_dev_base_above_every_installed_dev_build():
+    """dev.319 was the last build the dev repo produced; this repo must count on from there."""
+    root = Path(__file__).resolve().parents[1]
+    base = json.loads((root / ".release-check.json").read_text(encoding="utf-8"))["dev_base"]
+    assert base >= 319
+    assert version_stamp._dev_base() == base
+
+
+def test_a_bad_dev_base_counts_from_zero(tmp_path, monkeypatch):
+    (tmp_path / ".release-check.json").write_text('{"dev_base": "lots"}', encoding="utf-8")
+    monkeypatch.setattr(version_stamp, "_HERE", tmp_path / "pkg")
+    assert version_stamp._dev_base() == 0
