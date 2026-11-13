@@ -244,6 +244,24 @@ export function TelemetryStrip({
   );
 }
 
+/**
+ * The writeup chip. It names what the panel shows, and says where the model call happens: the
+ * viewer cannot ask a model — it holds no Hermes credential, by design — so the report is
+ * written inside Hermes with `/omni insight` and this panel reads it back.
+ */
+export function WriteupChip({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="chip ask-model"
+      onClick={onOpen}
+      title="The writeup: Hermes reads this recording — tokens, timings, rate limits, context growth — with the model you already use (/omni insight) and writes what to fix. Metadata only."
+    >
+      Writeup
+    </button>
+  );
+}
+
 export default function App() {
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -1537,14 +1555,7 @@ export default function App() {
                   Errors Only
                 </MenuCheck>
               </MenuButton>
-              <button
-                type="button"
-                className="chip ask-model"
-                onClick={() => setInsightOpen(true)}
-                title="Ask a model: one of your own models reads this recording — tokens, timings, rate limits, context growth — and writes what to fix."
-              >
-                Ask a Model
-              </button>
+              <WriteupChip onOpen={() => setInsightOpen(true)} />
               <MenuButton label="Actions" tip="Actions: export CSV, panels, reset the view." align="end">
                 <MenuLabel>Export CSV — timings, tokens, models; never message text</MenuLabel>
                 <MenuItem disabled={!selectedRoot} onSelect={() => exportCsv('steps:chat')}>Every Step of This Chat</MenuItem>
