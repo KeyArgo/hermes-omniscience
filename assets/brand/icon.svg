@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Omniscience">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f1640"/><stop offset="1" stop-color="#070a18"/></linearGradient>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4fd1ff"/><stop offset="1" stop-color="#3350ff"/></linearGradient>
+    <radialGradient id="iris" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#1b2a7a"/><stop offset=".75" stop-color="#2440d8"/><stop offset="1" stop-color="#4fd1ff"/></radialGradient>
+    <radialGradient id="g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#3a6bff" stop-opacity=".45"/><stop offset="1" stop-color="#3350ff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#b)"/>
+  <circle cx="512" cy="512" r="420" fill="url(#g)"/>
+  <!-- replay: a timeline arc that goes all the way round -->
+  <path d="M512 172a340 340 0 1 1-294 170" fill="none" stroke="url(#a)" stroke-width="22" stroke-linecap="round" opacity=".55"/>
+  <path d="M196 300l22 42 46-14" fill="none" stroke="#4fd1ff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+  <!-- the eye -->
+  <path d="M182 512 C270 360 390 300 512 300 S754 360 842 512 C754 664 634 724 512 724 S270 664 182 512Z" fill="#0b1030" stroke="#eaf0ff" stroke-width="20" stroke-linejoin="round"/>
+  <circle cx="512" cy="512" r="172" fill="url(#iris)"/>
+  <!-- the iris is your agent's activity graph: sessions, turns, tool calls -->
+  <g stroke="#bfe9ff" stroke-width="10" stroke-linecap="round" opacity=".9">
+    <path d="M512 512L430 440M512 512L606 452M512 512L578 600M512 512L432 590M430 440L470 378M606 452L640 520"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="512" cy="512" r="30"/>
+    <circle cx="430" cy="440" r="18"/><circle cx="606" cy="452" r="18"/><circle cx="578" cy="600" r="18"/><circle cx="432" cy="590" r="18"/>
+    <circle cx="470" cy="378" r="12" fill="#4fd1ff"/><circle cx="640" cy="520" r="12" fill="#4fd1ff"/>
+  </g>
+  <circle cx="560" cy="440" r="16" fill="#ffffff" opacity=".6"/>
+  <rect x="68" y="68" width="888" height="888" rx="204" fill="none" stroke="url(#a)" stroke-width="8" opacity=".35"/>
+  <path d="M842 176c-40 6-78 26-104 58 30-6 58-4 82 6-24 4-46 14-62 30 28-2 52 4 70 16-14-34-8-80 14-110Z" fill="#f2f4ff" opacity=".9"/>
+</svg>
