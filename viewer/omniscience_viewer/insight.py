@@ -292,8 +292,12 @@ def writeup_path(db_path: str) -> str:
     return os.path.join(os.path.dirname(os.path.realpath(db_path)), WRITEUP_FILE)
 
 
-def save(db_path: str, report: dict[str, Any]) -> str:
-    """Write the report beside the recording, replacing the last one. Read by the viewer."""
+def save(db_path: str, report: dict[str, Any]) -> Optional[str]:
+    """Write the report beside the recording, replacing the last one. Read by the viewer.
+
+    Returns the path it wrote, or ``None`` when it could not write: the caller says what actually
+    happened rather than promising the panel a report it will never find.
+    """
     path = writeup_path(db_path)
     body = dict(report)
     body.setdefault("generated_at", time.time())
@@ -308,6 +312,7 @@ def save(db_path: str, report: dict[str, Any]) -> str:
         os.replace(tmp, path)
     except OSError:
         log.debug("omniscience: could not save the writeup next to %s", db_path, exc_info=True)
+        return None
     return path
 
 

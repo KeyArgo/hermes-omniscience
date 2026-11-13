@@ -365,11 +365,14 @@ def _insight_command(action: str) -> str:
     except Exception as exc:  # noqa: BLE001 - tell the user what happened, not a traceback
         log.debug("omniscience: the insight writeup failed", exc_info=True)
         return f"Omniscience: the writeup did not happen. {exc}"
-    module.save(db_path, report)
-    where = module.writeup_path(db_path)
-    return (f"{report['markdown']}\n\n"
-            f"— written by {report.get('model') or 'your active model'} over {report.get('digest_chars', 0):,} "
-            f"characters of metadata, in {report.get('took_s', 0)}s. Saved for the viewer at {where}.")
+    where = module.save(db_path, report)
+    footer = (f"— written by {report.get('model') or 'your active model'} over "
+              f"{report.get('digest_chars', 0):,} characters of metadata, in {report.get('took_s', 0)}s.")
+    if where:
+        return f"{report['markdown']}\n\n{footer} Saved for the viewer at {where}."
+    return (f"{report['markdown']}\n\n{footer} It could not be saved beside the recording, so the "
+            f"viewer's Writeup panel will stay empty until a run that can write there; the text above "
+            f"is the whole report.")
 
 
 

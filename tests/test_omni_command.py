@@ -560,3 +560,25 @@ def test_insight_refuses_an_empty_recording_instead_of_spending_a_model_call(tmp
     answer = omniscience._omni_command('insight', session_id=None)
     assert 'nothing recorded' in answer.lower()
     assert not (tmp_path / 'insight.json').exists()
+
+
+def test_insight_does_not_claim_a_saved_report_it_could_not_write(tmp_path, monkeypatch):
+    """The reply is the whole report; the 'saved for the viewer' line is a promise about a file."""
+    from types import SimpleNamespace
+
+    db = tmp_path / 'events.db'
+    _events_db(db)
+    monkeypatch.setattr(omniscience, '_store', None)
+    monkeypatch.setenv('OMNISCIENCE_DB', str(db))
+
+    class Host:
+        def complete(self, **kwargs):
+            return SimpleNamespace(text='## Diagnosis', model='m', provider='p', usage=None)
+
+    monkeypatch.setattr(omniscience, '_ctx', SimpleNamespace(llm=Host()))
+    module = omniscience._insight_module()
+    monkeypatch.setattr(module, 'save', lambda db_path, report: None)
+    answer = omniscience._omni_command('insight', session_id=None)
+    assert '## Diagnosis' in answer
+    assert 'Saved for the viewer' not in answer
+    assert 'could not be saved' in answer.lower()
