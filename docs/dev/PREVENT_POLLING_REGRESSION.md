@@ -4,9 +4,8 @@
 > **Revised:** 2026-11-11 · **Body hash:** df27cdf1
 
 
-**For:** Bug fixer / developer working on omniscience  
+**For:** anyone changing how often Omniscience polls  
 **Date:** 2026-11-09  
-**Status:** Regression detected and fixed twice in one session  
 **Problem:** Polling interval `POLL_INTERVAL_S` keeps reverting to unsafe values
 
 ---
