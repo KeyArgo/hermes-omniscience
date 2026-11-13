@@ -28,3 +28,53 @@ jobs:
         env:
           PYTHONPATH: viewer
         run: python -m pytest tests -q -p no:cacheprovider
+
+  # The front end is half the surface (the viewer page, the graph, the panels) and it had no CI
+  # at all: a broken tsx file or a failing render test only showed up when someone ran npm by
+  # hand. Same three operating systems as the Python suite, so "works on my machine" is not the
+  # answer to a Windows or macOS bug report.
+  web:
+    name: web / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck and build
+        run: npm run build
+      - name: Test
+        run: npm test
+      - name: The bundled viewer is internally consistent
+        shell: bash
+        working-directory: .
+        run: |
+          # viewer_app/static is what a plugin install actually serves. A stale bundle renders a
+          # blank page (the page asks for an asset hash the last build replaced), so check it here
+          # too. The name comparison is advisory: the hash depends on the bundler build, and this
+          # job's Node may not be the one that produced the committed file. tests/
+          # test_viewer_static_bundle.py enforces the part that must never differ.
+          built=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' web/dist/index.html | head -1 || true)
+          shipped=$(grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' viewer_app/static/index.html | head -1 || true)
+          echo "built:   ${built:-missing}"
+          echo "shipped: ${shipped:-missing}"
+          if [ -z "$shipped" ]; then
+            echo "::error::viewer_app/static/index.html references no bundle"; exit 1
+          fi
+          if [ ! -f "viewer_app/static/$shipped" ]; then
+            echo "::error::viewer_app/static/index.html references $shipped, which is not shipped"; exit 1
+          fi
+          if [ -n "$built" ] && [ "$built" != "$shipped" ]; then
+            echo "::warning::web/dist built $built but viewer_app/static ships $shipped — run scripts/bundle-viewer.sh if the bundled page is stale"
+          fi

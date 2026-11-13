@@ -84,6 +84,9 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
   serving one profile could label chats with another profile's titles. Both copies now read only
   the path the plugin passes in (`--state-db`, the same way `--db` works); without one, the label is
   the session id. The privacy page follows the same rule instead of falling back to `~/.hermes`.
+- **Always on, three operating systems.** Both suites run on `ubuntu-latest`, `macos-latest` and
+  `windows-latest`. The front end (vitest) had no CI before 1.0.0's review pass: a type error or a
+  broken render test only showed up when someone ran `npm` by hand.
 - **Embedded desktop page (review 4).** The viewer is embedded with the SDK's `SandboxedFrame`
   instead of a raw `<iframe>`, so the page runs in the app's guest posture with an opaque origin:
   it cannot reach the app's realm, storage or bridge. The panel reports `Origin: null` as a

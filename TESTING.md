@@ -21,6 +21,19 @@ Each job installs `requirements-dev.txt`, sets `PYTHONPATH=viewer`, and runs:
 python -m pytest tests -q -p no:cacheprovider
 ```
 
+A second job runs the front end on the same three operating systems (Node 20):
+
+```bash
+cd web && npm ci && npm run build && npm test
+```
+
+`npm run build` is `tsc --noEmit && vite build`, so a type error fails CI as well as a test. The
+job finishes by checking that `viewer_app/static` — the page a plugin install actually serves —
+references assets it ships; a stale bundle renders a blank page, and the name comparison against
+`web/dist` is reported as a warning because the bundler hash depends on the Node build. The hard
+rule (every referenced asset exists, no sourcemaps) is a Python test:
+`tests/test_viewer_static_bundle.py`.
+
 Two additional workflows guard one design rule each and do not run the suite:
 
 - [`polling-guard.yml`](.github/workflows/polling-guard.yml) checks that the live feed interval is
@@ -36,8 +49,8 @@ local measurement here.
 
 | Suite | What it covers | Command | Result at this commit |
 |---|---|---|---|
-| Python | Plugin hooks and sanitizers, store and writer, viewer REST/WS, contract and e2e tests, QA core, docs currency | `PYTHONPATH=viewer python3 -m pytest tests -q -p no:cacheprovider` | **805 passed**, 1 warning in 77.72 s |
-| Front end | Graph reduction, views, panels, help layer, privacy and problem state (vitest) | `cd web && npm test` | **56 files passed**, **595 tests passed** in 22.09 s |
+| Python | Plugin hooks and sanitizers, store and writer, viewer REST/WS, contract and e2e tests, QA core, docs currency, the shipped bundle | `PYTHONPATH=viewer python3 -m pytest tests -q -p no:cacheprovider` | **827 passed**, 1 warning in 71.39 s |
+| Front end | Graph reduction, views, panels, help layer, privacy and problem state (vitest) | `cd web && npm test` | **58 files passed**, **602 tests passed** in 20.39 s |
 | Total | | | **1400 passed** |
 
 Environment for the counts above: Linux, Python 3.13.13, Node 26.5.1, 2026-11-11. The Python
