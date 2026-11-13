@@ -18,6 +18,10 @@
 </p>
 
 <p align="center">
+  <img src="docs/media/omni-map.gif" width="100%" alt="Omniscience in Hermes Desktop: a run as a map of messages, model calls and tools, then the timeline">
+</p>
+
+<p align="center">
   <img src="docs/media/omniscience-demo.gif" alt="Omniscience inside Hermes Desktop watching a real agent session: the live map, then the timeline" width="900"/>
   <br/><sub><b>Omniscience inside Hermes Desktop</b>, watching a real agent session. <a href="https://x.com/MHArgonaut/status/2120633813705363663">Watch the full demo ▶</a></sub>
 </p>
