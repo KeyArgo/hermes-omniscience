@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** ec557d3f
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** c3f6e847
+
 
 
 
@@ -185,32 +186,30 @@ what this machine experienced. An `llm.error` row carries no model of its own, s
 attributed to the last request in that session — the call it interrupted — and an error with no
 request before it is shown under `unknown` rather than dropped.
 
-## Ask a model — a written diagnosis of the whole recording
+## The writeup — a written diagnosis of the whole recording
 
-**Ask a model** (the chip in the view bar) opens one panel: pick any model your Hermes is already
-authenticated for, pick a period — last hour, 24 h, 7 days, 30 days or everything — and press
-**Write the report**. The panel says where the models come from: your own Hermes accounts, with the
-Nous Research portal among them, and nothing is sent to a provider you have not configured. The model reads a digest of the
-recording — calls, tokens and cache, per-model and per-provider timings, rate limits and retries,
-compaction counts, where the money went — and returns a written diagnosis: what is slow and why,
-what failed, whether context growth is the real problem, and five things to change.
+**The writeup** (the chip in the view bar, and `/omni insight` in Hermes) is a diagnosis of the
+recording in words: what is slow and why, what failed, whether context growth is the real problem,
+where the money went, and five things to change.
 
-The model list is not typed in: it is read from Hermes' own credentials
-(`~/.hermes/auth.json`, `config.yaml`, `.env`) and each provider's model list, so every name
-offered is one that answers. A provider that will not list its models still gets the ones your
-recordings show it serving (marked in the list), so any model you can actually reach is pickable. A provider that cannot be reached is named at the bottom of the
-panel instead of silently missing. Any model in the list can be picked.
+Hermes writes it. The model call runs inside Hermes through the plugin SDK's `ctx.llm` facade, on
+the model you are already using, so the viewer never reads `auth.json`, `config.yaml` or `.env`,
+never holds a key and never calls a provider. Run it from the chat:
 
-The picker opens on the cheapest model that has **actually answered calls on this machine** —
-a free or low-rate name the recording shows completing, never a cheap one that mostly gets
-rate-limited (the free `opencode-zen` route has no successful calls at all, so it is offered but
-not suggested). The line under the picker says which model and why. Your choice is remembered.
+    /omni insight          # the last 7 days
+    /omni insight 1        # the last day
+    /omni insight 30       # the last 30 days
+    /omni insight all      # everything recorded
+
+The reply is the report itself, and it is saved beside the recording (`insight.json`, next to
+`events.db`) so the viewer's **Writeup** panel shows the same text without asking a model again.
+The panel's **Reload** button re-reads that file; there is no picker, because there is no choice
+to make — Hermes uses the model it is already running.
 
 What it sends: counts, token totals, model and provider names, durations, error reasons and chat
-labels. What it never sends: a prompt, a tool argument, a tool result, or a file's contents —
-the recorder does not store them, so there is nothing to send. Your keys stay in the viewer;
-only the finished text comes back. A report costs one model call, a couple of thousand tokens
-each way, to the model you picked.
+labels. What it never sends: a prompt, a tool argument, a tool result, or a file's contents — the
+recorder does not store them, so there is nothing to send. A report costs one model call, a couple
+of thousand tokens each way, on the model Hermes is using.
 
 ## When a message stopped: the failure panel
 

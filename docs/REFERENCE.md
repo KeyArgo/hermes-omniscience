@@ -1,7 +1,8 @@
 # Reference
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4ba0b9e
-> **Revised:** 2026-11-11 · **Body hash:** a583b6ae
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** a5635bee
+
 
 
 
@@ -91,8 +92,7 @@ or the `omni.<token>` WebSocket subprotocol.
 | GET | `/api/v1/privacy` | `days` | Privacy-relevant tool runs, newest first |
 | GET | `/api/v1/privacy/flags` | — | Dossiers already written |
 | POST | `/api/v1/privacy/flag` | `{session_id, event_id?, note?}` | Write a dossier for one action |
-| GET | `/api/v1/insight/models` | `refresh` (query) | Models the machine can call |
-| POST | `/api/v1/insight` | `{provider, model, days}` | A written diagnosis from the chosen model |
+| GET | `/api/v1/insight` | — | The writeup Hermes saved beside the recording (`/omni insight`), or `available: false` and the command to run |
 | POST | `/api/v1/bundle/preview` | `{session_id}` | The exact bundle object that would be written |
 | POST | `/api/v1/bundle/write` | `{session_id}` | Writes the previewed bundle and returns its path |
 | POST | `/api/v1/run/stop` | `{session_id, action}` | Asks Hermes' run API to stop or skip; honest refusal when the brake is off |

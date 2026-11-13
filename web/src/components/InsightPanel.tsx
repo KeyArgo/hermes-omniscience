@@ -1,32 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import {
-  askInsight,
-  fetchInsightModels,
-  type InsightChoice,
-  type InsightModels,
-  type InsightReport,
-} from '../api';
+import { fetchInsight, type InsightReport } from '../api';
 import './InsightPanel.css';
 
 /**
- * "Ask a model" — one of your own models reads this recording and writes it up.
+ * The writeup — what the recording says needs fixing, in a model's words.
  *
- * The picker is filled from the providers Hermes is already authenticated for, so every name
- * offered is a name that answers. Nothing private goes out: the recorder keeps counts, timings
- * and error reasons, and the digest is built from the same figures the pages show.
+ * The model is Hermes' own (`ctx.llm`). The viewer never holds a key and never calls a
+ * provider, so this panel reads the report Hermes saved beside the recording; `/omni insight`
+ * in Hermes is what writes it. Nothing private is involved either way: the recorder keeps
+ * counts, timings and error reasons, and the digest is built from the same figures the pages
+ * show.
  *
  * The report is a diagnosis, not a summary of the interface: what the time and money went on,
  * which provider queued or refused calls, whether context growth is the real problem, and what
  * to change.
  */
-
-const DAY_OPTIONS: [number, string][] = [
-  [1 / 24, 'Last hour'],
-  [1, 'Last 24 h'],
-  [7, 'Last 7 days'],
-  [30, 'Last 30 days'],
-  [0, 'Everything'],
-];
 
 /** The period as a person reads it, for the line above the answer. */
 function periodLabel(days: number): string {
@@ -36,37 +24,30 @@ function periodLabel(days: number): string {
   return `the last ${days} days`;
 }
 
-const PICK_KEY = 'omni.insightModel';
-const DAYS_KEY = 'omni.insightDays';
-
 export function InsightPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [choices, setChoices] = useState<InsightModels | null>(null);
-  const [pick, setPick] = useState<string>(() => window.localStorage.getItem(PICK_KEY) ?? '');
-  const [days, setDays] = useState<number>(() => {
-    const saved = Number(window.localStorage.getItem(DAYS_KEY) ?? '7');
-    return DAY_OPTIONS.some(([value]) => value === saved) ? saved : 7;
-  });
-  const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<InsightReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState('');
+  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    const state = await fetchInsight();
+    setReport(state.report);
+    setHint(state.hint);
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (!open) return;
     let stopped = false;
-    void (async () => {
-      const loaded = await fetchInsightModels();
+    setLoading(true);
+    void fetchInsight().then((state) => {
       if (stopped) return;
-      setChoices(loaded);
-      setPick((current) => {
-        if (current && loaded.models.some((row) => keyOf(row) === current)) return current;
-        const first =
-          loaded.models.find((row) => row.recommended) ??
-          loaded.models.find((row) => row.default) ??
-          loaded.models[0];
-        return first ? keyOf(first) : '';
-      });
-    })();
+      setReport(state.report);
+      setHint(state.hint);
+      setLoading(false);
+    });
     return () => {
       stopped = true;
     };
@@ -81,27 +62,7 @@ export function InsightPanel({ open, onClose }: { open: boolean; onClose: () => 
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const choice = useMemo(() => choices?.models.find((row) => keyOf(row) === pick) ?? null, [choices, pick]);
-  const grouped = useMemo(() => groupByProvider(choices?.models ?? []), [choices]);
-
   if (!open) return null;
-
-  const run = async () => {
-    if (!choice) return;
-    setBusy(true);
-    setError(null);
-    setCopied(false);
-    window.localStorage.setItem(PICK_KEY, pick);
-    window.localStorage.setItem(DAYS_KEY, String(days));
-    const result = await askInsight(choice, days);
-    setBusy(false);
-    if (result.error) {
-      setError(result.error);
-      setReport(null);
-      return;
-    }
-    setReport(result.report);
-  };
 
   const copy = async () => {
     if (!report) return;
@@ -115,15 +76,15 @@ export function InsightPanel({ open, onClose }: { open: boolean; onClose: () => 
   };
 
   return (
-    <div className="ai-scrim" role="dialog" aria-modal="true" aria-label="Ask a model to read this recording">
+    <div className="ai-scrim" role="dialog" aria-modal="true" aria-label="The writeup">
       <div className="ai-panel">
         <header className="ai-head">
           <div>
-            <h2 className="ai-title">Ask a model</h2>
+            <h2 className="ai-title">The writeup</h2>
             <p className="ai-lede">
-              One of your own models reads this recording — calls, tokens, cache, timings, rate limits,
-              context growth — and writes what to fix. Metadata only: the recorder never stores a
-              prompt, a tool argument or a file's contents.
+              Hermes reads this recording — calls, tokens, cache, timings, rate limits, context
+              growth — with the model you are already using, and writes what to fix. Metadata only:
+              the recorder never stores a prompt, a tool argument or a file&apos;s contents.
             </p>
           </div>
           <button type="button" className="ai-close" onClick={onClose} aria-label="Close">
@@ -132,136 +93,42 @@ export function InsightPanel({ open, onClose }: { open: boolean; onClose: () => 
         </header>
 
         <div className="ai-controls">
-          <label className="ai-field">
-            <span className="ai-label">Model</span>
-            <select
-              value={pick}
-              onChange={(event) => setPick(event.target.value)}
-              disabled={busy}
-              aria-label="Model"
-            >
-              {choices === null ? <option value="">Reading the model list…</option> : null}
-              {choices !== null && choices.models.length === 0 ? (
-                <option value="">No model could be listed</option>
-              ) : null}
-              {grouped.map(([provider, rows]) => (
-                <optgroup key={provider} label={providerLabel(provider)}>
-                  {rows.map((row) => (
-                    <option key={keyOf(row)} value={keyOf(row)}>
-                      {row.model}
-                      {row.recommended ? ' — recommended' : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-
-          <label className="ai-field">
-            <span className="ai-label">Period</span>
-            <select
-              value={days}
-              onChange={(event) => setDays(Number(event.target.value))}
-              disabled={busy}
-              aria-label="Period"
-            >
-              {DAY_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button type="button" className="ai-run" onClick={() => void run()} disabled={busy || !choice}>
-            {busy ? 'Reading…' : report ? 'Ask again' : 'Write the report'}
+          <button type="button" className="ai-run" onClick={() => void load()} disabled={loading}>
+            {loading ? 'Reading…' : 'Reload'}
           </button>
         </div>
 
-        {choices && choices.models.some((row) => row.recommended) ? (
-          <p className="ai-note">
-            Starts on {choices.models.find((row) => row.recommended)?.model} because{' '}
-            {choices.models.find((row) => row.recommended)?.why}. Any model in the list works; pick
-            another and it is remembered.
+        <p className="ai-note">
+          Written in Hermes: run <code>/omni insight</code> there (or <code>/omni insight 30</code>{' '}
+          for a period), then reload this panel. The viewer holds no key and calls no provider, so
+          the model call happens inside Hermes, where your credentials already live.
+        </p>
+
+        {!loading && !report ? (
+          <p className="ai-idle">
+            No writeup yet for this recording. {hint ? `${hint} ` : ''}
+            The report costs one model call on the model Hermes is using — roughly a couple of
+            thousand tokens in and about the same out.
           </p>
         ) : null}
 
-        {choices && choices.models.some((row) => row.provider === 'nous') ? (
-          <p className="ai-provenance">
-            Models come from your own Hermes accounts; the Nous Research portal is one of them.
-            Nothing is sent to a provider you have not already configured.
-          </p>
-        ) : null}
-
-        {choices && choices.unavailable.length > 0 ? (
-          <p className="ai-note">
-            Not offered: {choices.unavailable.map((row) => `${row.provider} (${row.reason})`).join('; ')}.
-          </p>
-        ) : null}
-
-        {error ? (
-          <div className="ai-error" role="alert">
-            <strong>The model could not answer.</strong> {error}
-          </div>
-        ) : null}
-
-        {busy ? (
-          <p className="ai-waiting">
-            Asking {choice?.model ?? 'the model'} to read {periodLabel(days)}.
-            A long period takes a few seconds to gather and about ten to answer.
-          </p>
-        ) : null}
-
-        {report && !busy ? (
+        {report ? (
           <article className="ai-report">
             <div className="ai-meta">
-              {report.model} via {report.provider} · {periodLabel(report.days)} ·
-              answered in {report.took_s}s · {new Date(report.generated_at * 1000).toLocaleTimeString()}
+              {report.model || 'your active model'}
+              {report.provider ? ` via ${report.provider}` : ''} · {periodLabel(report.days)} ·
+              answered in {report.took_s}s ·{' '}
+              {new Date(report.generated_at * 1000).toLocaleString()}
               <button type="button" className="ai-copy" onClick={() => void copy()}>
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            {report.finish_reason === 'length' ? (
-              <p className="ai-truncated">
-                The model hit its output limit before it finished; ask again or pick a shorter period.
-              </p>
-            ) : null}
             <Markdown text={report.markdown} />
           </article>
-        ) : null}
-
-        {!report && !busy && !error ? (
-          <p className="ai-idle">
-            Nothing has been sent yet. The report costs one model call — roughly a couple of thousand
-            tokens in and about the same out — to the model you pick above.
-          </p>
         ) : null}
       </div>
     </div>
   );
-}
-
-function keyOf(row: InsightChoice): string {
-  return `${row.provider}|${row.model}`;
-}
-
-/** Provider names as a person reads them. `nous` is Nous Research's own inference portal, and
- *  saying so is a fact about where the call goes, not advertising. */
-export function providerLabel(provider: string): string {
-  if (provider === 'nous') return 'nous · Nous Research';
-  return provider;
-}
-
-function groupByProvider(rows: InsightChoice[]): [string, InsightChoice[]][] {
-  const map = new Map<string, InsightChoice[]>();
-  for (const row of rows) {
-    const list = map.get(row.provider) ?? [];
-    list.push(row);
-    map.set(row.provider, list);
-  }
-  // Keep the server's order: the model Hermes itself uses is first in its provider, and a
-  // second alphabetical sort here would hide it below `~anthropic/...`.
-  return [...map.entries()];
 }
 
 /** A deliberately small markdown reader: headings, bullets, numbers, bold and inline code. */

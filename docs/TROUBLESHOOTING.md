@@ -1,7 +1,8 @@
 # Troubleshooting
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** d66a3037
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** e74fa4c0
+
 
 
 Real failure modes this code produces or handles, and the shortest way to check each one. Start with
@@ -92,12 +93,15 @@ Money comes from Hermes' own `state.db` estimate, never from the recorder. If th
 found at `OMNISCIENCE_STATE_DB` or `~/.hermes/state.db`, the page still shows measured tokens.
 A dollar figure is always labelled as Hermes' estimate, not a bill.
 
-## "Ask a Model" fails
+## The writeup does not appear
 
-The endpoint returns HTTP 502 with a reason. It needs credentials Hermes already has
-(`auth.json`, `config.yaml`, `.env`) and a provider that answers its model list. The request carries
-a metadata-only digest; prompts and tool results are not stored, so none can be sent. See
-`GET /api/v1/insight/models` for what was discovered.
+The report is written inside Hermes, not by the viewer: run `/omni insight` (or `/omni insight 30`)
+in the chat, then press **Reload** in the Writeup panel. If `/omni` says the build has no plugin LLM
+access (`ctx.llm`), the Hermes version is older than the plugin's `requires_hermes`; everything
+else in the plugin keeps working. If `/omni` reports that the model call failed, that is the host's
+answer — a provider refusal, a rate limit or a timeout — and it is printed in the reply rather than
+hidden. The panel shows "no writeup yet" until a report exists for the recording the viewer is
+serving.
 
 ## The brake refuses to stop a run
 

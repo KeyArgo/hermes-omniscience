@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE, askInsight, fetchInsightModels, type InsightChoice } from '../api';
+import { API_BASE, fetchInsight } from '../api';
 import { tokenHeaders } from '../token';
 import './ConcernsView.css';
 
@@ -29,8 +29,6 @@ const PERIODS: { value: number; label: string }[] = [
   { value: 30, label: 'Past month' },
 ];
 
-const PICK_KEY = 'omni.insightModel';
-
 function ago(ts: number | null): string {
   if (typeof ts !== 'number') return '';
   const age = Math.max(0, Date.now() / 1000 - ts);
@@ -39,18 +37,12 @@ function ago(ts: number | null): string {
   return `${Math.round(age / 86400)} d ago`;
 }
 
-function splitPick(raw: string): InsightChoice | null {
-  const index = raw.indexOf(':');
-  if (index < 1) return null;
-  return { provider: raw.slice(0, index), model: raw.slice(index + 1) };
-}
-
 /**
  * The Concerns page: what deserves attention in a period, counted.
  *
  * Two halves, deliberately separate: the counts come from the recording and are always there, and
- * the written summary is asked of the operator's own model, only when the button is pressed. A page
- * that quietly sends recordings to a provider on every visit would be the opposite of the point.
+ * the written summary is the one Hermes already wrote (`/omni insight`), read back from beside the
+ * recording. The viewer holds no key, so a page visit can never send anything to a provider.
  */
 export function ConcernsView() {
   const [days, setDays] = useState(1);
@@ -79,20 +71,13 @@ export function ConcernsView() {
     setBusy(true);
     setFailed(null);
     try {
-      const saved = window.localStorage.getItem(PICK_KEY) ?? '';
-      let choice = splitPick(saved);
-      if (!choice) {
-        const models = await fetchInsightModels();
-        const first = models.models[0];
-        choice = first ? { provider: first.provider, model: first.model } : null;
-      }
-      if (!choice) {
-        setFailed('No model is available to ask. Choose one in Settings.');
+      const state = await fetchInsight();
+      if (!state.report) {
+        setAnswer(null);
+        setFailed(state.hint || 'No writeup yet. Run /omni insight in Hermes, then try again.');
         return;
       }
-      const result = await askInsight(choice, days);
-      if (result.error) setFailed(result.error);
-      setAnswer(result.report?.markdown ?? null);
+      setAnswer(state.report.markdown);
     } finally {
       setBusy(false);
     }
@@ -135,9 +120,9 @@ export function ConcernsView() {
           className="cv-ask"
           onClick={() => void ask()}
           disabled={busy}
-          title="Ask the model chosen for Ask a model in Settings to read this period and write up what needs attention. Nothing is sent until you press this."
+          title="Show the writeup Hermes saved for this recording. The model call happens inside Hermes (/omni insight); the viewer never reaches a provider."
         >
-          {busy ? 'Asking…' : 'Ask the model to summarise these'}
+          {busy ? 'Reading…' : 'Show the latest writeup'}
         </button>
         {failed ? <p className="cv-error">{failed}</p> : null}
         {answer ? <div className="cv-answer">{answer}</div> : null}

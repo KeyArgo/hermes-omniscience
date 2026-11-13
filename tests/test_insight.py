@@ -1,14 +1,22 @@
-"""Ask a model: finding an endpoint, and sending it nothing private.
+"""The writeup is Hermes' model, not this viewer's credential files.
 
-The feature is only as good as its two promises: every model it offers is one this machine can
-actually call, and the digest it sends carries counts and timings, never a prompt. Both are
-testable without a network.
+Two promises are testable without a network. The digest carries counts and timings and never a
+prompt — the recorder does not store one. And producing the writeup opens no credential file:
+the call goes through the host's own ``ctx.llm`` facade (``agent/plugin_llm.py``), so no key is
+read here, held here, or sent from here.
+
+The regression this file guards: the first version of ``insight.py`` read ``auth.json``,
+``config.yaml`` and ``.env`` to find an endpoint and a token. Every test below fails on that
+module, and passes on one that asks the host instead.
 """
 
+import builtins
+import io
 import json
 import sqlite3
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,90 +25,54 @@ sys.path.insert(0, str(ROOT / "viewer"))
 
 from omniscience_viewer import insight  # noqa: E402
 
+INSIGHT_SOURCE = ROOT / "viewer" / "omniscience_viewer" / "insight.py"
+
 COLUMNS = (
     "rowid INTEGER PRIMARY KEY, event_id TEXT, schema TEXT, boot_id TEXT, seq INTEGER, ts REAL, "
     "kind TEXT, session_id TEXT, parent_session_id TEXT, turn_id TEXT, api_request_id TEXT, "
     "tool_call_id TEXT, subagent_id TEXT, status TEXT, attrs TEXT"
 )
 
+CREDENTIAL_NAMES = ("auth.json", ".env", "config.yaml")
+CANARY = "CANARY-SECRET-DO-NOT-READ"
+
+
+def test_the_insight_module_never_names_a_credential_file():
+    """No credential file may be opened, so none may be named in the code that ships."""
+    source = INSIGHT_SOURCE.read_text(encoding="utf-8")
+    for name in CREDENTIAL_NAMES:
+        assert name not in source, f"insight.py refers to Hermes' credential file {name}"
+
 
 @pytest.fixture()
-def hermes_home(tmp_path, monkeypatch):
+def credential_canary(tmp_path, monkeypatch):
+    """A Hermes home full of files the writeup must never open; opening one is an assertion."""
     home = tmp_path / "hermes"
     home.mkdir()
     (home / "auth.json").write_text(
-        json.dumps(
-            {
-                "active_provider": "nous",
-                "providers": {},
-                "credential_pool": {
-                    "nous": [
-                        {
-                            "id": "n1",
-                            "label": "someone@example.com",
-                            "access_token": "token-from-pool",
-                            "inference_base_url": "https://inference.example.com/v1",
-                        }
-                    ],
-                    "other": [{"id": "o1", "label": "OTHER_API_KEY", "base_url": "https://other.example/v1"}],
-                },
-            }
-        )
+        json.dumps({"active_provider": "canary", "credential_pool": {"canary": [
+            {"access_token": CANARY, "base_url": "https://canary.example/v1"}]}}),
+        encoding="utf-8",
     )
     (home / "config.yaml").write_text(
-        "model:\n"
-        "  default: \"chosen/one\"\n"
-        "  provider: \"nous\"\n"
-        "  base_url: \"https://default.example/v1\"\n"
-        "\n"
-        "providers:\n"
-        "  nous:\n"
-        "    base_url: \"https://inference.example.com/v1\"\n"
-        "  other:\n"
-        "    base_url: \"https://other.example/v1\"\n"
-        "    key_env: \"OTHER_API_KEY\"\n"
+        f"model:\n  provider: canary\n  base_url: https://canary.example/v1\n", encoding="utf-8"
     )
-    (home / ".env").write_text("OTHER_API_KEY=secret-from-env\n")
-    monkeypatch.setattr(insight, "HERMES_HOME", home)
-    monkeypatch.setattr(insight, "_models_cache", {"at": 0.0, "items": [], "unavailable": []})
-    return home
+    (home / ".env").write_text(f"CANARY_API_KEY={CANARY}\n", encoding="utf-8")
+    monkeypatch.setattr(insight, "HERMES_HOME", home, raising=False)
 
+    opened: list[str] = []
+    real_open = io.open
 
-def test_an_endpoint_is_built_from_the_credential_pool(hermes_home):
-    rows = insight.endpoints()
-    nous = next(row for row in rows if row["provider"] == "nous")
-    assert nous["base_url"] == "https://inference.example.com/v1"
-    assert nous["key"] == "token-from-pool"
-    assert nous.get("default") is True
+    def guarded(file, *args, **kwargs):
+        path = Path(str(file))
+        if path.name in CREDENTIAL_NAMES and path.parent == home:
+            opened.append(str(path))
+            raise AssertionError(f"the writeup opened a credential file: {path}")
+        return real_open(file, *args, **kwargs)
 
-
-def test_a_key_is_found_by_the_env_name_the_pool_names(hermes_home):
-    rows = insight.endpoints()
-    other = next(row for row in rows if row["provider"] == "other")
-    assert other["key"] == "secret-from-env"
-    assert other["base_url"] == "https://other.example/v1"
-
-
-def test_the_configured_default_model_is_offered_first(hermes_home, monkeypatch):
-    monkeypatch.setattr(
-        insight,
-        "_models_from_endpoint",
-        lambda endpoint: ["zeta", "chosen/one", "alpha"] if endpoint["provider"] == "nous" else [],
-    )
-    report = insight.list_models(refresh=True)
-    top = report["models"][0]
-    assert (top["provider"], top["model"], top.get("default")) == ("nous", "chosen/one", True)
-    assert [row["model"] for row in report["models"][:3]] == ["chosen/one", "alpha", "zeta"]
-
-
-def test_a_provider_that_does_not_list_models_is_reported_not_hidden(hermes_home, monkeypatch):
-    def listing(endpoint):
-        return ["only-one"] if endpoint["provider"] == "nous" else []
-
-    monkeypatch.setattr(insight, "_models_from_endpoint", listing)
-    report = insight.list_models(refresh=True)
-    assert [row["provider"] for row in report["models"]] == ["nous"]
-    assert any(item["provider"] == "other" for item in report["unavailable"])
+    monkeypatch.setattr(builtins, "open", guarded)
+    monkeypatch.setattr(Path, "open", lambda self, *a, **k: guarded(self, *a, **k))
+    return home, opened
 
 
 def _events_db(path: Path) -> None:
@@ -117,6 +89,95 @@ def _events_db(path: Path) -> None:
     )
     con.commit()
     con.close()
+
+
+def _host(text="## Head\n- one", model="chosen/one", provider="nous"):
+    calls = []
+
+    def complete(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            text=text,
+            model=model,
+            provider=provider,
+            agent_id="main",
+            usage=SimpleNamespace(input_tokens=1200, output_tokens=300, total_tokens=1500, cost_usd=0.01),
+        )
+
+    complete.calls = calls  # type: ignore[attr-defined]
+    return complete
+
+
+def test_the_writeup_never_opens_a_credential_file(credential_canary, tmp_path):
+    _home, opened = credential_canary
+    db = tmp_path / "events.db"
+    _events_db(db)
+    digest = insight.build_digest(str(db), None, days=7)
+    report = insight.writeup(digest, _host(), days=7)
+    assert report["markdown"] == "## Head\n- one"
+    assert opened == []
+    assert CANARY not in json.dumps(report)
+
+
+def test_the_writeup_asks_the_host_for_the_completion(tmp_path):
+    db = tmp_path / "events.db"
+    _events_db(db)
+    digest = insight.build_digest(str(db), None, days=7)
+    complete = _host()
+    report = insight.writeup(digest, complete, days=7)
+    assert len(complete.calls) == 1
+    sent = complete.calls[0]
+    assert [row["role"] for row in sent["messages"]] == ["system", "user"]
+    assert sent["messages"][0]["content"] == insight.SYSTEM_PROMPT
+    assert sent["messages"][1]["content"] == digest
+    assert sent["max_tokens"] > 0
+    assert report["model"] == "chosen/one"
+    assert report["provider"] == "nous"
+    assert report["days"] == 7
+    assert report["digest_chars"] == len(digest)
+
+
+def test_a_completion_returning_plain_text_is_still_an_answer(tmp_path):
+    """A host facade that hands back a bare string (older Hermes) must not break the writeup."""
+    db = tmp_path / "events.db"
+    _events_db(db)
+    digest = insight.build_digest(str(db), None, days=7)
+    report = insight.writeup(digest, lambda **kwargs: "plain text answer", days=7)
+    assert report["markdown"] == "plain text answer"
+
+
+def test_an_empty_answer_says_why_instead_of_lying(tmp_path):
+    db = tmp_path / "events.db"
+    _events_db(db)
+    digest = insight.build_digest(str(db), None, days=7)
+    with pytest.raises(RuntimeError) as exc:
+        insight.writeup(digest, _host(text="   "), days=7)
+    assert "empty" in str(exc.value).lower()
+
+
+def test_the_writeup_is_saved_beside_the_recording_and_read_back(tmp_path):
+    db = tmp_path / "events.db"
+    _events_db(db)
+    report = {"markdown": "## Head", "model": "m", "provider": "p", "days": 7.0,
+              "took_s": 1.2, "generated_at": 1700000000.0, "digest_chars": 12}
+    path = insight.save(str(db), report)
+    assert Path(path).parent == db.parent
+    assert Path(path).name == "insight.json"
+    saved = insight.load(str(db))
+    assert saved is not None
+    assert {key: saved[key] for key in report} == report
+    # A report belongs to the recording it describes: another database in the same folder is
+    # not handed this one.
+    assert insight.load(str(tmp_path / "nothing.db")) is None
+
+
+def test_the_saved_writeup_is_readable_after_a_restart(tmp_path):
+    """The file is the hand-off between Hermes (which has the model) and the viewer (which does not)."""
+    db = tmp_path / "events.db"
+    _events_db(db)
+    insight.save(str(db), {"markdown": "# From the host", "days": 7})
+    reloaded = json.loads(Path(insight.writeup_path(str(db))).read_text(encoding="utf-8"))
+    assert reloaded["markdown"] == "# From the host"
 
 
 def test_the_digest_carries_counts_and_reasons(tmp_path):
@@ -138,98 +199,6 @@ def test_the_digest_never_asks_for_or_carries_a_prompt(tmp_path):
     assert "never stores prompts" in text
 
 
-def test_a_successful_answer_is_returned_as_markdown(hermes_home, tmp_path, monkeypatch):
-    db = tmp_path / "events.db"
-    _events_db(db)
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-        def read(self):
-            return json.dumps(
-                {
-                    "model": "chosen/one",
-                    "choices": [{"message": {"content": "## Head\n- one"}, "finish_reason": "stop"}],
-                    "usage": {"completion_tokens": 5},
-                }
-            ).encode()
-
-    monkeypatch.setattr(insight.urllib.request, "urlopen", lambda request, timeout=0: FakeResponse())
-    out = insight.ask("nous", "chosen/one", 7, str(db), None)
-    assert out["markdown"] == "## Head\n- one"
-    assert out["provider"] == "nous"
-    assert out["finish_reason"] == "stop"
-
-
-def test_an_empty_answer_says_why_instead_of_lying(hermes_home, tmp_path, monkeypatch):
-    db = tmp_path / "events.db"
-    _events_db(db)
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-        def read(self):
-            return json.dumps(
-                {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]}
-            ).encode()
-
-    monkeypatch.setattr(insight.urllib.request, "urlopen", lambda request, timeout=0: FakeResponse())
-    with pytest.raises(RuntimeError) as exc:
-        insight.ask("nous", "chosen/one", 7, str(db), None)
-    assert "length" in str(exc.value)
-
-
-def test_an_unknown_provider_is_refused_before_any_request(hermes_home, tmp_path, monkeypatch):
-    db = tmp_path / "events.db"
-    _events_db(db)
-    monkeypatch.setattr(
-        insight.urllib.request, "urlopen", lambda *a, **k: pytest.fail("no request should be sent")
-    )
-    with pytest.raises(RuntimeError):
-        insight.ask("nowhere", "m", 7, str(db), None)
-
-
-def test_the_picker_recommends_a_free_model_that_has_answered(hermes_home, monkeypatch):
-    monkeypatch.setattr(
-        insight,
-        "_models_from_endpoint",
-        lambda endpoint: ["deepseek/deepseek-v4.1-flash-1017", "deepseek-v4.1-flash-free"]
-        if endpoint["provider"] == "nous"
-        else [],
-    )
-    monkeypatch.setattr(
-        insight,
-        "_proven_models",
-        lambda db_path: {
-            ("nous", "deepseek/deepseek-v4.1-flash-1017"): {"calls": 900, "rate_limited": 0},
-            ("nous", "deepseek-v4.1-flash-free"): {"calls": 40, "rate_limited": 0},
-        },
-    )
-    report = insight.list_models(refresh=True)
-    assert report["models"][0]["model"] == "deepseek-v4.1-flash-free"
-    assert report["models"][0]["recommended"] is True
-    assert "free" in report["models"][0]["why"]
-
-
-def test_a_route_that_is_mostly_refusals_is_never_recommended(hermes_home, monkeypatch):
-    # opencode-zen's free route: 0 successful calls against 10 rate limits. Cheap is not the same
-    # as working, so it is offered but not suggested.
-    monkeypatch.setattr(
-        insight, "_models_from_endpoint", lambda endpoint: ["deepseek-v4.1-flash-free"] if endpoint["provider"] == "nous" else []
-    )
-    monkeypatch.setattr(insight, "_proven_models", lambda db_path: {})
-    report = insight.list_models(refresh=True)
-    assert not any(row.get("recommended") for row in report["models"])
-
-
 def test_a_fraction_of_a_day_is_not_rounded_to_everything(tmp_path):
     """The routes take float days: "the last hour" is 1/24, and int() used to turn it into 0,
     which this API means as "everything ever recorded"."""
@@ -246,17 +215,28 @@ def test_a_fraction_of_a_day_is_not_rounded_to_everything(tmp_path):
     assert report["since"] == pytest.approx(report["generated_at"] - 3600, abs=5)
 
 
-def test_a_provider_that_cannot_list_its_models_still_offers_what_ran(hermes_home, monkeypatch):
-    """opencode-go answers no /v1/models, yet the owner has used two of its models. Offering them
-    from the recording is what makes "any model you have access to" true."""
-    monkeypatch.setattr(insight, "_models_from_endpoint", lambda endpoint: [])
-    monkeypatch.setattr(
-        insight,
-        "_proven_models",
-        lambda db_path: {("nous", "deepseek/deepseek-v4.1-flash-1017"): {"calls": 50, "rate_limited": 0}},
-    )
-    report = insight.list_models(refresh=True)
-    offered = {(row["provider"], row["model"]) for row in report["models"]}
-    assert ("nous", "deepseek/deepseek-v4.1-flash-1017") in offered
-    assert any(row.get("from_recording") for row in report["models"])
-    assert any("recordings show" in item["reason"] for item in report["unavailable"])
+def test_the_viewer_serves_the_saved_writeup_and_offers_no_credential_route(tmp_path):
+    """The viewer can show a writeup Hermes wrote; it cannot ask a model itself."""
+    from fastapi.testclient import TestClient
+
+    from omniscience_viewer.app import create_app
+
+    db = tmp_path / "events.db"
+    _events_db(db)
+    client = TestClient(create_app(str(db), token="k"), base_url="http://127.0.0.1")
+    headers = {"x-omni-token": "k"}
+
+    empty = client.get("/api/v1/insight", headers=headers).json()
+    assert empty["available"] is False
+    assert "omni insight" in empty["hint"]
+
+    insight.save(str(db), {"markdown": "## From Hermes", "model": "m", "provider": "p",
+                           "days": 7.0, "generated_at": 1700000000.0})
+    body = client.get("/api/v1/insight", headers=headers).json()
+    assert body["available"] is True
+    assert body["report"]["markdown"] == "## From Hermes"
+
+    # The route that used to read Hermes' credentials is gone.
+    assert client.get("/api/v1/insight/models", headers=headers).status_code == 404
+    assert client.post("/api/v1/insight", json={"provider": "p", "model": "m"},
+                       headers=headers).status_code in (404, 405)

@@ -1,7 +1,8 @@
 # Security — threat model, collection policy, privacy
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** bfc57691
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** b2f4ac5f
+
 
 
 
@@ -26,16 +27,18 @@ ignored until someone adds them on purpose. On top of that:
 Opt-in content capture is **not implemented**. A future `omniscience.capture: previews` setting
 would store redacted short previews; nothing in 1.0.0 stores prompt, argument or result content.
 
-Two features can make a network request, and only when you turn them on:
+One feature can make a network request, and only when you turn it on:
 
-- **Ask a Model** (`POST /api/v1/insight`) sends a metadata-only digest to a provider Hermes is
-  already authenticated for, then returns the written answer. It sends counts, token totals, model
-  and provider names, durations, error reasons and chat labels. It cannot send prompts or tool
-  output because the recorder does not store them.
 - **DGX Sparks usage source** polls TensorFold counters at the hosts you list in
   `OMNISCIENCE_TENSORFOLD_HOSTS`.
 
-The recorder itself makes no network calls. The viewer binds loopback by default.
+The recorder makes no network calls. The viewer makes no network calls and reads no credential
+file: the written diagnosis (`/omni insight`) is produced **inside Hermes** through the plugin
+SDK's `ctx.llm` facade, which owns the credentials, the routing and the fallback. What travels is a
+metadata-only digest — counts, token totals, model and provider names, durations, error reasons,
+chat labels. It cannot carry prompts or tool output because the recorder does not store them. The
+viewer only reads the saved report back from beside the recording. The viewer binds loopback by
+default.
 
 ## Threat model
 

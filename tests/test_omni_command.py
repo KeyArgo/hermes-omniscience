@@ -476,3 +476,65 @@ def test_forget_says_so_when_the_pause_could_not_be_cleared(tmp_path, monkeypatc
     monkeypatch.setattr(omniscience, '_paused', Stuck())
     answer = omniscience._omni_command('forget confirm', session_id='chat-a')
     assert 'could not be cleared' in answer
+
+
+def test_insight_runs_the_writeup_through_the_host_and_saves_it(tmp_path, monkeypatch):
+    """/omni insight must ask Hermes (ctx.llm), never a key file this plugin can reach."""
+    from types import SimpleNamespace
+
+    db = tmp_path / 'events.db'
+    _events_db(db)
+    monkeypatch.setattr(omniscience, '_store', None)
+    monkeypatch.setenv('OMNISCIENCE_DB', str(db))
+
+    class Host:
+        def __init__(self):
+            self.seen = None
+
+        def complete(self, **kwargs):
+            self.seen = kwargs
+            return SimpleNamespace(text='## Diagnosis\n- one action', model='chosen/one',
+                                   provider='nous', usage=SimpleNamespace(input_tokens=1200,
+                                                                          output_tokens=200))
+
+    host = Host()
+    monkeypatch.setattr(omniscience, '_ctx', SimpleNamespace(llm=host))
+    answer = omniscience._omni_command('insight 7', session_id=None)
+
+    assert '## Diagnosis' in answer
+    assert host.seen is not None
+    assert host.seen['messages'][1]['content'].startswith('RECORDING DIGEST')
+    saved = json.loads((tmp_path / 'insight.json').read_text(encoding='utf-8'))
+    assert saved['markdown'] == '## Diagnosis\n- one action'
+    assert 'chosen/one' in answer
+
+
+def test_insight_says_so_when_hermes_has_no_llm_facade(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    db = tmp_path / 'events.db'
+    _events_db(db)
+    monkeypatch.setattr(omniscience, '_store', None)
+    monkeypatch.setenv('OMNISCIENCE_DB', str(db))
+    monkeypatch.setattr(omniscience, '_ctx', SimpleNamespace())
+    answer = omniscience._omni_command('insight', session_id=None)
+    assert 'ctx.llm' in answer
+    assert not (tmp_path / 'insight.json').exists()
+
+
+def test_insight_reports_a_failed_model_call_without_a_traceback(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    db = tmp_path / 'events.db'
+    _events_db(db)
+    monkeypatch.setattr(omniscience, '_store', None)
+    monkeypatch.setenv('OMNISCIENCE_DB', str(db))
+
+    class Host:
+        def complete(self, **kwargs):
+            raise RuntimeError('provider refused (429)')
+
+    monkeypatch.setattr(omniscience, '_ctx', SimpleNamespace(llm=Host()))
+    answer = omniscience._omni_command('insight', session_id=None)
+    assert 'did not happen' in answer
+    assert '429' in answer

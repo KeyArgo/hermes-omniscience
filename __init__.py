@@ -6,6 +6,7 @@ import logging
 import os
 import urllib.parse
 import socket
+import sys
 import ipaddress
 from pathlib import Path
 
@@ -38,6 +39,7 @@ HOOKS = (
 _store = None
 _notices = None
 _paused = None
+_ctx = None
 # Hooks the live notices care about; others are only recorded.
 _NOTICE_HOOKS = frozenset({"pre_llm_call", "pre_api_request", "post_api_request", "api_request_error", "post_tool_call"})
 
@@ -255,6 +257,8 @@ def _omni_command(_args: str, *, session_id: str | None = None, platform: str | 
         return _digest_command(action)
     if action.split(" ")[0] in ("tokens", "usage"):
         return _tokens_command(action, platform)
+    if action.split(" ")[0] in ("insight", "writeup"):
+        return _insight_command(action)
     mode = "full" if action == "full" else "light"
 
     links = None
@@ -286,28 +290,85 @@ def _omni_command(_args: str, *, session_id: str | None = None, platform: str | 
                             state_db_path=_state_db_path(), mode=mode, links=links)
 
 
-def _usage_module():
-    """The Usage aggregation that the viewer serves, loaded from the copy shipped with this
-    plugin. One implementation for both surfaces: a second copy here would drift, and the
-    chat command and the page would disagree about the same period."""
+def _viewer_module(filename: str, module_name: str):
+    """A module from the viewer package, loaded from the copy shipped with this plugin.
+
+    One implementation for both surfaces: a second copy here would drift, and the chat command
+    and the page would disagree about the same thing.
+    """
     import importlib.util
 
     here = os.path.dirname(os.path.abspath(__file__))
-    for rel in (("viewer_app", "omniscience_viewer", "usage.py"),
-                ("viewer", "omniscience_viewer", "usage.py")):
+    for rel in (("viewer_app", "omniscience_viewer", filename),
+                ("viewer", "omniscience_viewer", filename)):
         path = os.path.join(here, *rel)
         if not os.path.isfile(path):
             continue
         try:
-            spec = importlib.util.spec_from_file_location("omniscience_usage_shared", path)
+            spec = importlib.util.spec_from_file_location(module_name, path)
             if spec is None or spec.loader is None:
                 continue
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             return module
         except Exception:
-            log.debug("omniscience: bundled usage module did not load from %s", path, exc_info=True)
+            log.debug("omniscience: bundled %s did not load from %s", filename, path, exc_info=True)
     return None
+
+
+def _usage_module():
+    return _viewer_module("usage.py", "omniscience_usage_shared")
+
+
+def _insight_module():
+    """The insight module as a package import: it reads its neighbours (``db``, ``usage``)."""
+    import importlib
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    for rel in ("viewer_app", "viewer"):
+        root = os.path.join(here, rel)
+        if not os.path.isdir(os.path.join(root, "omniscience_viewer")):
+            continue
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        try:
+            return importlib.import_module("omniscience_viewer.insight")
+        except Exception:
+            log.debug("omniscience: bundled insight module did not import from %s", root, exc_info=True)
+    return None
+
+
+def _insight_command(action: str) -> str:
+    """``/omni insight [7|30|all]`` — Hermes' own model reads the recording and writes it up.
+
+    The completion runs inside Hermes (``ctx.llm``): the host owns the credentials, the routing
+    and the fallback, so the viewer never reads a key file and never talks to a provider. The
+    report is saved beside the recording, where the viewer's Insight panel reads it back.
+    """
+    period = action.split(" ", 1)[1].strip().lower() if " " in action else ""
+    days = {"": 7, "7": 7, "week": 7, "today": 1, "day": 1, "1": 1,
+            "30": 30, "month": 30, "all": 0, "0": 0}.get(period, 7)
+    llm = getattr(_ctx, "llm", None)
+    if llm is None or not callable(getattr(llm, "complete", None)):
+        return ("Omniscience: this Hermes build does not expose plugin LLM access (ctx.llm), "
+                "so the writeup cannot be generated. Everything else keeps working.")
+    module = _insight_module()
+    if module is None:
+        return "Omniscience: the bundled insight module is missing from this install, so nothing was generated."
+    db_path = _store.db_path if _store is not None else _db_path()
+    try:
+        digest = module.build_digest(db_path, _state_db_path(), days)
+        report = module.writeup(digest, llm.complete, days=days)
+    except Exception as exc:  # noqa: BLE001 - tell the user what happened, not a traceback
+        log.debug("omniscience: the insight writeup failed", exc_info=True)
+        return f"Omniscience: the writeup did not happen. {exc}"
+    module.save(db_path, report)
+    where = module.writeup_path(db_path)
+    return (f"{report['markdown']}\n\n"
+            f"— written by {report.get('model') or 'your active model'} over {report.get('digest_chars', 0):,} "
+            f"characters of metadata, in {report.get('took_s', 0)}s. Saved for the viewer at {where}.")
+
+
 
 
 def _tokens_command(action: str, platform: str | None) -> str:
@@ -395,7 +456,8 @@ def _import_history_in_background(db_path: str) -> None:
 
 
 def register(ctx):
-    global _store
+    global _store, _ctx
+    _ctx = ctx
     db_path = _db_path()
     parent = os.path.dirname(os.path.abspath(db_path))
     if parent:

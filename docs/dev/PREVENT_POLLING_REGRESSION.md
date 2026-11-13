@@ -1,7 +1,8 @@
 # Omniscience Polling Regression — Prevention Checklist
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 95e0c82
-> **Revised:** 2026-11-11 · **Body hash:** df27cdf1
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** fc6ccd19
+
 
 
 **For:** anyone changing how often Omniscience polls  

@@ -1,7 +1,8 @@
 # FAQ
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** ec7bbbe6
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** 05b81986
+
 
 
 
@@ -18,10 +19,12 @@ and your agent keeps running.
 
 ### Does it send data anywhere?
 
-The recorder makes no network calls. Everything is stored in a SQLite file on your machine, and the
-viewer reads it locally. Two opt-in features can reach the network: **Ask a Model** sends a
-metadata-only digest to a provider you pick, and the **DGX Sparks** usage source polls the hosts you
-configure. Neither runs unless you turn it on. There is no telemetry endpoint.
+The recorder makes no network calls, and neither does the viewer. Everything is stored in a SQLite
+file on your machine and read locally. The written diagnosis (`/omni insight`) runs inside Hermes on
+the model you already use, through the SDK's `ctx.llm` facade — the viewer holds no key and never
+talks to a provider. The one optional network feature is the **DGX Sparks** usage source, which
+polls the hosts you configure, and it does not run unless you turn it on. There is no telemetry
+endpoint.
 
 ### Where is the data?
 

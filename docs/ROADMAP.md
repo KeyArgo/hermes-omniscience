@@ -1,7 +1,8 @@
 # Roadmap
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 3b1c33fc
+> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
+> **Revised:** 2026-11-13 · **Body hash:** 403a6649
+
 
 
 What is built in 1.0.0, what is next, and what is parked. Status is read from the code at this
@@ -36,7 +37,7 @@ Hook to sanitized event to SQLite to viewer to live graph.
 | CSV export of steps, chats and models | Done — `viewer/omniscience_viewer/export.py` |
 | Redacted problem bundle | Done — preview and write routes |
 | Token usage from other harnesses, opt-in per source | Done — `viewer/omniscience_viewer/sources.py` |
-| Ask one of your own models to read the recording | Done — `insight.py`; metadata-only digest |
+| Ask one of your own models to read the recording | Done — `/omni insight`; the model call runs in Hermes via `ctx.llm`, the viewer only reads the saved report |
 | Run comparison (two graphs, diff) | Not built |
 | Read-only Hermes tools (`omni_query_events`, `omni_explain_failure`) | Not built; the `/omni` command covers chat triage today |
 | OTLP export | Not built |

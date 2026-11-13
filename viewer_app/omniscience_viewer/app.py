@@ -328,50 +328,25 @@ def create_app(db_path: str, static_dir: str | None = None,
             "providers": db_mod.rollup_by_provider(rows),
         }
 
-    @app.get("/api/v1/insight/models")
-    def insight_models(refresh: int = 0) -> dict:
-        """The models this machine can already call, so the picker offers what exists.
+    @app.get("/api/v1/insight")
+    def insight_latest() -> dict:
+        """The writeup Hermes already wrote for this recording, if there is one.
 
-        Enumerated from Hermes' own credentials (``~/.hermes/auth.json`` → the provider's
-        ``/v1/models``), never from a typed-in list: a name nobody serves is a button that fails.
+        The viewer cannot ask a model: it has no Hermes credentials and must not want any. The
+        plugin writes the report beside the recording with ``ctx.llm`` (``/omni insight`` in
+        Hermes); this route only reads that file back, so the page shows the same text the
+        operator got in chat.
         """
-        try:
-            report = insight_mod.list_models(refresh=bool(refresh), db_path=db_path)
-        except Exception as exc:  # noqa: BLE001 - a listing failure must not 500 the page
-            log.warning("omniscience: listing models failed: %s", exc)
-            return {"models": [], "unavailable": [{"provider": "hermes", "reason": str(exc)}]}
-        return report
-
-    @app.post("/api/v1/insight")
-    def insight_ask(payload: dict = Body(...)) -> dict:
-        """Ask one of the operator's own models to read the recording and write a diagnosis.
-
-        Metadata only: the digest is built by ``insight.build_digest`` from the same functions
-        that feed the Usage and Latency pages. No prompt, tool argument, tool result or file
-        content is stored by the recorder, so none can be sent.
-        """
-        provider = str(payload.get("provider") or "").strip()
-        model = str(payload.get("model") or "").strip()
-        try:
-            # A fraction of a day is legitimate: "last hour" is 1/24, and int() would round it to
-            # 0, which this API means as "everything ever recorded".
-            days = max(0.0, min(float(payload.get("days", 7)), 3650.0))
-        except (TypeError, ValueError):
-            days = 7.0
-        if not provider or not model:
-            raise HTTPException(status_code=400, detail="provider and model are required")
-        state_db = None
-        try:
-            from .labels import hermes_state_db
-
-            found = hermes_state_db()
-            state_db = str(found) if found else None
-        except Exception:  # noqa: BLE001 - money is optional, the report is not
-            log.debug("omniscience: locating Hermes' state database failed", exc_info=True)
-        try:
-            return insight_mod.ask(provider, model, days, db_path, state_db)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        report = insight_mod.load(db_path)
+        return {
+            "available": report is not None,
+            "report": report,
+            "hint": (
+                "In Hermes, run /omni insight (optionally /omni insight 30 for a period). "
+                "Hermes writes it with the model you are already using, so the viewer never "
+                "holds a key."
+            ),
+        }
 
     _usage_cache: dict[float, tuple[float, dict]] = {}
 

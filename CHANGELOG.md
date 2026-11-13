@@ -79,6 +79,13 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
   opened, because the flexible surface was squeezed to 0 px. Page views (Usage, Latency) now own
   their scrollbar, take the full width, and suppress the chat-scoped chrome; the graph surfaces
   keep a 320 px floor and the stage scrolls around them.
+- **The writeup is written by Hermes, not by the viewer.** The diagnosis panel used to read
+  `auth.json`, `config.yaml` and `.env` to find an endpoint and a key, then call the provider from
+  the viewer process. It now asks Hermes through the plugin SDK's `ctx.llm` facade (`/omni insight`,
+  on the model Hermes is already running), saves the report beside the recording as `insight.json`,
+  and the viewer's Writeup panel reads that file back. No credential file is opened, no key is held
+  and the viewer makes no outbound request; `GET /api/v1/insight` replaces `GET /api/v1/insight/models`
+  and `POST /api/v1/insight`.
 - **Latency shows the provider, and what went wrong.** The table keyed on the response's model
   name only, so a 429 storm, its retries and every timeout left no trace. Each row now carries the
   provider the request went to (learned from `llm.request`), rate limits, retries, timeouts, other

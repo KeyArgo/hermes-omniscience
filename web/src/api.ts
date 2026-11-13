@@ -381,38 +381,7 @@ export async function fetchLatency(windowSeconds = 0): Promise<LatencyReport> {
 
 /** Observed latency per model, from the recorder's own timings. No probing, no traffic. */
 
-/** One model the machine can already call, as listed by its provider. */
-export interface InsightChoice {
-  provider: string;
-  model: string;
-  /** The model Hermes itself uses. */
-  default?: boolean;
-  /** Has completed calls in this recording (rate limits under a fifth of its traffic). */
-  working?: boolean;
-  /** The picker's starting choice: cheapest model that has actually answered here. */
-  recommended?: boolean;
-  /** Why it is recommended, in words. */
-  why?: string;
-}
-
-export interface InsightModels {
-  models: InsightChoice[];
-  unavailable: { provider: string; reason: string }[];
-}
-
-/** The models Hermes itself is authenticated for. Never a typed-in list. */
-export async function fetchInsightModels(): Promise<InsightModels> {
-  try {
-    const body = (await getJson(`${API_BASE}/insight/models`)) as Partial<InsightModels>;
-    return {
-      models: Array.isArray(body.models) ? body.models : [],
-      unavailable: Array.isArray(body.unavailable) ? body.unavailable : [],
-    };
-  } catch {
-    return { models: [], unavailable: [{ provider: 'hermes', reason: 'the viewer did not answer' }] };
-  }
-}
-
+/** The writeup Hermes wrote for this recording, as the viewer reads it back. */
 export interface InsightReport {
   markdown: string;
   model: string;
@@ -420,34 +389,33 @@ export interface InsightReport {
   days: number;
   took_s: number;
   generated_at: number;
-  finish_reason?: string | null;
-  usage: Record<string, unknown>;
+  digest_chars?: number;
+  usage?: Record<string, unknown>;
 }
 
-/** Ask one of the operator's own models to read the recording and write it up. */
-export async function askInsight(
-  choice: InsightChoice,
-  days: number,
-): Promise<{ report: InsightReport | null; error: string | null }> {
+export interface InsightState {
+  /** True when Hermes has written a report for this recording. */
+  available: boolean;
+  report: InsightReport | null;
+  /** What to do when there is no report yet — the command to run in Hermes. */
+  hint: string;
+}
+
+/**
+ * The saved writeup. The viewer cannot ask a model: it holds no Hermes credential and must not
+ * want one. Hermes writes the report with `ctx.llm` (`/omni insight`) and this route reads the
+ * file back, so the page shows the same text the operator got in chat.
+ */
+export async function fetchInsight(): Promise<InsightState> {
   try {
-    const response = await fetch(`${API_BASE}/insight`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', ...tokenHeaders() },
-      body: JSON.stringify({ provider: choice.provider, model: choice.model, days }),
-    });
-    if (!response.ok) {
-      let detail = `${response.status} ${response.statusText}`;
-      try {
-        const body = (await response.json()) as { detail?: string };
-        if (body.detail) detail = body.detail;
-      } catch {
-        /* a non-JSON error body keeps the status line */
-      }
-      return { report: null, error: detail };
-    }
-    return { report: (await response.json()) as InsightReport, error: null };
-  } catch (exc) {
-    return { report: null, error: exc instanceof Error ? exc.message : String(exc) };
+    const body = (await getJson(`${API_BASE}/insight`)) as Partial<InsightState>;
+    return {
+      available: body.available === true,
+      report: body.report ?? null,
+      hint: typeof body.hint === 'string' ? body.hint : '',
+    };
+  } catch {
+    return { available: false, report: null, hint: 'the viewer did not answer' };
   }
 }
 
