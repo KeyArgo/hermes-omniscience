@@ -44,7 +44,7 @@ function listenForOpenExternal() {
     }
     if (data.type !== 'omniscience:open-external') return
     if (typeof data.url !== 'string' || !data.url.startsWith(VIEWER_URL + '/')) return
-    window.hermesDesktop?.openExternal?.(data.url)
+    CTX?.os?.openExternal?.(data.url)
   }
   window.addEventListener('message', externalListener)
 }
@@ -176,7 +176,7 @@ function LivePane() {
   const btn = { flex: 1, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 6,
     background: 'transparent', color: 'inherit', font: 'inherit', fontSize: 12, cursor: 'pointer' }
   const fullView = () => host.navigate(session ? `/omniscience?session=${encodeURIComponent(session)}` : '/omniscience')
-  const inBrowser = () => window.hermesDesktop?.openExternal?.(viewerSrc(session, key.token))
+  const inBrowser = () => CTX?.os?.openExternal?.(viewerSrc(session, key.token))
   return jsx('div', {
     style: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%' },
     children: [
