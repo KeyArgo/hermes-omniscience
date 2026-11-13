@@ -49,6 +49,11 @@ def build_demo_db() -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the Hermes Omniscience viewer.")
     parser.add_argument("--db", default=None, help="events SQLite DB path")
+    parser.add_argument(
+        "--state-db",
+        default=None,
+        help="Hermes' state database for THIS profile (chat titles, cost); passed in by the plugin",
+    )
     parser.add_argument("--demo", action="store_true", help="serve a synthetic demo database")
     parser.add_argument("--host", default="127.0.0.1", help="bind host (default 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8797, help="bind port (default 8797)")
@@ -99,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
         # Token will be written after successful bind (see startup event below)
 
     hosts = LOCAL_HOSTS if args.host in LOCAL_HOSTS else LOCAL_HOSTS + [args.host]
-    app = create_app(db_path, static_dir, allowed_hosts=hosts, token=token)
+    # The plugin hands this over (--state-db, or OMNISCIENCE_STATE_DB for a process it spawned);
+    # the viewer never guesses which profile is active.
+    state_db = (args.state_db or os.environ.get("OMNISCIENCE_STATE_DB") or "").strip() or None
+    app = create_app(db_path, static_dir, allowed_hosts=hosts, token=token, state_db=state_db)
 
     # Register a startup event that writes the token only after the server has bound.
     # This prevents a second viewer from overwriting the token file before the first

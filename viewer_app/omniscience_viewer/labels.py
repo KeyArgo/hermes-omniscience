@@ -22,18 +22,19 @@ NOISE = (
 )
 
 
-def hermes_state_db() -> Path | None:
-    home = os.environ.get('HERMES_HOME')
-    candidates = []
-    if home:
-        candidates.append(Path(home) / 'state.db')
-        candidates.append(Path(home) / 'profiles' / 'dev' / 'state.db')
-    candidates.append(Path.home() / '.hermes' / 'profiles' / 'dev' / 'state.db')
-    candidates.append(Path.home() / '.hermes' / 'state.db')
-    for c in candidates:
-        if c.is_file():
-            return c
-    return None
+def hermes_state_db(state_db: str | os.PathLike | None = None) -> Path | None:
+    """The state database the plugin handed over, and nothing else.
+
+    Hermes keeps one store per profile (``<HERMES_HOME>/state.db``), and only the plugin knows
+    which profile is active: it passes the path in with ``--state-db`` the same way it passes
+    ``--db``. Inventing candidates here (``profiles/dev/state.db``, ``~/.hermes/state.db``) is how
+    a viewer started for one profile shows another profile's chat titles — and ``dev`` is one
+    machine's profile name, not a default. Without a path, labels fall back to the session id.
+    """
+    if not state_db:
+        return None
+    path = Path(state_db)
+    return path if path.is_file() else None
 
 
 def _clean(text: str, limit: int = 64) -> str:
@@ -46,9 +47,9 @@ def _clean(text: str, limit: int = 64) -> str:
     return line[:limit] + ('…' if len(line) > limit else '')
 
 
-def session_metadata(session_ids: list[str]) -> dict[str, dict]:
+def session_metadata(session_ids: list[str], state_db: str | os.PathLike | None = None) -> dict[str, dict]:
     """Read known source and archive state without modifying the Hermes database."""
-    db = hermes_state_db()
+    db = hermes_state_db(state_db)
     if db is None or not session_ids:
         return {}
     try:
@@ -73,13 +74,13 @@ def session_metadata(session_ids: list[str]) -> dict[str, dict]:
     return result
 
 
-def labels_for(session_ids: list[str]) -> dict[str, str]:
+def labels_for(session_ids: list[str], state_db: str | os.PathLike | None = None) -> dict[str, str]:
     """Return Hermes titles when present, otherwise the first usable user line.
 
     This function reads conversation content and should only be called when
     OMNISCIENCE_VIEWER_CONTENT_LABELS is explicitly enabled.
     """
-    db = hermes_state_db()
+    db = hermes_state_db(state_db)
     if db is None or not session_ids:
         return {}
     out: dict[str, str] = {}

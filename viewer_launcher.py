@@ -116,7 +116,31 @@ def is_paused(state_dir: str) -> bool:
     return os.path.exists(pause_marker_path(state_dir))
 
 
-def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool) -> dict:
+def viewer_command(db_path: str, *, state_db: str | None, static_dir: str, port: int) -> list[str]:
+    """The argv the viewer is spawned with.
+
+    ``--db`` and ``--state-db`` are both facts only this process has: which recording, and which
+    profile's Hermes store belongs to it. The viewer is given them, never left to guess.
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "omniscience_viewer",
+        "--db",
+        db_path,
+        "--static",
+        str(static_dir),
+        "--port",
+        str(port),
+        "--host",
+        "127.0.0.1",
+    ]
+    if state_db:
+        cmd += ["--state-db", str(state_db)]
+    return cmd
+
+
+def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool, state_db: str | None = None) -> dict:
     """
     Ensure the viewer is running. Never raises.
 
@@ -238,22 +262,13 @@ def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool) -> dict:
             # Prepare spawn command
             port = _get_port_from_url(url)
             static_dir = bundle_dir / "static"
-            cmd = [
-                sys.executable,
-                "-m",
-                "omniscience_viewer",
-                "--db",
-                db_path,
-                "--static",
-                str(static_dir),
-                "--port",
-                str(port),
-                "--host",
-                "127.0.0.1",
-            ]
+            cmd = viewer_command(db_path, state_db=state_db, static_dir=str(static_dir), port=port)
 
             # Prepare environment
             env = os.environ.copy()
+            # The child resolves chat titles from this store; nothing else is implied.
+            if state_db:
+                env["OMNISCIENCE_STATE_DB"] = str(state_db)
             # Hermes adds its own package environment at startup (not via PYTHONPATH), so hand the
             # viewer this process's import path: it then finds fastapi/uvicorn exactly as Hermes does.
             parts = pythonpath_entries(str(bundle_dir), sys.path)

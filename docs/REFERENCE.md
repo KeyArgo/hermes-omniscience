@@ -1,7 +1,8 @@
 # Reference
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
-> **Revised:** 2026-11-13 · **Body hash:** a5635bee
+> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
+> **Revised:** 2026-11-13 · **Body hash:** 49ecab5d
+
 
 
 
@@ -137,6 +138,7 @@ flags, usage-source state and the optional brake request.
 | Flag | Meaning | Default |
 |---|---|---|
 | `--db PATH` | Event database | `OMNISCIENCE_DB`, else `HERMES_HOME/plugin-data/omniscience/events.db` |
+| `--state-db PATH` | Hermes' state database for the active profile (chat titles, cost). The plugin passes this in; without it the viewer shows ids, never a guessed path | `OMNISCIENCE_STATE_DB` |
 | `--demo` | Generate and serve synthetic data; cannot be combined with `--db` | off |
 | `--host` | Bind address | `127.0.0.1` |
 | `--port` | Bind port | `8797` |

@@ -1,7 +1,8 @@
 # Install & operate Hermes Omniscience
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 6ef3aaab
+> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
+> **Revised:** 2026-11-13 · **Body hash:** 3325f15e
+
 
 
 
@@ -156,6 +157,7 @@ Useful flags (from `viewer/omniscience_viewer/__main__.py`):
 | flag | meaning | default |
 |---|---|---|
 | `--db PATH` | events SQLite path | `OMNISCIENCE_DB` / `HERMES_HOME`/plugin-data/omniscience/events.db |
+| `--state-db PATH` | Hermes' state database for this profile (titles, cost); passed in by the plugin | `OMNISCIENCE_STATE_DB` |
 | `--host` | bind address | **`127.0.0.1`** |
 | `--port` | bind port | `8797` |
 | `--static DIR` | static dir to serve | `web/dist` if present |

@@ -417,7 +417,9 @@ def _start_viewer_in_background(db_path: str) -> None:
     autostart = os.environ.get("OMNISCIENCE_VIEWER_AUTOSTART", "1").strip().lower() not in ("0", "false", "no", "off")
     real_db = os.path.realpath(db_path)
     threading.Thread(
-        target=lambda: viewer_launcher.ensure_viewer(real_db, log_dir=os.path.dirname(real_db), autostart=autostart),
+        target=lambda: viewer_launcher.ensure_viewer(
+            real_db, log_dir=os.path.dirname(real_db), autostart=autostart, state_db=_state_db_path()
+        ),
         name="omniscience-viewer-autostart",
         daemon=True,
     ).start()

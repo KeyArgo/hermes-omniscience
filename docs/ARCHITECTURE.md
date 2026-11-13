@@ -1,7 +1,8 @@
 # Architecture
 
-> **Applies to:** Omniscience 1.0.0 · written at commit ad9c637
-> **Revised:** 2026-11-11 · **Body hash:** a5f5172d
+> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
+> **Revised:** 2026-11-13 · **Body hash:** b4cf2536
+
 
 
 
@@ -167,7 +168,8 @@ Everything is under `<HERMES_HOME>/plugin-data/omniscience/`, normally
 | `bundles/`, `privacy-flags/` | viewer | User-requested exports and dossiers |
 | `paused`, `brake.json` | scripts | Operator controls |
 
-Chat titles are read from Hermes' own `<HERMES_HOME>/state.db` at request time and are not copied
+Chat titles are read from the active profile's `state.db` — the path the plugin passes in with
+`--state-db` — at request time and are not copied
 into `events.db`. Earlier chat metadata may be imported once from that database, never message text.
 
 ## 7. Deletion and history

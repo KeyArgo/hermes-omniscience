@@ -171,3 +171,26 @@ def test_pythonpath_for_the_spawn_excludes_relative_entries():
         assert entries[0] == d
         assert "." not in entries and "rel" not in entries and "" not in entries
         assert all(os.path.isabs(p) for p in entries)
+
+
+def test_the_spawn_command_passes_the_active_profiles_state_database(tmp_path):
+    """The viewer gets the active profile's state.db on the command line, like --db.
+
+    It cannot work it out itself: the plugin is the process that knows which profile is active,
+    and a viewer that guesses ends up labelling chats from someone else's profile.
+    """
+    from omniscience.viewer_launcher import viewer_command
+
+    state_db = tmp_path / 'profiles' / 'work' / 'state.db'
+    cmd = viewer_command(
+        str(tmp_path / 'events.db'),
+        state_db=str(state_db),
+        static_dir=str(tmp_path / 'static'),
+        port=8797,
+    )
+    assert '--state-db' in cmd
+    assert cmd[cmd.index('--state-db') + 1] == str(state_db)
+    # Without one, the flag is absent rather than pointing at a guess.
+    bare = viewer_command(str(tmp_path / 'events.db'), state_db=None,
+                          static_dir=str(tmp_path / 'static'), port=8797)
+    assert '--state-db' not in bare

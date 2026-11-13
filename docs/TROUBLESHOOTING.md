@@ -1,7 +1,8 @@
 # Troubleshooting
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
-> **Revised:** 2026-11-13 · **Body hash:** e74fa4c0
+> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
+> **Revised:** 2026-11-13 · **Body hash:** 4ac46ba2
+
 
 
 
@@ -89,8 +90,10 @@ last event. Replay will show the same state because it only redraws recorded row
 
 ## The Usage page shows tokens but no money
 
-Money comes from Hermes' own `state.db` estimate, never from the recorder. If that database is not
-found at `OMNISCIENCE_STATE_DB` or `~/.hermes/state.db`, the page still shows measured tokens.
+Money comes from Hermes' own `state.db` estimate, never from the recorder. The plugin hands the
+active profile's path to the viewer (`--state-db`, or `OMNISCIENCE_STATE_DB` for a process it
+spawned); if it is missing the page still shows measured tokens, and chat titles fall back to
+session ids rather than being read from another profile's store.
 A dollar figure is always labelled as Hermes' estimate, not a bill.
 
 ## The writeup does not appear

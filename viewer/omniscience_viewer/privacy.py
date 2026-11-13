@@ -127,8 +127,10 @@ def list_runs(db_path: str, days: float = 7) -> list[dict[str, Any]]:
         )
     # Names last, resolved in one query: a run's chat can be renamed at any time, so the name is read
     # when the page is asked for it rather than when the step was recorded.
-    state_db = os.environ.get("OMNISCIENCE_STATE_DB") or os.path.expanduser("~/.hermes/state.db")
-    titles = chat_titles(state_db, {r["session_id"] for r in out if r["session_id"]})
+    # Only the store the plugin named (it sets OMNISCIENCE_STATE_DB for this process): the active
+    # profile is its fact, not something to guess from ~/.hermes.
+    state_db = (os.environ.get("OMNISCIENCE_STATE_DB") or "").strip()
+    titles = chat_titles(state_db, {r["session_id"] for r in out if r["session_id"]}) if state_db else {}
     for run in out:
         run["chat_title"] = titles.get(run["session_id"])
     return out

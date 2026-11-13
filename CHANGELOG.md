@@ -79,6 +79,11 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
   opened, because the flexible surface was squeezed to 0 px. Page views (Usage, Latency) now own
   their scrollbar, take the full width, and suppress the chat-scoped chrome; the graph surfaces
   keep a 320 px floor and the stage scrolls around them.
+- **Chat titles come from the profile the viewer was started for (review 5).** `labels.py` used to
+  invent candidates — `<HERMES_HOME>/profiles/dev/state.db` and `~/.hermes/state.db` — so a viewer
+  serving one profile could label chats with another profile's titles. Both copies now read only
+  the path the plugin passes in (`--state-db`, the same way `--db` works); without one, the label is
+  the session id. The privacy page follows the same rule instead of falling back to `~/.hermes`.
 - **Embedded desktop page (review 4).** The viewer is embedded with the SDK's `SandboxedFrame`
   instead of a raw `<iframe>`, so the page runs in the app's guest posture with an opaque origin:
   it cannot reach the app's realm, storage or bridge. The panel reports `Origin: null` as a

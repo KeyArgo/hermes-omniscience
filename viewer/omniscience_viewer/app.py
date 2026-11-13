@@ -356,7 +356,14 @@ def _watch_parent() -> None:
 
 def create_app(db_path: str, static_dir: str | None = None,
                allowed_hosts: list[str] | None = None,
-               token: str | None = None) -> FastAPI:
+               token: str | None = None,
+               state_db: str | None = None) -> FastAPI:
+    """Build the viewer for one events database.
+
+    ``state_db`` is Hermes' own per-profile store, handed in by the plugin (``--state-db``) for
+    chat titles and cost. The viewer never guesses it: the profile that is active is a fact only
+    the plugin has, and a wrong guess labels chats from someone else's profile.
+    """
     _watch_parent()
     app = FastAPI(title="Hermes Omniscience Viewer", docs_url=None, redoc_url=None)
     # Blocks DNS-rebinding: a hostile page can't reach us under its own hostname.
@@ -438,15 +445,8 @@ def create_app(db_path: str, static_dir: str | None = None,
             lookback = max(0.0, min(float(days), 3650.0))
         except (TypeError, ValueError):
             lookback = 7.0
-        state_db = None
-        try:
-            from .labels import hermes_state_db
-
-            found = hermes_state_db()
-            state_db = str(found) if found else None
-        except Exception:
-            # Cost is one section of the page; a missing session store must not empty it.
-            log.debug("omniscience: locating Hermes' state database failed", exc_info=True)
+        # Cost comes from Hermes' own store when the plugin handed one over; without it the page
+        # still shows measured tokens, which is the part that is ours.
         # Aggregating a month of imported history takes seconds; a page that is opened, left and
         # returned to should not pay that every time. Twenty seconds is short enough that the
         # freshness footer ("generated …") stays honest.
@@ -633,9 +633,9 @@ def create_app(db_path: str, static_dir: str | None = None,
             from .labels import labels_for, session_metadata
 
             session_ids = [r.get("id") for r in rows if r.get("id")]
-            metadata = session_metadata(session_ids)
+            metadata = session_metadata(session_ids, state_db)
             if content_labels_enabled:
-                names = labels_for(session_ids)
+                names = labels_for(session_ids, state_db)
             else:
                 names = {}
         except Exception:

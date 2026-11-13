@@ -1,7 +1,8 @@
 # Configuration
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** eeade3e2
+> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
+> **Revised:** 2026-11-13 · **Body hash:** 498d344f
+
 
 
 Every setting Omniscience actually reads, where it lives, and what it does. The recorder reads
@@ -25,7 +26,7 @@ database.
 | `OMNISCIENCE_IDLE_POLL_INTERVAL_S` | `4.0` | viewer | Slower poll used after three empty polls. The first new row restores the normal interval. |
 | `OMNISCIENCE_PARENT_PID` | unset | viewer | Set by the launcher. The viewer exits when that process is gone. |
 | `OMNISCIENCE_VIEWER_CONTENT_LABELS` | `1` | viewer | Set to `0`, `false`, `no` or `off` to show session ids instead of chat titles from Hermes' `state.db`. |
-| `OMNISCIENCE_STATE_DB` | `~/.hermes/state.db` | viewer | Hermes' own state database, used for chat titles and privacy-page labels. |
+| `OMNISCIENCE_STATE_DB` | the active profile's, set by the plugin | viewer | Hermes' own state database for the profile the viewer was started for, used for chat titles, privacy labels and Hermes' cost estimate. The plugin sets it when it spawns the viewer; nothing else is guessed. |
 | `OMNISCIENCE_TENSORFOLD_HOSTS` | empty | viewer | Comma-separated `name=http://host:port` pairs for the optional DGX Sparks usage source. |
 | `OMNISCIENCE_PORT` | `8797` | `scripts/omni.sh` | Port the pause/resume helper checks and stops. |
 
