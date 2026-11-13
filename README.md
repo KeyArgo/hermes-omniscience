@@ -22,6 +22,9 @@
   <br/><sub><b>Omniscience inside Hermes Desktop</b>, watching a real agent session. <a href="https://x.com/MHArgonaut/status/2120633813705363663">Watch the full demo ▶</a></sub>
 </p>
 
+<p align="center"><img src="docs/media/omni-map.gif" alt="Omniscience: each message with its model calls and tools on the map, then the timeline" width="100%"/>
+<br/><sub><b>The map and the timeline.</b> Each message with its model calls and tools, then the same run in time order.</sub></p>
+
 <p align="center">
   <a href="#install">Install</a> ·
   <a href="#features">Features</a> ·
