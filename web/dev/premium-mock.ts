@@ -504,6 +504,9 @@ export function installShowcaseViewer(): ShowcaseHarness {
       return respond(200, { failures: [], root });
     }
     if (path.endsWith('/diagnose')) return respond(200, { status: 'no_failure' });
+    if (path.endsWith('/concerns')) return respond(200, { days: 1, counts: { privacy: 1, failures: 0 }, items: [] });
+    if (path.endsWith('/privacy/flags')) return respond(200, { flags: [] });
+    if (path.endsWith('/privacy')) return respond(200, { runs: [] });
     if (path.endsWith('/insight')) return respond(200, { state: 'none' });
     if (path.endsWith('/ping')) return respond(200, { build: 'synthetic' });
     if (path.endsWith('/version')) {

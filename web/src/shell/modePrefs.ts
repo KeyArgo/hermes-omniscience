@@ -36,6 +36,7 @@ export const HERMES_PANEL_PREFIX = 'omni.hermes.panel.';
  */
 export const MODE_VIEW_KEYS = [
   'theme',
+  'accent',
   'view',
   'defaultView',
   'mapStyle',

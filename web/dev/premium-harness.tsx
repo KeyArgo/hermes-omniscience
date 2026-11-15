@@ -24,6 +24,7 @@ import '../src/theme/pass10-paper.gen.css';
 import '../src/theme/pass11-modes.css';
 import '../src/theme/pass12-premium.css';
 import '../src/theme/audit-overflow-fixes.css';
+import '../src/theme/focus-areas.css';
 
 installSafeStorage();
 installShowcaseViewer();

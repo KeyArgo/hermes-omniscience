@@ -146,6 +146,7 @@ def test_db_error_then_recovered(tmp_path, monkeypatch):
     from omniscience_viewer import app as app_mod
 
     monkeypatch.setattr(app_mod, "POLL_INTERVAL_S", 0.05)
+    monkeypatch.setattr(app_mod, "IDLE_POLL_INTERVAL_S", 0.05)
     path = _make_db(tmp_path)
     root = "sess-r"
     _insert(path, kind="session.start", session_id=root, ts=1.0)

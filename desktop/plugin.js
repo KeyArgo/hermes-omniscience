@@ -175,39 +175,55 @@ function LivePane() {
         children: [
           jsx('button', { key: 'f', type: 'button', style: btn, onClick: fullView, children: 'Open full view' }),
           jsx('button', { key: 'b', type: 'button', style: btn, onClick: inBrowser, children: 'Open in browser ↗' }),
+        jsx('button', { key: 'c', type: 'button', style: btn, onClick: () => setPane(false), children: 'Close pane' }),
         ],
       }),
     ],
   })
 }
 
-const PANE_KEY = 'omniscience.livePane'
+// The previous live pane opened globally by default and could occupy space in other apps.
+// A new preference starts closed even if that older default was saved.
+const PANE_KEY = 'omniscience.livePane.v2'
 let paneDisposer = null
 // On by default: the pane shows the current chat as it happens. Closing it (button or palette)
 // is remembered.
 function paneWanted() {
   try {
-    return window.localStorage.getItem(PANE_KEY) !== '0'
+    return window.localStorage.getItem(PANE_KEY) === '1'
   } catch {
-    return true
+    return false
   }
 }
 function setPane(on) {
+  if (paneDisposer) {
+    const dispose = paneDisposer
+    paneDisposer = null
+    try {
+      dispose()
+    } catch {
+      /* already gone */
+    }
+  }
   try {
     window.localStorage.setItem(PANE_KEY, on ? '1' : '0')
   } catch {
     /* storage unavailable */
   }
-  if (paneDisposer) {
-    try {
-      paneDisposer()
-    } catch {
-      /* already gone */
-    }
-    paneDisposer = null
-  }
   if (!on || !CTX) return
   try {
+    if (typeof host.openWorkspace === 'function') {
+      paneDisposer = host.openWorkspace('omniscience:live-pane', {
+        title: 'Omniscience live',
+        dock: { pane: 'workspace', pos: 'right' },
+        render: () => jsx(LivePane, {}),
+        onClose: () => {
+          paneDisposer = null
+          try { window.localStorage.setItem(PANE_KEY, '0') } catch { /* storage unavailable */ }
+        },
+      })
+      return
+    }
     paneDisposer = CTX.register({
       id: 'live-pane',
       area: 'panes',
@@ -225,6 +241,12 @@ export default {
   name: 'Omniscience',
   register(ctx) {
     CTX = ctx
+    ctx.onDispose?.(() => {
+      const dispose = paneDisposer
+      paneDisposer = null
+      if (dispose) dispose()
+      CTX = null
+    })
     ctx.register({
       id: 'page',
       area: 'routes',

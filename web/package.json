@@ -14,7 +14,8 @@
     "check:lens": "node dev/lens-harness.mjs",
     "check:events": "node dev/app-events-harness.mjs",
     "check:visual": "node dev/interface-slice.mjs",
-    "check:selection-resize": "node dev/selection-resize.mjs"
+    "check:selection-resize": "node dev/selection-resize.mjs",
+    "check:readability": "node dev/readability-check.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",

@@ -222,7 +222,7 @@ describe('connection state', () => {
       tooltip: 'The last event was 1–5 minutes ago: it just worked, but is not doing anything this second.',
     });
     expect(CONNECTION_TEXT.recorded).toEqual({
-      label: 'Quiet',
+      label: 'Chat quiet',
       tooltip:
         'No event in this chat for over 5 minutes. Other chats may still be recording — this badge only describes the chat you have open.',
     });

@@ -588,6 +588,19 @@ export default function App() {
   // shortcuts cannot open a dialog underneath it.
   const [tourActive, setTourActive] = useState(false);
   const [railTab, setRailTab] = useState<'inspect' | 'warnings' | 'why'>('warnings');
+  const [focusedArea, setFocusedArea] = useState<'stage' | 'details' | null>(null);
+  useEffect(() => {
+    if (!focusedArea) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented &&
+          !document.querySelector('[role="dialog"][aria-modal="true"]')) {
+        event.preventDefault();
+        setFocusedArea(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusedArea]);
 
   /**
    * Switch layout family. Every view preference moves with the mode: the preset, compact text, the
@@ -603,6 +616,7 @@ export default function App() {
     setPresetState(nextPreset);
     setCompact(readModeCompact(next, embedded));
     setTheme(readScopedPref('theme', next) === 'paper' ? 'paper' : 'console');
+    setAccent(readScopedPref('accent', next) === 'red' ? 'red' : 'teal');
     const savedView = readScopedPref('view', next);
     const savedDefault = readScopedPref('defaultView', next);
     setDefaultView(isView(savedDefault) ? savedDefault : 'graph');
@@ -890,10 +904,16 @@ export default function App() {
   const [theme, setTheme] = useState<'console' | 'paper'>(
     () => (readScopedPref('theme', mode) === 'paper' ? 'paper' : 'console'),
   );
+  const [accent, setAccent] = useState<'teal' | 'red'>(
+    () => (readScopedPref('accent', mode) === 'red' ? 'red' : 'teal'),
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent;
+  }, [accent]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Side-pane view (List / Context / Tools / Tokens / Time), remembered per mode.
   const [miniView, setMiniView] = useState<MiniView>(() => {
@@ -1045,7 +1065,6 @@ export default function App() {
       socket = new WebSocket(liveUrl(selectedRoot, after), liveSubprotocol() ? [liveSubprotocol()!] : []);
 
       socket.onopen = () => {
-        attempt = 0;
         if (!closed) setSocketOpen(true);
       };
 
@@ -1060,6 +1079,9 @@ export default function App() {
         if (!payload || typeof payload !== 'object') return;
         const record = payload as Record<string, unknown>;
         if (record.type === 'heartbeat') {
+          // A handshake alone does not mean the feed is stable: rapid open/close flaps must
+          // keep backing off until the connection stays alive for a heartbeat.
+          attempt = 0;
           setSocketOpen(true);
           return;
         }
@@ -1532,6 +1554,7 @@ export default function App() {
     setShowTitles(true);
     setFollowNewest(false);
     setTheme('console');
+    setAccent('teal');
     setLinkView(false);
     window.dispatchEvent(new Event('omni:privacy'));
     setShowContext(true);
@@ -1557,13 +1580,14 @@ export default function App() {
     resetView();
   };
 
-  const viewerSettings: ViewerSettings = { defaultView, compact, followNewest, showTitles, theme, showContext };
+  const viewerSettings: ViewerSettings = { defaultView, compact, followNewest, showTitles, theme, accent, showContext };
   const applySettings = (next: ViewerSettings) => {
     setDefaultView(next.defaultView);
     setCompact(next.compact);
     setFollowNewest(next.followNewest);
     setShowTitles(next.showTitles);
     setTheme(next.theme);
+    setAccent(next.accent);
     setShowContext(next.showContext);
     // Every viewer setting is remembered for the mode on screen only.
     writeModeCompact(mode, next.compact);
@@ -1571,6 +1595,7 @@ export default function App() {
     writeScopedBool('showTitles', mode, next.showTitles);
     writeScopedBool('showContext', mode, next.showContext);
     writeScopedPref('theme', mode, next.theme);
+    writeScopedPref('accent', mode, next.accent);
     writeScopedPref('defaultView', mode, next.defaultView);
   };
   const toggleFullscreen = () => {
@@ -2135,8 +2160,12 @@ export default function App() {
           </div>
         </aside>
 
-        <section className="stage">
+        <section className={`stage${focusedArea === 'stage' ? ' is-area-focused' : ''}`}>
           <div className="stage-toolbar">
+            <button type="button" className="area-focus-button" aria-pressed={focusedArea === 'stage'}
+              onClick={() => setFocusedArea(focusedArea === 'stage' ? null : 'stage')}>
+              {focusedArea === 'stage' ? 'Restore view' : 'Expand view'}
+            </button>
             <div className="stage-title" title="The conversation currently shown on the map (its session id).">
               {selectedRoot ? (
                 <>
@@ -2533,7 +2562,7 @@ export default function App() {
             <div className="rail-scrim" aria-hidden="true" onClick={() => setInspectorShown(false)} />
           ) : null}
           <aside
-          className={`rail-right ${selectedNode ? 'has-selection' : ''} ${rightCollapsed ? 'is-collapsed' : ''} ${railMode === 'follow' ? 'is-mini' : ''}`}
+          className={`rail-right ${selectedNode ? 'has-selection' : ''} ${rightCollapsed ? 'is-collapsed' : ''} ${railMode === 'follow' ? 'is-mini' : ''}${focusedArea === 'details' ? ' is-area-focused' : ''}`}
         >
           {rightCollapsed ? (
             <button
@@ -2553,6 +2582,10 @@ export default function App() {
             </button>
           ) : null}
           <div className="rail-content">
+            <button type="button" className="area-focus-button" aria-pressed={focusedArea === 'details'}
+              onClick={() => setFocusedArea(focusedArea === 'details' ? null : 'details')}>
+              {focusedArea === 'details' ? 'Restore details' : 'Expand details'}
+            </button>
             {/* The same strip that heads the standalone mini page, so "next to your chat" means
                 the same thing whether Omniscience is docked or opened on its own. */}
             <SessionContextStrip

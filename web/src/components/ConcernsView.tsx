@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE, fetchInsight } from '../api';
 import { tokenHeaders } from '../token';
 import './ConcernsView.css';
@@ -48,23 +48,31 @@ export function ConcernsView() {
   const [days, setDays] = useState(1);
   const [report, setReport] = useState<ConcernsReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const loadId = useRef(0);
   const [answer, setAnswer] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
   const load = useCallback(async (window: number) => {
+    const id = ++loadId.current;
+    setReport(null);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/concerns?days=${window}`, { headers: { ...tokenHeaders() } });
+      const response = await fetch(`${API_BASE}/concerns?days=${window}`, {
+        headers: { ...tokenHeaders() }, signal: AbortSignal.timeout(15000),
+      });
       if (!response.ok) throw new Error(`the viewer answered ${response.status}`);
-      setReport((await response.json()) as ConcernsReport);
+      const body = (await response.json()) as ConcernsReport;
+      if (!body || !Array.isArray(body.items) || !body.counts) throw new Error('the viewer returned an unreadable report');
+      if (id === loadId.current) setReport(body);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'could not read the recording');
+      if (id === loadId.current) setError(failure instanceof Error ? failure.message : 'could not read the recording');
     }
   }, []);
 
   useEffect(() => {
     void load(days);
+    return () => { loadId.current += 1; };
   }, [days, load]);
 
   const ask = async () => {
@@ -108,11 +116,11 @@ export function ConcernsView() {
           ))}
         </div>
         <p className="cv-counts">
-          {report ? `${report.counts.privacy} privacy calls · ${report.counts.failures} failures` : 'reading…'}
+          {report ? `${report.counts.privacy} privacy calls · ${report.counts.failures} failures` : error ? 'Unable to load' : 'Reading…'}
         </p>
       </header>
 
-      {error ? <p className="cv-error">Could not read the recording: {error}</p> : null}
+      {error ? <p className="cv-error">Could not read the recording: {error} <button type="button" onClick={() => void load(days)}>Retry</button></p> : null}
 
       <section className="cv-ai">
         <button

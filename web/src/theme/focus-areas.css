@@ -1,0 +1,78 @@
+/* Focus overlays for the map stage and the details rail. These classes are
+   toggled by the host component; the surrounding layout keeps its place. */
+.stage.is-area-focused,
+.rail-right.is-area-focused {
+  position: fixed !important;
+  inset: 8px !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  box-sizing: border-box;
+  isolation: isolate;
+  border: 1px solid var(--line-strong, var(--line, #526174));
+  border-radius: 12px;
+  background: var(--panel, #0a1422);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.48);
+}
+
+.stage.is-area-focused {
+  flex-direction: column;
+}
+
+.stage.is-area-focused > :not(.graph-surface):not(.us-surface):not(.lat-surface) {
+  flex: 0 0 auto;
+}
+
+.stage.is-area-focused > .graph-surface,
+.stage.is-area-focused > .us-surface,
+.stage.is-area-focused > .lat-surface {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rail-right.is-area-focused {
+  flex-direction: column;
+}
+
+.area-focus-button {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong, var(--line, #526174));
+  border-radius: 8px;
+  background: var(--panel-2, #0e1d30);
+  color: var(--text, #eef4fb);
+  font: inherit;
+  cursor: pointer;
+}
+
+.area-focus-button:hover {
+  border-color: var(--accent, #63e3ea);
+}
+
+.area-focus-button:focus-visible {
+  outline: 3px solid var(--accent, #63e3ea);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .stage.is-area-focused,
+  .rail-right.is-area-focused {
+    inset: 4px !important;
+    border-radius: 8px;
+  }
+}

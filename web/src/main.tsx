@@ -22,6 +22,7 @@ import './theme/pass11-modes.css';
 import './theme/pass12-premium.css';
 // Audit overflow fixes: loaded last so its scoped rules override the passes above.
 import './theme/audit-overflow-fixes.css';
+import './theme/focus-areas.css';
 
 // Before anything renders: the desktop embeds this page in a sandboxed frame, where
 // window.localStorage throws on access and the first preference read would blank the page.

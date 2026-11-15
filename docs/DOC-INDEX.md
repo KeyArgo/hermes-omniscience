@@ -1,10 +1,10 @@
 # Documentation index
 
-Every guide below describes **Omniscience 1.0.0** (commit 2f13567). The date on each row is
+Every guide below describes **Omniscience 1.0.0** (commit a5db339). The date on each row is
 the last time its body changed; a row reading *behind* means the file was edited without being
 restamped, and `python3 scripts/docs-stamp.py --check` treats that as an error.
 
-Regenerate this page with `python3 scripts/docs-stamp.py --index`. Generated 2026-11-14.
+Regenerate this page with `python3 scripts/docs-stamp.py --index`. Generated 2026-11-15.
 
 | Document | Title | What it covers | Revised | State |
 |---|---|---|---|---|
@@ -20,6 +20,7 @@ Regenerate this page with `python3 scripts/docs-stamp.py --index`. Generated 202
 | [INSTALL-CHANNELS](INSTALL-CHANNELS.md) | Omniscience install channels |  | 2026-11-14 | current |
 | [INSTALL](INSTALL.md) | Install & operate Hermes Omniscience | Install, run, upgrade and remove the plugin | 2026-11-13 | current |
 | [INTERFACE-SLICE](INTERFACE-SLICE.md) | Premium interface slice — what changed, what was measured |  | 2026-11-14 | current |
+| [INTERFACE-WORK](INTERFACE-WORK.md) | Omniscience interface work in progress |  | 2026-11-15 | current |
 | [README](README.md) | Omniscience documentation | What the plugin is, how to install it, what it looks like | 2026-11-11 | current |
 | [REFERENCE](REFERENCE.md) | Reference |  | 2026-11-13 | current |
 | [ROADMAP](ROADMAP.md) | Roadmap | What is built, what is next, what is parked | 2026-11-13 | current |
@@ -39,7 +40,7 @@ Regenerate this page with `python3 scripts/docs-stamp.py --index`. Generated 202
 Each document opens with the build it was written against and a hash of its own body:
 
 ```
-> **Applies to:** Omniscience 1.0.0 · commit 2f13567
+> **Applies to:** Omniscience 1.0.0 · commit a5db339
 > **Revised:** <date the body last changed> · **Body hash:** <first 8 hex of sha256(body)>
 ```
 

@@ -775,6 +775,8 @@ def create_app(db_path: str, static_dir: str | None = None,
                         # Never let a transient failure kill the feed silently.
                         rows, error = [], "database unavailable"
                     if error is not None:
+                        # Retry a failed database promptly even if the feed had gone idle.
+                        idle_polls = 0
                         # A broken feed must not look healthy: say so once, keep polling,
                         # and announce recovery when the DB works again.
                         if not db_broken:
@@ -783,6 +785,7 @@ def create_app(db_path: str, static_dir: str | None = None,
                                 {"type": "error", "detail": "database unavailable"}
                             )
                     else:
+                        had_activity = bool(rows)
                         if db_broken:
                             db_broken = False
                             await websocket.send_json({"type": "recovered"})
@@ -800,6 +803,7 @@ def create_app(db_path: str, static_dir: str | None = None,
                                 seen_sessions |= fetched_ids
                                 if extra:
                                     await websocket.send_json({"type": "events", "events": extra})
+                                    had_activity = True
                         if rows:
                             known: set[str] = {
                                 sid for sid in (r.get("session_id") for r in rows)
@@ -841,7 +845,7 @@ def create_app(db_path: str, static_dir: str | None = None,
                             seen_sessions |= known
                             cursor = rows[-1]["rowid"]
                             await websocket.send_json({"type": "events", "events": rows})
-                            idle_polls = 0 if rows else idle_polls + 1
+                        idle_polls = 0 if had_activity else idle_polls + 1
 
                 now = time.monotonic()
                 if now - last_heartbeat >= HEARTBEAT_INTERVAL_S:

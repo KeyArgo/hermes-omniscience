@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../api';
 import { tokenHeaders } from '../token';
 import './PrivacyView.css';
@@ -48,34 +48,44 @@ function ago(seconds: number): string {
  * waiting for an alert to be on screen.
  */
 export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) => void }) {
-  const [days, setDays] = useState(1);
+  const [days, setDays] = useState(7);
   const [runs, setRuns] = useState<PrivacyRun[]>([]);
   const [flags, setFlags] = useState<PrivacyFlag[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const loadId = useRef(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async (window: number) => {
+    const id = ++loadId.current;
+    setLoading(true);
+    setRuns([]);
     setError(null);
+    // Flags are optional; a slow or unavailable flags request must not hide the actual runs.
+    void fetch(`${API_BASE}/privacy/flags`, { headers: { ...tokenHeaders() }, signal: AbortSignal.timeout(15000) })
+      .then((response) => response.ok ? response.json() : null)
+      .then((body: { flags?: PrivacyFlag[] } | null) => {
+        if (id === loadId.current && body && Array.isArray(body.flags)) setFlags(body.flags);
+      }).catch(() => {});
     try {
-      const [runsResponse, flagsResponse] = await Promise.all([
-        fetch(`${API_BASE}/privacy?days=${window}`, { headers: { ...tokenHeaders() } }),
-        fetch(`${API_BASE}/privacy/flags`, { headers: { ...tokenHeaders() } }),
-      ]);
+      const runsResponse = await fetch(`${API_BASE}/privacy?days=${window}`, {
+        headers: { ...tokenHeaders() }, signal: AbortSignal.timeout(15000),
+      });
       if (!runsResponse.ok) throw new Error(`the viewer answered ${runsResponse.status}`);
       const runsBody = (await runsResponse.json()) as { runs?: PrivacyRun[] };
-      setRuns(Array.isArray(runsBody.runs) ? runsBody.runs : []);
-      if (flagsResponse.ok) {
-        const flagsBody = (await flagsResponse.json()) as { flags?: PrivacyFlag[] };
-        setFlags(Array.isArray(flagsBody.flags) ? flagsBody.flags : []);
-      }
+      if (!Array.isArray(runsBody.runs)) throw new Error('the viewer returned an unreadable record');
+      if (id === loadId.current) setRuns(runsBody.runs);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'could not read the record');
+      if (id === loadId.current) setError(failure instanceof Error ? failure.message : 'could not read the record');
+    } finally {
+      if (id === loadId.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void load(days);
+    return () => { loadId.current += 1; };
   }, [days, load]);
 
   const counts = useMemo(() => {
@@ -128,7 +138,7 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
           ))}
         </div>
         <p className="pv-counts">
-          {runs.length} runs
+          {loading ? 'Loading privacy records…' : `${runs.length} runs`}
           {Object.keys(counts).length
             ? ` · ${Object.entries(counts)
                 .map(([cls, n]) => `${n} ${cls}`)
@@ -138,11 +148,11 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
         </p>
       </header>
 
-      {error ? <p className="pv-error">Could not read the record: {error}</p> : null}
+      {error ? <p className="pv-error">Could not read the record: {error} <button type="button" onClick={() => void load(days)}>Retry</button></p> : null}
       {note ? <p className="pv-note">{note}</p> : null}
 
-      {runs.length === 0 && !error ? (
-        <p className="pv-empty">Nothing privacy-relevant in this period.</p>
+      {loading || error ? null : runs.length === 0 ? (
+        <p className="pv-empty">Nothing privacy-relevant in this period. Choose a longer period to see older activity.</p>
       ) : (
         <table className="pv-table">
           <thead>

@@ -8,6 +8,7 @@ export type ViewMode =
   | 'flame' | 'tools' | 'context' | 'helpers' | 'coverage' | 'latency' | 'lens';
 
 export type ThemeName = 'console' | 'paper';
+export type AccentName = 'teal' | 'red';
 
 export interface ViewerSettings {
   defaultView: ViewMode;
@@ -16,6 +17,7 @@ export interface ViewerSettings {
   showTitles: boolean;
   showContext: boolean;
   theme: ThemeName;
+  accent: AccentName;
 }
 
 interface Props {
@@ -169,6 +171,13 @@ export function SettingsPanel({ open, settings, onChange, onOpenPrivacy, onReset
             <select value={settings.theme} onChange={(e) => set({ theme: e.target.value as ThemeName })}>
               <option value="console">Console — deep space, neon cyan and violet</option>
               <option value="paper">Paper — warm graphite and brass</option>
+            </select>
+          </label>
+          <label className="sp-row">
+            <span>Accent color</span>
+            <select value={settings.accent} onChange={(e) => set({ accent: e.target.value as AccentName })}>
+              <option value="teal">Teal</option>
+              <option value="red">Red</option>
             </select>
           </label>
           <label className="sp-row">

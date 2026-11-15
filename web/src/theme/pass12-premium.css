@@ -35,9 +35,10 @@
   --muted: #a9c1cf;
   --dim: #8199aa;
 
+  --accent-rgb: 99 227 234;
   --accent: #63e3ea;
   --cyan: #63e3ea;
-  --accent-glow: rgb(99 227 234 / 0.28);
+  --accent-glow: rgb(var(--accent-rgb) / 0.28);
   --gold: #e6c784;
   --green: #5fe3b0;
   --amber: #ffd28a;
@@ -74,7 +75,7 @@ body {
   background-image:
     radial-gradient(1200px 700px at 78% -16%, rgb(41 128 164 / 0.2), transparent 62%),
     radial-gradient(820px 540px at 4% 110%, rgb(24 104 112 / 0.14), transparent 60%),
-    radial-gradient(640px 420px at 52% 46%, rgb(99 227 234 / 0.035), transparent 70%);
+    radial-gradient(640px 420px at 52% 46%, rgb(var(--accent-rgb) / 0.035), transparent 70%);
   background-attachment: fixed;
 }
 
@@ -85,7 +86,7 @@ body {
 }
 
 ::selection {
-  background: rgb(99 227 234 / 0.28);
+  background: rgb(var(--accent-rgb) / 0.28);
   color: var(--text);
 }
 
@@ -136,7 +137,7 @@ body {
   right: 20px;
   bottom: -1px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(99 227 234 / 0.6), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--accent-rgb) / 0.6), transparent);
   pointer-events: none;
 }
 
@@ -187,7 +188,7 @@ body {
   display: flex;
   align-items: center;
   color: var(--gold);
-  filter: drop-shadow(0 0 14px rgb(99 227 234 / 0.22));
+  filter: drop-shadow(0 0 14px rgb(var(--accent-rgb) / 0.22));
 }
 
 .brand-mark svg {
@@ -212,7 +213,7 @@ body {
   height: 6px;
   margin-left: 6px;
   background: var(--cyan);
-  box-shadow: 0 0 12px rgb(99 227 234 / 0.85);
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.85);
 }
 
 .brand-sub {
@@ -318,7 +319,7 @@ body {
 .chip:hover {
   color: var(--text);
   border-color: var(--line-strong);
-  background: rgb(99 227 234 / 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
 }
 
 .chip.is-active,
@@ -326,7 +327,7 @@ body {
   color: #041318;
   border-color: rgb(150 250 255 / 0.85);
   background: linear-gradient(135deg, #b6fbfd, #6fd8e6);
-  box-shadow: 0 0 26px rgb(99 227 234 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.65);
+  box-shadow: 0 0 26px rgb(var(--accent-rgb) / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.65);
 }
 
 .chip:disabled {
@@ -372,8 +373,8 @@ select.chip {
 .help-button:hover:not(:disabled) {
   color: var(--cyan);
   border-color: var(--line-strong);
-  background: rgb(99 227 234 / 0.1);
-  box-shadow: 0 0 22px rgb(99 227 234 / 0.14);
+  background: rgb(var(--accent-rgb) / 0.1);
+  box-shadow: 0 0 22px rgb(var(--accent-rgb) / 0.14);
 }
 
 .icon-button:disabled {
@@ -400,7 +401,7 @@ select.chip {
 .popout-link:hover {
   color: var(--text);
   border-color: var(--line-strong);
-  background: rgb(99 227 234 / 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
 }
 
 .mini-glyph {
@@ -440,7 +441,7 @@ select.chip {
   border-radius: 18px;
   background: linear-gradient(
     160deg,
-    rgb(99 227 234 / 0.22) 0%,
+    rgb(var(--accent-rgb) / 0.22) 0%,
     rgb(14 29 48 / 0.98) 64%
   );
   color: var(--text);
@@ -450,20 +451,20 @@ select.chip {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.2),
     0 10px 30px rgb(0 0 0 / 0.4),
-    0 0 30px rgb(99 227 234 / 0.1);
+    0 0 30px rgb(var(--accent-rgb) / 0.1);
 }
 
 .chats-toggle:hover {
   border-color: #c9fdff;
-  background: linear-gradient(160deg, rgb(99 227 234 / 0.28), rgb(14 29 48 / 0.98) 70%);
+  background: linear-gradient(160deg, rgb(var(--accent-rgb) / 0.28), rgb(14 29 48 / 0.98) 70%);
 }
 
 .chats-toggle.is-open {
   border-color: #c9fdff;
-  background: linear-gradient(160deg, rgb(99 227 234 / 0.38), rgb(16 34 54 / 0.98) 74%);
+  background: linear-gradient(160deg, rgb(var(--accent-rgb) / 0.38), rgb(16 34 54 / 0.98) 74%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.24),
-    0 0 0 4px rgb(99 227 234 / 0.14),
+    0 0 0 4px rgb(var(--accent-rgb) / 0.14),
     0 12px 34px rgb(0 0 0 / 0.42);
 }
 
@@ -475,9 +476,9 @@ select.chip {
 .chats-toggle-count {
   min-width: 34px;
   padding: 3px 9px;
-  border: 1px solid rgb(99 227 234 / 0.36);
+  border: 1px solid rgb(var(--accent-rgb) / 0.36);
   border-radius: 999px;
-  background: rgb(99 227 234 / 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
   font-size: 16px;
 }
 
@@ -520,7 +521,7 @@ select.chip {
   background: linear-gradient(150deg, #b6fbfd, #67cfdd);
   color: #03141a;
   font-weight: 700;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.65), 0 0 24px rgb(99 227 234 / 0.2);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.65), 0 0 24px rgb(var(--accent-rgb) / 0.2);
 }
 
 .mode-option[aria-pressed="true"]::after {
@@ -544,7 +545,7 @@ select.chip {
 .mb-trigger:hover {
   color: var(--text);
   border-color: var(--line-strong);
-  background: rgb(99 227 234 / 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
 }
 
 .mb-caret {
@@ -781,7 +782,7 @@ select.chip {
   border: 1px solid var(--line-2);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(700px 220px at 12% 0%, rgb(99 227 234 / 0.09), transparent 70%),
+    radial-gradient(700px 220px at 12% 0%, rgb(var(--accent-rgb) / 0.09), transparent 70%),
     linear-gradient(155deg, rgb(17 39 58 / 0.96), rgb(9 20 35 / 0.98));
   box-shadow: var(--shadow-seam), 0 18px 50px rgb(0 0 0 / 0.24);
 }
@@ -945,9 +946,9 @@ select.chip {
 }
 
 .session-item.is-active {
-  background: linear-gradient(115deg, rgb(99 227 234 / 0.17), rgb(20 50 66 / 0.42));
+  background: linear-gradient(115deg, rgb(var(--accent-rgb) / 0.17), rgb(20 50 66 / 0.42));
   border-color: rgb(150 250 255 / 0.55);
-  box-shadow: inset 3px 0 0 var(--cyan), 0 0 24px rgb(99 227 234 / 0.08);
+  box-shadow: inset 3px 0 0 var(--cyan), 0 0 24px rgb(var(--accent-rgb) / 0.08);
 }
 
 .session-title {
@@ -1194,14 +1195,14 @@ select.chip {
   height: 56px;
   border-radius: 14px;
   border: 1px solid var(--line-2);
-  background: rgb(99 227 234 / 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
   color: var(--cyan);
   font-size: 23px;
 }
 
 .transport:hover:not(:disabled) {
   border-color: var(--line-strong);
-  box-shadow: 0 0 24px rgb(99 227 234 / 0.18);
+  box-shadow: 0 0 24px rgb(var(--accent-rgb) / 0.18);
 }
 
 .replay-mode {
@@ -1282,7 +1283,7 @@ input[type="range"] {
 }
 
 .speed.is-active {
-  background: rgb(99 227 234 / 0.16);
+  background: rgb(var(--accent-rgb) / 0.16);
   color: var(--cyan);
 }
 
@@ -2337,7 +2338,7 @@ button.ctx-strip-cost:hover {
 :where(button, a, select, input, textarea, [tabindex]):focus-visible {
   outline: 3px solid var(--cyan);
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px rgb(99 227 234 / 0.16);
+  box-shadow: 0 0 0 6px rgb(var(--accent-rgb) / 0.16);
 }
 
 :root[data-theme="paper"] :where(button, a, select, input, textarea, [tabindex]):focus-visible {
@@ -2836,3 +2837,8 @@ button.ctx-strip-cost:hover {
   min-height: 320px;
   margin-top: 8px;
 }
+
+/* Optional red signal; error and success colors remain semantic. */
+:root[data-accent="red"] { --accent-rgb: 255 119 136; --accent: #ff7788; --cyan: #ff7788; --accent-glow: rgb(255 119 136 / 0.28); --line-strong: rgb(255 151 164 / 0.48); }
+:root[data-theme="paper"][data-accent="red"] { --accent-rgb: 153 31 48; --accent: #991f30; --cyan: #991f30; --accent-glow: rgb(153 31 48 / 0.2); --line-strong: rgb(153 31 48 / 0.4); }
+:root[data-accent="red"] .chip.is-active, :root[data-accent="red"] .chip.is-on, :root[data-accent="red"] .mode-option[aria-pressed="true"] { background: linear-gradient(135deg, #ffd5db, #ff8b9a); border-color: #ffc3cc; color: #351019; }
