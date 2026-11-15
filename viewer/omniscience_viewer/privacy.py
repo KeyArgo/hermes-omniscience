@@ -84,22 +84,17 @@ def _attrs(raw: Any) -> dict[str, Any]:
 def list_runs(db_path: str, days: float = 7) -> list[dict[str, Any]]:
     """Every privacy-relevant tool run in the window, newest first."""
     since = 0.0 if days <= 0 else time.time() - days * 86400
-    try:
-        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    except sqlite3.Error:
-        return []
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         columns = {row[1] for row in con.execute("PRAGMA table_info(events)")}
         if not columns:
-            return []
+            raise sqlite3.OperationalError("events table is missing")
         turn_col = "turn_id" if "turn_id" in columns else "NULL AS turn_id"
         rows = con.execute(
             "SELECT event_id, ts, kind, session_id, "+turn_col+", status, attrs FROM events "
             "WHERE ts >= ? AND kind LIKE 'tool%' ORDER BY ts DESC LIMIT 5000",
             (since,),
         ).fetchall()
-    except sqlite3.Error:
-        return []
     finally:
         con.close()
 

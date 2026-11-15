@@ -503,7 +503,10 @@ def create_app(db_path: str, static_dir: str | None = None,
     def privacy_runs(days: float = 7.0) -> dict:
         """Every privacy-relevant tool run in the window, newest first."""
         window = max(0.0, min(days, 3650.0))
-        return {"runs": privacy_mod.list_runs(db_path, window), "days": window}
+        try:
+            return {"runs": privacy_mod.list_runs(db_path, window), "days": window}
+        except sqlite3.Error as exc:
+            raise HTTPException(status_code=503, detail=f"cannot read the recording: {exc}") from exc
 
     @app.get("/api/v1/privacy/flags")
     def privacy_flags() -> dict:

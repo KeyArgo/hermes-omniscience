@@ -1,7 +1,10 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 5e9baac
-> **Revised:** 2026-11-15 · **Body hash:** 997452c0
+> **Applies to:** Omniscience 1.0.0 · written at commit e3e1a82
+> **Revised:** 2026-11-15 · **Body hash:** 15f258a8
+
+
+
 
 
 
@@ -36,7 +39,8 @@ current as fixes land; report tests and unresolved issues against the exact comm
   the recordings were lost. Privacy originally showed an empty state while data was still loading,
   and its flags request could hold back the runs. Changes show a loading state, request
   flags separately, and default to seven days. The exact cause of the owner's Concerns symptom is
-  not yet proven; add timeout and retry so stalled requests are visible.
+  not yet proven; timeout and retry make stalled requests visible. An unavailable or malformed
+  recording now returns an error rather than silently appearing empty.
 - Current Preferences use in-memory fallback inside the opaque Hermes frame, so settings may not
   survive a Desktop pane reload. Do not claim persistent accent preferences there.
 - The right-hand live pane was registered globally and defaulted on. Changes make it
@@ -46,9 +50,20 @@ current as fixes land; report tests and unresolved issues against the exact comm
   avoid resetting reconnect backoff on a brief handshake. Identical queries that overlap in the
   same viewer app are coalesced, with tests for cursor isolation, failures and disconnects. This
   does not guarantee one query per chat per tick: staggered or different-cursor queries still run.
+  A full shared per-chat poller must preserve each subscriber's cursor, perform bounded paginated
+  catch-up for late joiners, and replay late helper history whose row IDs predate that cursor.
+  Keep authentication per connection, isolate app instances, stop polling after the last subscriber,
+  and test queue overflow, reconnects, errors, and large backfills before enabling it.
+  Proposed sequence: build an app-scoped hub with one poller per root; attach each authenticated
+  subscriber with its own cursor and bounded queue; catch late subscribers up to a captured
+  watermark without skipping pages; broadcast old helper history independently of live cursor;
+  retry failed backfills; and close slow subscribers rather than silently dropping events. Verify
+  different cursors, writes during subscribe, more than 1,000 rows, helper links after the cursor,
+  reconnection, database errors/recovery, app isolation, and last-subscriber cleanup before rollout.
 - The graph focus-guard resize fix has a browser regression for selection, resize and manual pan.
   Still verify it against real data in Hermes. A browser regression attempting to double-click a
-  graph node did not enlarge it as the on-screen hint promises; reproduce and fix that separately.
+  graph node did not enlarge it as the on-screen hint promises: the first click opens the details
+  rail and moves the node before the second click lands. Fix that interaction separately.
   Remaining earlier issues: exact 2x button sizing,
   real Windows/macOS testing, owner visual acceptance, final independent review.
 

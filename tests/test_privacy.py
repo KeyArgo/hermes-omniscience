@@ -8,12 +8,30 @@ import json
 import sqlite3
 import sys
 import time
+import importlib
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "viewer"))
 
 from omniscience_viewer import privacy  # noqa: E402
+
+
+@pytest.mark.parametrize("module", ["omniscience_viewer.app", "omniscience.viewer_app.omniscience_viewer.app"])
+@pytest.mark.parametrize("missing_table", [False, True])
+def test_unavailable_recording_reports_an_error(tmp_path, module, missing_table):
+    from fastapi.testclient import TestClient
+
+    db = tmp_path / "events.db"
+    if missing_table:
+        with sqlite3.connect(db) as con:
+            con.execute("CREATE TABLE unrelated (id INTEGER)")
+    app = importlib.import_module(module).create_app(str(db))
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        assert client.get("/api/v1/privacy").status_code == 503
+        assert client.get("/api/v1/concerns").status_code == 503
 
 COLUMNS = (
     "rowid INTEGER PRIMARY KEY, event_id TEXT, schema TEXT, boot_id TEXT, seq INTEGER, ts REAL, "
