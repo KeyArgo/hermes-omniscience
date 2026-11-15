@@ -150,14 +150,36 @@ export async function fetchUsage(days: number): Promise<UsageReport> {
   };
 }
 
-export async function fetchEvents(root: string, after = 0, before?: number): Promise<OmniEvent[]> {
+export interface EventsPage {
+  events: OmniEvent[];
+  /**
+   * Rows the server sent, before normalization dropped any it could not read. A caller that asks
+   * "is there another page?" must use this: a full page with one unreadable row normalizes to fewer
+   * rows than the page size, and treating that as the end of history hides real earlier activity.
+   */
+  rawCount: number;
+}
+
+export async function fetchEventsPage(
+  root: string,
+  after = 0,
+  before?: number,
+): Promise<EventsPage> {
   const payload = await getJson(
     `${API_BASE}/events?root=${encodeURIComponent(root)}&after=${after}&limit=${EVENT_PAGE_SIZE}&tail=true${before === undefined ? '' : `&before=${before}`}`,
   );
-  return arrayFrom(payload, 'events')
-    .map(normalizeEvent)
-    .filter((event): event is OmniEvent => event !== null)
-    .sort((a, b) => a.rowid - b.rowid);
+  const rows = arrayFrom(payload, 'events');
+  return {
+    events: rows
+      .map(normalizeEvent)
+      .filter((event): event is OmniEvent => event !== null)
+      .sort((a, b) => a.rowid - b.rowid),
+    rawCount: rows.length,
+  };
+}
+
+export async function fetchEvents(root: string, after = 0, before?: number): Promise<OmniEvent[]> {
+  return (await fetchEventsPage(root, after, before)).events;
 }
 
 function normalizeWarning(raw: unknown): Warning | null {

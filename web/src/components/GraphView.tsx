@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -19,11 +19,11 @@ import { nodeTypes } from './nodes';
 
 const TYPES: NodeTypes = nodeTypes;
 
-/** Below this zoom the overview is unreadable; centre on the newest box instead. */
-// A graph that fits at 0.75 or better is drawn fitted; below that the old code centred on the newest
-// node instead, which left everything else off the canvas on a short pane. 0.4 is still legible at
-// node width 224 px (a name and a step number), and the reader can zoom from there.
-const MIN_FIT_ZOOM = 0.4;
+// Below this zoom a fitted graph is a picture of coloured specks, not a readable map. 0.9 keeps a
+// 220 px box at 198 px and its 16 px label at 14.4 px. Auto-framing stops here and centres the
+// newest box at 1× instead; the Fit button remains available for a reader who explicitly wants the
+// whole shape.
+const MIN_FIT_ZOOM = 0.9;
 const OVERVIEW_ZOOM = 1;
 
 const STATUS_COLOR: Record<string, string> = {
@@ -56,7 +56,7 @@ export interface GraphViewProps {
   graph: Graph;
   selectedId: string | null;
   rootKey: string;
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, options?: { focus?: boolean }) => void;
   /** Draw the chat as a link web (steps as nodes, force layout) instead of the timeline. */
   linkView?: boolean;
   /** Expand a collapsed group back into its turn's children. */
@@ -86,21 +86,48 @@ function GraphCanvas({
 }: CanvasProps) {
   const { fitView, setCenter, getNodes, getZoom, getNodesBounds } = useReactFlow();
   const fittedFor = useRef<string | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  // The camera code must not be recreated when the graph grows. `frameGraph` used to close over
+  // `nodes.length`; that changed its identity on every append, which recreated the ResizeObserver,
+  // which fired its initial callback and reset a user's pan/zoom after ~500 ms. Keep the expected
+  // count and the callback in refs so the observer and its debounce survive node-count changes.
+  const nodesCountRef = useRef(0);
+  const frameGraphRef = useRef<() => void>(() => {});
+  const retryRef = useRef<{ timer: number | null; attempts: number }>({ timer: null, attempts: 0 });
+  const initialTimersRef = useRef<number[]>([]);
+  const observerTimerRef = useRef<number | null>(null);
+  const linkFrameTimerRef = useRef<number | null>(null);
+  const focusGuardRef = useRef(0);
 
-  const expandedTurn = useMemo(() => {
+  const clearInitialTimers = useCallback(() => {
+    for (const timer of initialTimersRef.current) window.clearTimeout(timer);
+    initialTimersRef.current = [];
+  }, []);
+
+  const expandedTurns = useMemo<ReadonlySet<string>>(() => {
+    const ids = new Set<string>();
     for (const node of graph.nodes) {
-      if (node.type === 'turn' && node.data?.expanded === true) {
-        return typeof node.data.turn_id === 'string' ? node.data.turn_id : node.id;
-      }
+      if (node.type !== 'turn' || node.data?.expanded !== true) continue;
+      const raw = typeof node.data.turn_id === 'string' ? node.data.turn_id : node.id.replace(/^turn:/, '');
+      ids.add(raw);
+      ids.add(`turn:${raw}`);
+      ids.add(node.id);
     }
-    return null;
+    return ids;
   }, [graph.nodes]);
 
-  // The link view re-places the same boxes as a floating web. Computed once per graph shape, not
-  // per render: a force layout that shifts under the cursor is unusable.
+  // The link view re-places the same boxes as a floating web. The graph object is rebuilt on every
+  // live event (statuses change), but the force layout only depends on ids, types and endpoints;
+  // cache it under that structural key so a status tick does not re-run the simulation.
+  const linkCacheRef = useRef<{ key: string; positions: Map<string, { x: number; y: number }> } | null>(null);
   const linkPositions = useMemo(() => {
     if (!linkView) return null;
-    return forceLayout(
+    const key =
+      graph.nodes.map((node) => `${node.id}:${node.type}`).join('|') +
+      '||' +
+      graph.edges.map((edge) => `${edge.source}>${edge.target}`).join('|');
+    if (linkCacheRef.current?.key === key) return linkCacheRef.current.positions;
+    const positions = forceLayout(
       graph.nodes.map((node) => ({
         id: node.id,
         width: NODE_SIZE[node.type]?.width ?? 200,
@@ -108,6 +135,8 @@ function GraphCanvas({
       })),
       graph.edges.map((edge) => ({ source: edge.source, target: edge.target })),
     );
+    linkCacheRef.current = { key, positions };
+    return positions;
   }, [linkView, graph.nodes, graph.edges]);
 
   const nodes = useMemo(
@@ -118,6 +147,13 @@ function GraphCanvas({
           node.type === 'group' && typeof node.data?.turn_id === 'string'
             ? () => onExpandTurn?.(String(node.data.turn_id))
             : undefined;
+        const turnKey =
+          node.type === 'turn'
+            ? typeof node.data?.turn_id === 'string'
+              ? node.data.turn_id
+              : node.id.replace(/^turn:/, '')
+            : null;
+        const isExpanded = turnKey !== null && (expandedTurns.has(turnKey) || expandedTurns.has(node.id));
         return {
           id: node.id,
           type: node.type,
@@ -131,22 +167,18 @@ function GraphCanvas({
             ...node.data,
             label: node.label,
             status: node.status,
-            expanded: node.type === 'turn' && expandedTurn === (node.data?.turn_id ?? node.id)
-              ? true
-              : undefined,
+            expanded: isExpanded ? true : undefined,
             onExpand:
               node.type === 'group' && clickable
                 ? () => onExpandTurn?.(String(node.data.turn_id))
                 : undefined,
-            onFold:
-              node.type === 'turn' && expandedTurn === (node.data?.turn_id ?? node.id)
-                ? () => onFoldTurn?.(String(node.data?.turn_id ?? node.id.replace(/^turn:/, '')))
-                : undefined,
+            onFold: isExpanded ? () => onFoldTurn?.(turnKey) : undefined,
           },
         };
       }),
-    [graph.nodes, selectedId, expandedTurn, onExpandTurn, onFoldTurn],
+    [graph.nodes, linkPositions, selectedId, expandedTurns, onExpandTurn, onFoldTurn],
   );
+  nodesCountRef.current = nodes.length;
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -172,74 +204,208 @@ function GraphCanvas({
     [graph.edges],
   );
 
-  useEffect(() => {
-    if (fittedFor.current === graphKey || nodes.length === 0) return;
-    fittedFor.current = graphKey;
-    const timer = window.setTimeout(() => {
-      const bounds = getNodesBounds(getNodes());
-      // Measure the pane the map actually has. The old arithmetic assumed a 270 px left rail and a
-      // 360 px right rail, which is false in Simple (both hidden) and wrong again with a panel
-      // folded: it under-estimated the width by ~570 px and over-estimated the height, so a graph
-      // that fitted was treated as too big and only the newest box was centred.
-      const shell = shellRef.current;
-      const viewport = Math.max(320, shell?.clientWidth || window.innerWidth);
-      const height = Math.max(240, shell?.clientHeight || window.innerHeight - 224);
-      const zoom = Math.min(
-        1.2,
-        Math.max(
-          0.05,
-          Math.min(viewport / (bounds.width + 120), height / (bounds.height + 120)) || 0.2,
-        ),
-      );
-      if (zoom >= MIN_FIT_ZOOM) {
-        void fitView({ padding: 0.22, maxZoom: 1.2, duration: 260 });
-        return;
-      }
-      // too big to read fitted: centre on the newest box at a readable zoom
-      let newest: { x: number; y: number; w: number; h: number } | null = null;
-      for (const node of getNodes()) {
-        const size = NODE_SIZE[node.type as keyof typeof NODE_SIZE] ?? { width: 200, height: 60 };
-        const position = node.position ?? { x: 0, y: 0 };
-        if (
-          !newest ||
-          position.x + position.y > newest.x + newest.y ||
-          (position.x === newest.x && position.y > newest.y)
-        ) {
-          newest = { x: position.x, y: position.y, w: size.width, h: size.height };
-        }
-      }
-      const target = newest ?? { x: 0, y: 0, w: 200, h: 60 };
-      void setCenter(target.x + target.w / 2, target.y + target.h / 2, {
-        zoom: OVERVIEW_ZOOM,
+  /**
+   * Frame the graph honestly. A graph that fits is fitted; one too large to read fitted is
+   * centred on its newest box at 1× instead of being shrunk below the legibility floor. Both the
+   * first paint and a real size change go through here: the old resize handler called fitView
+   * unconditionally, so a large graph that had deliberately been shown at 1× was silently
+   * miniaturised to 0.15× a fraction of a second later.
+   */
+  const frameGraph = useCallback(() => {
+    const current = getNodes();
+    if (current.length === 0) return;
+    // React Flow's store can still hold the previous chat's boxes for a frame after a switch.
+    // Framing that stale graph left a new chat's map parked thousands of pixels off-screen, but an
+    // unbounded retry can outlive the component. Retry a few frames, then leave the camera alone.
+    if (current.length !== nodesCountRef.current) {
+      if (retryRef.current.attempts >= 5) return;
+      if (retryRef.current.timer !== null) window.clearTimeout(retryRef.current.timer);
+      retryRef.current.attempts += 1;
+      retryRef.current.timer = window.setTimeout(() => {
+        retryRef.current.timer = null;
+        frameGraphRef.current();
+      }, 120);
+      return;
+    }
+    retryRef.current.attempts = 0;
+    const bounds = getNodesBounds(current);
+    const shell = shellRef.current;
+    // The surface can be taller than the part of it the page actually shows: the stage clips or
+    // scrolls, the as-of line and transport take the bottom, and the browser window has a bottom
+    // edge too. Fit against the intersection, not against the box's declared size. Otherwise a
+    // 320 px surface that is 175 px visible is fitted as if all 320 px were readable.
+    const shellRect = shell?.getBoundingClientRect();
+    const stage = shell?.closest('.stage') as HTMLElement | null;
+    const stageRect = stage?.getBoundingClientRect();
+    const left = Math.max(shellRect?.left ?? 0, stageRect?.left ?? 0, 0);
+    const right = Math.min(shellRect?.right ?? 0, stageRect?.right ?? 0, window.innerWidth);
+    const top = Math.max(shellRect?.top ?? 0, stageRect?.top ?? 0, 0);
+    const bottom = Math.min(shellRect?.bottom ?? 0, stageRect?.bottom ?? 0, window.innerHeight);
+    const visibleWidth = right - left;
+    const visibleHeight = bottom - top;
+    const viewport = Math.max(200, visibleWidth > 20 ? visibleWidth : shell?.clientWidth || window.innerWidth);
+    const height = Math.max(180, visibleHeight > 20 ? visibleHeight : shell?.clientHeight || window.innerHeight - 224);
+    // Compute the fit ourselves instead of asking React Flow to animate one and then racing it:
+    // the same bounds and the same visible rectangle must give the same zoom every run. 32 px of
+    // breathing room on each side keeps boxes off the edge without shrinking text for nothing.
+    const fitZoom = Math.min(
+      1.2,
+      (viewport - 64) / Math.max(1, bounds.width),
+      (height - 64) / Math.max(1, bounds.height),
+    );
+    if (fitZoom >= MIN_FIT_ZOOM) {
+      void setCenter(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, {
+        zoom: fitZoom,
         duration: 320,
       });
-    }, 60);
-    return () => window.clearTimeout(timer);
+      return;
+    }
+    let newest: { x: number; y: number; w: number; h: number } | null = null;
+    for (const node of current) {
+      const size = NODE_SIZE[node.type as keyof typeof NODE_SIZE] ?? { width: 200, height: 60 };
+      const position = node.position ?? { x: 0, y: 0 };
+      if (
+        !newest ||
+        position.x + position.y > newest.x + newest.y ||
+        (position.x === newest.x && position.y > newest.y)
+      ) {
+        newest = { x: position.x, y: position.y, w: size.width, h: size.height };
+      }
+    }
+    const target = newest ?? { x: 0, y: 0, w: 200, h: 60 };
+    void setCenter(target.x + target.w / 2, target.y + target.h / 2, {
+      zoom: OVERVIEW_ZOOM,
+      duration: 320,
+    });
+  }, [getNodes, getNodesBounds, setCenter]);
+  frameGraphRef.current = frameGraph;
+
+  // Switching Timeline/Links changes every position. Frame the new layout after it renders;
+  // otherwise the old camera can be looking at empty canvas. Explicit layout change, so moving the
+  // camera is expected.
+  const previousLinkView = useRef(linkView);
+  useEffect(() => {
+    if (previousLinkView.current === linkView) return;
+    previousLinkView.current = linkView;
+    // Links is an explicit layout change, so frame the whole web rather than keep the timeline
+    // camera. This may zoom far out on a large chat, but an empty canvas is worse; the user can
+    // zoom back in from a visible shape.
+    const timer = window.setTimeout(
+      () => {
+        linkFrameTimerRef.current = null;
+        void fitView({ padding: 0.18, maxZoom: 1.2, duration: 320 });
+      },
+      80,
+    );
+    linkFrameTimerRef.current = timer;
+    return () => {
+      window.clearTimeout(timer);
+      if (linkFrameTimerRef.current === timer) linkFrameTimerRef.current = null;
+    };
+  }, [linkView, fitView]);
+
+  useEffect(() => {
+    if (nodes.length === 0) {
+      // A chat switch clears the old graph before the new rows arrive. Forget the fit mark and
+      // cancel its timers, or the new graph inherits "already fitted" from the stale old one and
+      // never gets framed.
+      fittedFor.current = null;
+      clearInitialTimers();
+      if (retryRef.current.timer !== null) {
+        window.clearTimeout(retryRef.current.timer);
+        retryRef.current.timer = null;
+      }
+      return;
+    }
+    if (fittedFor.current === graphKey) return;
+    fittedFor.current = graphKey;
+    // A new graph or the first boxes: frame now and once after the store settles. The second pass
+    // catches a late batch; appends on the same graph no longer enter this effect at all.
+    if (retryRef.current.timer !== null) {
+      window.clearTimeout(retryRef.current.timer);
+      retryRef.current.timer = null;
+    }
+    retryRef.current.attempts = 0;
+    clearInitialTimers();
+    initialTimersRef.current = [
+      window.setTimeout(() => frameGraphRef.current(), 60),
+      window.setTimeout(() => frameGraphRef.current(), 520),
+    ];
+    return clearInitialTimers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphKey, nodes.length]);
+  }, [graphKey, nodes.length === 0, clearInitialTimers]);
 
   // Reset view: forget the "already fitted" mark so the camera frames everything again.
   useEffect(() => {
     if (!resetToken) return;
     fittedFor.current = null;
+    focusGuardRef.current = 0;
+    clearInitialTimers();
+    if (retryRef.current.timer !== null) {
+      window.clearTimeout(retryRef.current.timer);
+      retryRef.current.timer = null;
+    }
+    if (observerTimerRef.current !== null) {
+      window.clearTimeout(observerTimerRef.current);
+      observerTimerRef.current = null;
+    }
+    if (linkFrameTimerRef.current !== null) {
+      window.clearTimeout(linkFrameTimerRef.current);
+      linkFrameTimerRef.current = null;
+    }
     void fitView({ padding: 0.22, maxZoom: 1.2, duration: 260 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetToken]);
 
   useEffect(() => {
     if (!focusToken || !selectedId) return;
-    const node = getNodes().find((candidate) => candidate.id === selectedId);
-    if (!node || node.position == null) return;
-    const nodeType = node.type as keyof typeof NODE_SIZE | undefined;
-    const nodeSize = (nodeType && NODE_SIZE[nodeType]) || { width: 200, height: 60 };
-    const width = node.width ?? nodeSize.width;
-    const height = node.height ?? nodeSize.height;
-    void setCenter(
-      (node.position.x ?? 0) + width / 2,
-      (node.position.y ?? 0) + height / 2,
-      { zoom: Math.max(getZoom(), 0.9), duration: 320 },
-    );
-    // center only when the app explicitly asks (Next error), not on every click
+    let cancelled = false;
+    let attempts = 0;
+    let recentred = false;
+    let timer: number | undefined;
+    // Opening the inspector is a real resize, and its 140 ms reframe would otherwise land after
+    // this explicit focus and centre the newest node instead. Let the requested selection win.
+    focusGuardRef.current = performance.now() + 2500;
+    clearInitialTimers();
+    if (observerTimerRef.current !== null) {
+      window.clearTimeout(observerTimerRef.current);
+      observerTimerRef.current = null;
+    }
+    const centre = () => {
+      if (cancelled) return;
+      const node = getNodes().find((candidate) => candidate.id === selectedId);
+      // A selection inside a folded group expands the group first; the child node does not exist
+      // in React Flow until the worker returns the expanded graph. Retry for a bounded time rather
+      // than centring once against nothing and giving up.
+      if (!node || node.position == null) {
+        if (attempts < 12) {
+          attempts += 1;
+          timer = window.setTimeout(centre, 120);
+        }
+        return;
+      }
+      const nodeType = node.type as keyof typeof NODE_SIZE | undefined;
+      const nodeSize = (nodeType && NODE_SIZE[nodeType]) || { width: 200, height: 60 };
+      const width = node.width ?? nodeSize.width;
+      const height = node.height ?? nodeSize.height;
+      void setCenter(
+        (node.position.x ?? 0) + width / 2,
+        (node.position.y ?? 0) + height / 2,
+        { zoom: Math.max(getZoom(), 0.9), duration: 320 },
+      );
+      // The inspector rail finishes resizing after the first centre. A second pass at the settled
+      // geometry puts the node at the real middle of the map.
+      if (!recentred) {
+        recentred = true;
+        timer = window.setTimeout(centre, 450);
+      }
+    };
+    centre();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // center only when the app explicitly asks (Next error or a deep selection), not on every click
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusToken]);
 
@@ -253,38 +419,69 @@ function GraphCanvas({
     if (node.type === 'group') {
       const turnId = node.data?.turn_id;
       if (typeof turnId === 'string' && turnId) onExpandTurn?.(turnId);
-      onSelect(node.id);
+      // The group node disappears when it expands. Select the turn that replaces it, not an id
+      // that is no longer on the canvas.
+      onSelect(
+        typeof turnId === 'string' && turnId
+          ? turnId.startsWith('turn:')
+            ? turnId
+            : `turn:${turnId}`
+          : node.id,
+        { focus: false },
+      );
       return;
     }
     if (node.type === 'turn' && node.data?.expanded === true) {
       const turnId = typeof node.data.turn_id === 'string' ? node.data.turn_id : node.id;
+      // Select first: selectNodeDeep re-expands the turn it is given. Folding last wins in the
+      // queued state updates, so a body click actually folds instead of folding then expanding.
+      onSelect(node.id, { focus: false });
       onFoldTurn?.(turnId.replace(/^turn:/, ''));
-      onSelect(node.id);
       return;
     }
     void event;
-    onSelect(node.id);
+    onSelect(node.id, { focus: false });
   };
 
-  // Fitted once at mount to whatever size the pane was then. Resize the window (or collapse a rail)
-  // and the nodes keep their old coordinates: a graph centred at 720 px can sit entirely outside a
-  // 1440 px pane, so clicks land on empty canvas. Re-fit on a real size change, debounced.
-  const shellRef = useRef<HTMLDivElement | null>(null);
+  // Resize the window (or collapse a rail) and the nodes keep their old coordinates: a graph
+  // centred at 720 px can sit outside a 1440 px pane, so clicks land on empty canvas. Re-frame on a
+  // real size change, debounced. The observer is created once and reads the latest camera callback
+  // through a ref; a node append must not recreate it, because its first delivery would schedule an
+  // unasked-for reframe and throw away the user's pan/zoom.
   useEffect(() => {
     const shell = shellRef.current;
     if (!shell) return;
-    let last = '';
-    let timer: number | undefined;
+    let last = `${Math.round(shell.clientWidth)}x${Math.round(shell.clientHeight)}`;
     const observer = new ResizeObserver(() => {
+      if (performance.now() < focusGuardRef.current) return;
       const key = `${Math.round(shell.clientWidth)}x${Math.round(shell.clientHeight)}`;
       if (key === last) return;
       last = key;
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => { void fitView({ padding: 0.22, maxZoom: 1.2, duration: 200 }); }, 140);
+      if (observerTimerRef.current !== null) window.clearTimeout(observerTimerRef.current);
+      observerTimerRef.current = window.setTimeout(() => {
+        observerTimerRef.current = null;
+        frameGraphRef.current();
+      }, 140);
     });
     observer.observe(shell);
-    return () => { observer.disconnect(); window.clearTimeout(timer); };
-  }, [fitView]);
+    return () => {
+      observer.disconnect();
+      if (observerTimerRef.current !== null) {
+        window.clearTimeout(observerTimerRef.current);
+        observerTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (retryRef.current.timer !== null) {
+        window.clearTimeout(retryRef.current.timer);
+        retryRef.current.timer = null;
+      }
+    },
+    [],
+  );
 
   return (
     <div className="graph-shell" ref={shellRef} style={{ width: '100%', height: '100%', minHeight: 0 }}>
@@ -292,8 +489,6 @@ function GraphCanvas({
       nodes={nodes}
       edges={edges}
       nodeTypes={TYPES}
-      fitView
-      fitViewOptions={{ padding: 0.22, maxZoom: 1.2 }}
       minZoom={0.15}
       maxZoom={2.5}
       nodesDraggable={false}

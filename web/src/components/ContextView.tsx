@@ -47,7 +47,9 @@ function fmtAxis(n: number): string {
 
 export function ContextView({ events, rootSessionId, onSelectEvent, compact = false }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(320);
+  const [inlineHeight, setInlineHeight] = useState(INLINE_HEIGHT);
   const [hover, setHover] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -64,6 +66,31 @@ export function ContextView({ events, rootSessionId, onSelectEvent, compact = fa
     return () => ro.disconnect();
   }, []);
 
+  // A docked chart should use the space the panel gives it, including when focused or resized.
+  // Standalone and mini charts keep their fixed inline height: only a chart inside a PanelFrame
+  // is stretched by the flex layout above it.
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!compact || !el || typeof ResizeObserver === 'undefined' || !el.closest('.pf')) return;
+    let last = 0;
+    const apply = (raw: number) => {
+      // Rounded down so the SVG can never spill a fraction of a pixel past its box. Zero means
+      // the panel is folded or not laid out yet: keep the last drawing instead of collapsing.
+      const next = Math.floor(raw);
+      if (next < 1 || next === last) return;
+      last = next;
+      setInlineHeight(next);
+    };
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) apply(entry.contentRect.height);
+    });
+    ro.observe(el);
+    // The observer's first callback is asynchronous; measure now so the first docked paint is
+    // already full height rather than showing the 132px inline chart for a frame.
+    apply(el.getBoundingClientRect().height);
+    return () => ro.disconnect();
+  }, [compact]);
+
   // Esc closes the enlarged chart, like every other panel overlay here.
   useEffect(() => {
     if (!expanded) return;
@@ -79,10 +106,12 @@ export function ContextView({ events, rootSessionId, onSelectEvent, compact = fa
     [events, rootSessionId]
   );
 
-  const height = compact ? INLINE_HEIGHT : FULL_HEIGHT;
+  const height = compact ? inlineHeight : FULL_HEIGHT;
   const PAD = compact ? INLINE_PAD : FULL_PAD;
   const plotW = Math.max(10, width - PAD.left - PAD.right);
-  const plotH = height - PAD.top - PAD.bottom;
+  // A very short focused panel can leave less than the padding; keep the plot area positive
+  // instead of drawing the axis backwards.
+  const plotH = Math.max(1, height - PAD.top - PAD.bottom);
 
   const maxPrompt = useMemo(() => {
     let m = 0;
@@ -393,7 +422,7 @@ export function ContextView({ events, rootSessionId, onSelectEvent, compact = fa
       </div>
       {notes}
       {scaleNote}
-      <div className="cx-chart">{chart}</div>
+      <div className="cx-chart" ref={chartRef}>{chart}</div>
 
       {expanded ? (
         <div

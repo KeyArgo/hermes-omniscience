@@ -1,7 +1,7 @@
 # Omniscience — a guide to the screen
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 48e2370
-> **Revised:** 2026-11-13 · **Body hash:** 8b22ed49
+> **Applies to:** Omniscience 1.0.0 · written at commit 2f13567
+> **Revised:** 2026-11-14 · **Body hash:** 8f0f3c90
 
 
 Generated from `web/src/help/guide.json` by `web/scripts/gen-ui-guide.mjs`. The same text
@@ -19,6 +19,7 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 - **Reset view (↺)** — Put view, zoom, filters and panels back the way Omniscience first opens. Recordings are never touched.
 - **Maximize (⛶)** — Full screen; Esc leaves.
 - **Mini Panel** — A small frame on the right with only what you chose to watch.
+- **Workspace (⌘)** — On a laptop, tablet or phone this opens the same secondary controls at full size: Follow Newest, Mini Panel, Panels, Reset, Tour, map style, Settings and Help. Every action stays present; nothing is removed to make room.
 - **Panels** — Show, hide and resize every panel, switch between Simple, Standard and Everything, and reset the layout.
 - **Settings (⚙)** — Default view, compact text, chat titles, the theme (dark or Paper), recording and privacy.
 - **Help** — What Am I Looking At? explains every box and colour; Take the Tour walks five stops in about 30 seconds.

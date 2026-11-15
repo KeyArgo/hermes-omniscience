@@ -103,6 +103,11 @@ function ViewerProblem({ up, retry }) {
   })
 }
 
+// The viewer is told which host it is in, explicitly: `?host=hermes`. It must not guess from
+// being framed, because a browser tab and any other embed are web mode. The marker travels in the
+// src so it survives reloads and the page can keep per-mode layout preferences apart.
+const HOST_MARKER = { host: 'hermes' }
+
 function viewerSrc(session, token, extra) {
   const params = new URLSearchParams(extra || {})
   if (session) params.set('session', session)
@@ -118,7 +123,7 @@ function OmnisciencePage() {
   const session = linkedSession() || focusedChat()
   if (!key.ready) return jsx('div', { style: { padding: 16, opacity: 0.6 }, children: 'Opening Omniscience…' })
   if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry: key.retry })
-  const src = viewerSrc(session, key.token)
+  const src = viewerSrc(session, key.token, HOST_MARKER)
   return jsx('div', {
     style: { width: '100%', height: '100%', display: 'flex' },
     // SandboxedFrame, not a raw <iframe>: the viewer is web content, so it gets the app's guest
@@ -160,7 +165,7 @@ function LivePane() {
     children: [
       jsx(SandboxedFrame, {
         key: session || 'none',
-        src: viewerSrc(session, key.token, { mini: '1', actions: '0' }),
+        src: viewerSrc(session, key.token, { ...HOST_MARKER, mini: '1', actions: '0' }),
         title: 'Omniscience live',
         style: { flex: 1, width: '100%', border: 'none', display: 'block' },
       }),

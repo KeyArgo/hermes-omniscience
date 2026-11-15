@@ -33,6 +33,33 @@ export function groupNodeId(turnId: string): string {
   return `group:${turnId}`;
 }
 
+/**
+ * Record which turn is currently expanded in the graph data. The canvas uses this flag to draw the
+ * Fold control; folding only removes child nodes, so without this marker an expanded turn had no
+ * way back. Pure: returns the same graph when no turn's flag changes.
+ */
+export function markExpandedTurns(
+  graph: Graph,
+  expandedTurnIds?: ReadonlySet<string>,
+  collapsibleTurnIds?: ReadonlySet<string>,
+): Graph {
+  const expanded = expandedTurnIds ?? new Set<string>();
+  let changed = false;
+  const nodes = graph.nodes.map((node) => {
+    if (node.type !== 'turn') return node;
+    const raw =
+      typeof node.data?.turn_id === 'string' ? node.data.turn_id : node.id.replace(/^turn:/, '');
+    const inExpanded = expanded.has(raw) || expanded.has(node.id) || expanded.has(`turn:${raw}`);
+    const collapsible =
+      !collapsibleTurnIds || collapsibleTurnIds.has(raw) || collapsibleTurnIds.has(node.id);
+    const isExpanded = inExpanded && collapsible;
+    if ((node.data?.expanded === true) === isExpanded) return node;
+    changed = true;
+    return { ...node, data: { ...node.data, expanded: isExpanded } };
+  });
+  return changed ? { ...graph, nodes } : graph;
+}
+
 function labelFor(counts: GroupCounts): string {
   const parts = [`${counts.llm} model call${counts.llm === 1 ? '' : 's'}`, `${counts.tools} tool${counts.tools === 1 ? '' : 's'}`];
   if (counts.failed > 0) parts.push(`${counts.failed} failed`);
@@ -86,12 +113,17 @@ export function foldBusyTurns(graph: Graph, expandedTurnIds?: ReadonlySet<string
   }
 
   const folded = new Map<string, GNode[]>(); // turn id -> children being removed
+  const collapsible = new Set<string>();
   for (const [turnId, children] of childrenByTurn) {
-    if (children.length > COLLAPSE_THRESHOLD && !expanded.has(turnId) && !expanded.has(turnId.replace(/^turn:/, ''))) {
-      folded.set(turnId, children);
+    if (children.length > COLLAPSE_THRESHOLD) {
+      collapsible.add(turnId);
+      collapsible.add(turnId.replace(/^turn:/, ''));
+      if (!expanded.has(turnId) && !expanded.has(turnId.replace(/^turn:/, ''))) {
+        folded.set(turnId, children);
+      }
     }
   }
-  if (folded.size === 0) return graph;
+  if (folded.size === 0) return markExpandedTurns(graph, expanded, collapsible);
 
   const removedIds = new Set<string>();
   for (const children of folded.values()) {
@@ -159,7 +191,7 @@ export function foldBusyTurns(graph: Graph, expandedTurnIds?: ReadonlySet<string
     edges.push({ ...edge, id, source: nextSource, target });
   }
 
-  return { nodes, edges };
+  return markExpandedTurns({ nodes, edges }, expanded, collapsible);
 }
 
 /** Nodes that a collapsed group stands in for — used to expand selection targets. */

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { Tip } from './Tip';
+import { scopedStorageKey } from '../shell/modePrefs';
+import { usePrefScope } from '../shell/prefScope';
 import './PanelFrame.css';
 
-const STORE = 'omni.panel.';
 const MAX_H = 1200;
 
 export function clampHeight(h: number, min: number, max = MAX_H): number {
@@ -26,29 +27,29 @@ export function heightForKey(h: number, key: string, shift: boolean, min: number
   }
 }
 
-function readString(key: string): string | null {
+function readString(prefix: string, key: string): string | null {
   try {
-    return window.localStorage.getItem(STORE + key);
+    return window.localStorage.getItem(prefix + key);
   } catch {
     return null;
   }
 }
 
-function writeString(key: string, value: string): void {
+function writeString(prefix: string, key: string, value: string): void {
   try {
-    window.localStorage.setItem(STORE + key, value);
+    window.localStorage.setItem(prefix + key, value);
   } catch {
     /* storage unavailable */
   }
 }
 
-function readNumber(key: string, fallback: number): number {
-  const raw = Number(readString(key));
+function readNumber(prefix: string, key: string, fallback: number): number {
+  const raw = Number(readString(prefix, key));
   return Number.isFinite(raw) && raw > 0 ? raw : fallback;
 }
 
-function writeNumber(key: string, value: number): void {
-  writeString(key, String(Math.round(value)));
+function writeNumber(prefix: string, key: string, value: number): void {
+  writeString(prefix, key, String(Math.round(value)));
 }
 
 export function PanelFrame({
@@ -78,15 +79,27 @@ export function PanelFrame({
   tourId?: string;
   children: ReactNode;
 }) {
-  const [height, setHeight] = useState(() => clampHeight(readNumber(id + '.h', defaultHeight), minHeight));
+  const scope = usePrefScope();
+  // Panel geometry lives in the same mode namespace as the rest of the view preferences, so
+  // resizing or folding a panel in the docked pane does not move the browser's panels.
+  const prefix = scopedStorageKey('panel.', scope);
+  const [height, setHeight] = useState(() => clampHeight(readNumber(prefix, id + '.h', defaultHeight), minHeight));
   const [folded, setFolded] = useState(() => {
-    const stored = readString(id + '.folded');
+    const stored = readString(prefix, id + '.folded');
     return stored === null ? defaultFolded : stored === '1';
   });
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [bodyHeight, setBodyHeight] = useState(0);
   const [focused, setFocused] = useState(false);
   const dragging = useRef<{ startY: number; startH: number } | null>(null);
+
+  // A mode switch points the prefix at the other mode's keys. State initialisers do not re-run,
+  // so adopt that mode's geometry instead of carrying the previous mode's panel sizes across.
+  useEffect(() => {
+    setHeight(clampHeight(readNumber(prefix, id + '.h', defaultHeight), minHeight));
+    const stored = readString(prefix, id + '.folded');
+    setFolded(stored === null ? defaultFolded : stored === '1');
+  }, [prefix, id, defaultHeight, minHeight, defaultFolded]);
 
   // Charts size from a percentage of an auto-height box (zero), so publish the measured body height.
   useEffect(() => {
@@ -121,14 +134,14 @@ export function PanelFrame({
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         setHeight((current) => {
-          writeNumber(id + '.h', current);
+          writeNumber(prefix, id + '.h', current);
           return current;
         });
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
     },
-    [height, id, minHeight],
+    [height, id, minHeight, prefix],
   );
 
   const onResizeKey = useCallback(
@@ -137,17 +150,17 @@ export function PanelFrame({
       if (next === null) return;
       event.preventDefault();
       setHeight(next);
-      writeNumber(id + '.h', next);
+      writeNumber(prefix, id + '.h', next);
     },
-    [height, id, minHeight],
+    [height, id, minHeight, prefix],
   );
 
   const toggleFold = useCallback(() => {
     setFolded((current) => {
-      writeString(id + '.folded', current ? '0' : '1');
+      writeString(prefix, id + '.folded', current ? '0' : '1');
       return !current;
     });
-  }, [id]);
+  }, [id, prefix]);
 
   const dataAttrs = tourId ? { 'data-tour': tourId } : undefined;
 

@@ -1993,6 +1993,12 @@ table.kv.friendly td {
   pointer-events: none;
 }
 
+/* This note carries buttons (Load earlier, Try again). The truncation note above does not, and
+   staying inert keeps the map underneath clickable — so only the interactive one takes pointers. */
+.stage-window-note.is-actionable {
+  pointer-events: auto;
+}
+
 /* a conversation is named by what the person said first; the id is not a name */
 .session-title {
   display: block;

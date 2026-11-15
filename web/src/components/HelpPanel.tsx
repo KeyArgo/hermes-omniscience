@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const EXAMPLE = [
   { title: '1. Pick a run', text: 'Example: select a chat where the agent seems to be taking longer than expected.' },
@@ -27,23 +27,57 @@ export function markHelpSeen(): void {
 
 export function HelpPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [exampleStep, setExampleStep] = useState(0);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!open) return;
+    closeRef.current?.focus();
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const items = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.getClientRects().length > 0);
+      if (items.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (active === first || active === dialog || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div className="help-overlay" role="dialog" aria-modal="true" aria-label="What am I looking at?">
-      <div className="help-panel">
+      <div className="help-panel" ref={dialogRef} tabIndex={-1}>
         <div className="help-head">
           <span>What am I looking at?</span>
-          <button type="button" className="help-close" onClick={onClose} title="Close this help (Esc)" aria-label="Close help">
+          <button ref={closeRef} type="button" className="help-close" onClick={onClose} title="Close this help (Esc)" aria-label="Close help">
             ×
           </button>
         </div>

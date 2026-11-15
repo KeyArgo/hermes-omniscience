@@ -31,6 +31,7 @@
         { "name": "Reset view (↺)", "what": "Put view, zoom, filters and panels back the way Omniscience first opens. Recordings are never touched." },
         { "name": "Maximize (⛶)", "what": "Full screen; Esc leaves." },
         { "name": "Mini Panel", "what": "A small frame on the right with only what you chose to watch." },
+        { "name": "Workspace (⌘)", "what": "On a laptop, tablet or phone this opens the same secondary controls at full size: Follow Newest, Mini Panel, Panels, Reset, Tour, map style, Settings and Help. Every action stays present; nothing is removed to make room." },
         { "name": "Panels", "what": "Show, hide and resize every panel, switch between Simple, Standard and Everything, and reset the layout." },
         { "name": "Settings (⚙)", "what": "Default view, compact text, chat titles, the theme (dark or Paper), recording and privacy." },
         { "name": "Help", "what": "What Am I Looking At? explains every box and colour; Take the Tour walks five stops in about 30 seconds." }

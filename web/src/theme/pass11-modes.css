@@ -1,0 +1,377 @@
+/*
+ * Slice 2 — interface modes and the Chats control.
+ *
+ * Loaded last so a header control cannot be restyled by a later theme pass. Everything here is
+ * scoped to the two controls this slice adds; the rest of the visual system is untouched.
+ *
+ * Sizing: the old "Sessions" label was 10 px type in a ~22 px chip. Both new controls are 44 px
+ * tall (a 36 px segment inside a 44 px rail), so their hit areas and text are about twice the
+ * old ones. Nothing blinks: the open state is a caret, a ring and `aria-expanded`.
+ */
+
+/* The brand line now carries controls; baseline alignment pushed them off centre. */
+.brand {
+  align-items: center;
+}
+
+/* ---------- Chats: the one control for the list ---------- */
+
+.chats-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  min-width: 132px;
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--cyan, #78e7ef) 46%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--cyan, #78e7ef) 13%, var(--panel-2, #0c121a)) 0%,
+    var(--panel, #090d13) 74%
+  );
+  color: var(--text, #edf7ff);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 14%, transparent),
+    0 6px 18px color-mix(in srgb, #000000 34%, transparent);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.chats-toggle:hover {
+  border-color: var(--cyan, #78e7ef);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 20%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--cyan, #78e7ef) 16%, transparent),
+    0 8px 22px color-mix(in srgb, #000000 38%, transparent);
+}
+
+.chats-toggle.is-open {
+  border-color: var(--cyan, #78e7ef);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent, #3d7bff) 30%, var(--panel-2, #0c121a)) 0%,
+    var(--panel, #090d13) 78%
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 18%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--cyan, #78e7ef) 20%, transparent),
+    0 8px 22px color-mix(in srgb, #000000 40%, transparent);
+}
+
+.chats-toggle-glyph {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--cyan, #78e7ef);
+}
+
+.chats-toggle-text {
+  white-space: nowrap;
+}
+
+.chats-toggle-count {
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--cyan, #78e7ef) 24%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cyan, #78e7ef) 10%, transparent);
+  color: var(--text, #edf7ff);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.chats-toggle-caret {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted, #73869a);
+}
+
+.chats-toggle.is-open .chats-toggle-caret {
+  color: var(--cyan, #78e7ef);
+}
+
+/* ---------- mode: Hermes | Web ---------- */
+
+.mode-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  min-height: 44px;
+  padding: 3px 4px;
+  border: 1px solid var(--line-2, #273547);
+  border-radius: 12px;
+  /* Near-opaque, so the labels keep their contrast over the header; the blur is only texture. */
+  background: color-mix(in srgb, var(--panel-2, #0c121a) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  backdrop-filter: blur(12px) saturate(130%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 9%, transparent);
+}
+
+/* A browser that cannot blur still gets the near-opaque surface, just flat. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mode-select {
+    background: var(--panel-2, #0c121a);
+  }
+}
+
+.mode-select-label {
+  padding: 0 6px 0 5px;
+  color: var(--muted, #73869a);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.mode-option {
+  min-width: 68px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted, #73869a);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.mode-option:hover {
+  color: var(--text, #edf7ff);
+  background: color-mix(in srgb, var(--cyan, #78e7ef) 9%, transparent);
+}
+
+.mode-option[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent, #3d7bff) 62%, #ffffff);
+  /* Darkened from the raw accent so white label text clears 4.5:1 on the dark theme too
+     (#3d7bff with white is only 3.8:1; this pair is 4.7:1 or better in both themes). */
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--accent, #3d7bff) 88%, #000000),
+    color-mix(in srgb, var(--accent, #3d7bff) 72%, #000000)
+  );
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 26%, transparent),
+    0 2px 8px color-mix(in srgb, #000000 26%, transparent);
+}
+
+.chats-toggle:focus-visible,
+.mode-option:focus-visible,
+.chats-close:focus-visible {
+  outline: 3px solid var(--cyan, #78e7ef);
+  outline-offset: 3px;
+}
+
+/* ---------- the Chats drawer's own header (narrow windows only) ---------- */
+
+.chats-drawer-head {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .chats-drawer-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex: none;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line, #1a2532);
+    background: color-mix(in srgb, var(--panel-2, #0c121a) 92%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .chats-drawer-title {
+    color: var(--text, #edf7ff);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .chats-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line-2, #273547);
+    border-radius: 10px;
+    background: var(--panel-2, #0c121a);
+    color: var(--text, #edf7ff);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .chats-close:hover {
+    border-color: var(--cyan, #78e7ef);
+  }
+}
+
+/* ---------- narrow headers: keep both controls, give up the wordmark first ---------- */
+
+/* pass10 re-declares the tagline as inline-block outside its own breakpoint, so the 1180 px rule
+   that hides it never won. At these widths it crowded the new controls off the edge. */
+@media (max-width: 1180px) {
+  .brand-sub {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .mode-select-label {
+    display: none;
+  }
+
+  .mode-option {
+    min-width: 58px;
+    padding: 0 9px;
+  }
+}
+
+@media (max-width: 620px) {
+  .brand-name {
+    display: none;
+  }
+
+  .chats-toggle {
+    min-width: 112px;
+    padding: 0 10px;
+    gap: 7px;
+  }
+
+  .chats-toggle-glyph {
+    font-size: 16px;
+  }
+
+  .chats-toggle-caret {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .chats-toggle {
+    min-width: 104px;
+    font-size: 13px;
+  }
+
+  .mode-option {
+    min-width: 52px;
+    font-size: 12.5px;
+  }
+}
+
+/* ---------- narrow drawers above the inspector scrim ---------- */
+/* From 900 px down the details rail draws a full-viewport click-away scrim (pass10). It covered
+   the header too, so the Chats control — and the drawer it opens — could not be clicked. The
+   header, the Chats drawer and its own click-away now sit above that scrim; the details drawer
+   keeps its higher layer. */
+@media (max-width: 900px) {
+  .app:not(.app-mini) .topbar {
+    z-index: 28;
+  }
+
+  .app:not(.app-mini) .rail-backdrop.is-open {
+    z-index: 26;
+  }
+
+  .app:not(.app-mini) .rail-left,
+  .app:not(.app-mini) .rail-left.is-open {
+    z-index: 27;
+  }
+}
+
+/* ---------- very wide headers: wrap when the two rows would collide ---------- */
+/* The brand now carries Chats and the mode switch, so on a 1600–1900 px window the single header
+   row can be wider than the viewport. Let the metrics row drop to a second line there (the grid
+   row grows with it); at 1920 px and above everything still fits on one 54 px line. */
+@media (min-width: 1600px) {
+  .app:not(.app-mini) {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+
+  .app.is-account:not(.app-mini) {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    min-height: 54px;
+  }
+
+  .top-metrics {
+    margin-left: auto;
+  }
+}
+
+/* The closed narrow drawer is hidden, not merely translated off-screen: `hidden` also takes its
+   rows and Close button out of the tab order. (`.rail-left` sets display:flex, so restate it.) */
+@media (max-width: 700px) {
+  .rail-left[hidden] {
+    display: none !important;
+  }
+}
+
+/* ---------- accessibility fallbacks ---------- */
+
+@media (prefers-reduced-transparency: reduce) {
+  .mode-select,
+  .chats-drawer-head {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--panel, #090d13);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chats-toggle {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .chats-toggle,
+  .mode-select,
+  .mode-option,
+  .chats-close {
+    border-color: ButtonBorder;
+    background: ButtonFace;
+    color: ButtonText;
+    box-shadow: none;
+  }
+
+  .chats-toggle.is-open {
+    border-width: 2px;
+  }
+
+  .mode-option[aria-pressed="true"] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .mode-option[aria-pressed="true"]::after {
+    content: " ✓";
+  }
+}

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from './api';
 import { tokenHeaders } from './token';
-import { EVENT_PAGE_SIZE, downloadCsv, fetchBuildId, fetchEvents, fetchSessions, fetchVersion, fetchWarnings, liveSubprotocol, liveUrl, normalizeEvent, type BuildInfo } from './api';
+import { EVENT_PAGE_SIZE, downloadCsv, fetchBuildId, fetchEvents, fetchEventsPage, fetchSessions, fetchVersion, fetchWarnings, liveSubprotocol, liveUrl, normalizeEvent, type BuildInfo } from './api';
 import { recoverStaleKey } from './token';
 import type { OmniEvent, SessionMeta, Warning } from './types';
 import { groupMembers } from './graph/collapse';
@@ -32,6 +32,7 @@ import { Legend } from './components/Legend';
 import { ChatSummaryPanel } from './components/ChatSummaryPanel';
 import { TimeView } from './components/TimeView';
 import { RunList } from './components/RunList';
+import { RunLens } from './components/RunLens';
 import { MiniLive } from './components/MiniLive';
 import { MiniShell, type MiniView } from './components/MiniShell';
 import { PrivacyPanel } from './components/PrivacyPanel';
@@ -52,8 +53,12 @@ import { SessionContextStrip } from './components/SessionContextStrip';
 import { VerdictHeader } from './components/VerdictHeader';
 import { buildVerdict } from './graph/verdict';
 import { applyFilter, buildRows } from './graph/rows';
+import { replayPrefixCount } from './graph/lens';
+import { nodeForEvent } from './graph/selection';
 import { ReplayBar, type Speed } from './components/ReplayBar';
 import { SessionList } from './components/SessionList';
+import { ChatsButton } from './components/ChatsButton';
+import { ModeSwitch } from './components/ModeSwitch';
 import { SlowestList } from './components/SlowestList';
 import { SummaryBar } from './components/SummaryBar';
 import { WarningsPanel, groupWarnings } from './components/WarningsPanel';
@@ -63,17 +68,166 @@ import { MenuButton, MenuCheck, MenuItem, MenuLabel, MenuSep } from './component
 import { PanelsSheet } from './components/PanelsSheet';
 import { PanelFrame } from './components/PanelFrame';
 import { Tour } from './components/Tour';
-import { useLayoutPrefs } from './shell/layoutPrefs';
+import { useLayoutPrefs, isVisible, readOverrides, type Overrides, type Preset } from './shell/layoutPrefs';
+import {
+  initialModeFromLocation,
+  isHostPinnedFromLocation,
+  withoutHostMarker,
+  writeStoredMode,
+  type InterfaceMode,
+} from './shell/mode';
+import {
+  defaultCompact,
+  defaultPreset,
+  isModePrefKey,
+  readCompact as readModeCompact,
+  readPreset as readModePreset,
+  readScopedBool,
+  readScopedPref,
+  writeCompact as writeModeCompact,
+  writePreset as writeModePreset,
+  writeScopedBool,
+  writeScopedPref,
+} from './shell/modePrefs';
+import { PrefScopeProvider } from './shell/prefScope';
+import { useMediaQuery } from './shell/useMediaQuery';
 import { TipLayer } from './help/TipLayer';
 import guide from './help/guide.json';
+
+const EMPTY_COMPUTED = {
+  root: null as string | null,
+  fullGraph: { nodes: [], edges: [] } as Graph,
+  baseGraph: { nodes: [], edges: [] } as Graph,
+  graph: { nodes: [], edges: [] } as Graph,
+  truncated: 0,
+};
 
 function shortRoot(id: string): string {
   return id.length > 26 ? `${id.slice(0, 10)}…${id.slice(-10)}` : id;
 }
 
+/**
+ * Which header arrangement is on screen. Below 1440 px the secondary controls live in the
+ * Workspace sheet, so the common ones stay in the primary row, the sheet keeps a single Reset,
+ * and the tour's "Panels" stop anchors to the Workspace control that reveals Panels.
+ */
+export interface HeaderLayout {
+  quickControlsInline: boolean;
+  showResetIcon: boolean;
+  showResetChip: boolean;
+  panelsTourAnchor: 'workspace' | 'panels';
+}
+
+export function headerLayout(compactHeader: boolean, phone = false): HeaderLayout {
+  return {
+    // On a laptop the two quick toggles are worth a second header row. On a phone or a tablet the
+    // same two buttons would be a third row and push the stage off the screen, so they travel
+    // into the Workspace sheet with the rest.
+    quickControlsInline: compactHeader && !phone,
+    // The sheet keeps the icon Reset; its labelled chip is the inline duplicate and is also
+    // CSS-hidden below 1100 px. On a wide window the existing icon + chip pair is unchanged.
+    showResetIcon: true,
+    showResetChip: !compactHeader,
+    panelsTourAnchor: compactHeader ? 'workspace' : 'panels',
+  };
+}
+
+type EscapeKeyEvent = Pick<KeyboardEvent, 'key' | 'defaultPrevented'>;
+
+/**
+ * Escape belongs to the innermost layer. An open Panels/Help/Settings dialog or menu handles it
+ * itself; the Workspace sheet closes only while focus is on its control or inside the sheet.
+ */
+export function workspaceEscapeCloses(
+  event: EscapeKeyEvent,
+  context: { onControl: boolean; inPanel: boolean; nestedOverlay: boolean },
+): boolean {
+  if (event.key !== 'Escape' || event.defaultPrevented) return false;
+  if (context.nestedOverlay) return false;
+  return context.onControl || context.inPanel;
+}
+
+/**
+ * Chats is a drawer only at narrow widths. On a wide window it is a persistent column: Escape
+ * must leave it alone instead of folding the layout away.
+ */
+export function chatsEscapeCloses(
+  event: EscapeKeyEvent,
+  context: { narrow: boolean; open: boolean; onControl: boolean; inPanel: boolean },
+): boolean {
+  if (event.key !== 'Escape' || event.defaultPrevented) return false;
+  if (!context.narrow || !context.open) return false;
+  return context.onControl || context.inPanel;
+}
+
+/** A Chats press starts a drawer session only where Chats is a drawer. */
+export function drawerOpensOnChatsClick(narrow: boolean): boolean {
+  return narrow;
+}
+
+/**
+ * A width change must not strand focus on a list that is now hidden or collapsed. If the list is
+ * still shown (wide column or open drawer), focus can stay where it was.
+ */
+export function shouldRescueChatsFocus(
+  chatsOpen: boolean,
+  activeInsideList: boolean,
+  lastFocusWasInsideList: boolean,
+): boolean {
+  if (chatsOpen) return false;
+  return activeInsideList || lastFocusWasInsideList;
+}
+
+/** Wait for every dialog in the chain to close before returning focus to the Workspace control. */
+export function shouldReturnDialogFocus(anyDialogOpen: boolean, returnPending: boolean): boolean {
+  return returnPending && !anyDialogOpen;
+}
+
+/** A remembered opener is only usable if it is still connected and is not the page body. */
+export function shouldRestoreDialogOpener(
+  hasTarget: boolean,
+  targetConnected: boolean,
+  targetIsBody: boolean,
+): boolean {
+  return hasTarget && targetConnected && !targetIsBody;
+}
+
+/** Every modal surface that owns the keyboard while it is open, including the Tour. */
+export function shortcutsBlockedByOverlay(state: {
+  panelsOpen: boolean;
+  helpOpen: boolean;
+  settingsOpen: boolean;
+  privacyOpen: boolean;
+  insightOpen: boolean;
+  tourActive: boolean;
+}): boolean {
+  return (
+    state.panelsOpen ||
+    state.helpOpen ||
+    state.settingsOpen ||
+    state.privacyOpen ||
+    state.insightOpen ||
+    state.tourActive
+  );
+}
+
+/**
+ * Crossing out of the compact header unmounts both the sheet and its toggle. Rescue focus only
+ * when the sheet/toggle had it, no dialog is open, and no dialog is waiting to return it.
+ */
+export function shouldRescueWorkspaceFocus(
+  compactHeader: boolean,
+  anyDialogOpen: boolean,
+  returnPending: boolean,
+  lastFocusWasInsideWorkspace: boolean,
+): boolean {
+  return !compactHeader && !anyDialogOpen && !returnPending && lastFocusWasInsideWorkspace;
+}
+
 /** Views behind the "more" menu, so the main switch stays short. The label carries what the view
  *  is for: a menu of six bare nouns asks the reader to open all six to find out. */
 const MORE_VIEWS: [ViewMode, string][] = [
+  ['lens', 'Lens — one ring through the recorded run'],
   ['flame', 'Flame — where the time went'],
   ['tools', 'Tools — which ones failed'],
   ['context', 'Context — how the prompt grew'],
@@ -103,6 +257,7 @@ const VIEW_HINTS: Partial<Record<ViewMode, string>> = {
   context: 'How the prompt grew call by call, and where a compaction cut it back.',
   helpers: 'Helper agents this chat spawned, and what each one did for it.',
   coverage: 'What the recording holds and what it is missing, by event kind.',
+  lens: 'Recorded moments as one ring: type, recorded status and step counts. Selecting a moment moves replay to it.',
 };
 
 /** ?mini=1: the narrow live pane docked next to a Hermes chat. */
@@ -122,36 +277,62 @@ const embedded = (() => {
   }
 })();
 
-/** How much of the interface is on show. One control, three answers, remembered. */
-export type Preset = 'simple' | 'standard' | 'everything';
+/** How much of the interface is on show. One control, three answers, remembered per mode. */
+export type { Preset } from './shell/layoutPrefs';
 
-function readPreset(): Preset {
-  try {
-    const stored = window.localStorage.getItem('omni.preset');
-    if (stored === 'simple' || stored === 'standard' || stored === 'everything') return stored;
-  } catch {
-    /* storage unavailable */
-  }
-  return 'simple';
+/**
+ * The side rails follow the mode's panel layout on first paint. Reading the layout (rather than a
+ * separate remembered flag) means a docked pane and a browser tab cannot show one mode's open rail
+ * while its stored layout says the panel is hidden.
+ */
+function initialRails(mode: InterfaceMode): { left: boolean; right: boolean } {
+  const preset = readModePreset(mode);
+  const overrides = readOverrides(preset, undefined, mode);
+  return {
+    left: !isVisible('chats', preset, overrides),
+    right: !isVisible('inspector', preset, overrides),
+  };
 }
 
-function readPersistedBool(key: string, fallback: boolean): boolean {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === '1') return true;
-    if (raw === '0') return false;
-  } catch {
-    /* ignore */
-  }
-  return fallback;
+/**
+ * A replay position is a prefix length into the loaded events, not a timestamp. Loading earlier
+ * steps inserts them in front of everything currently loaded, so the same recorded moment sits that
+ * many steps further along; adding the count back keeps the replay on the steps it was showing
+ * instead of silently sliding backwards into older history. Live replay (`null`) stays live.
+ * An active replay at 0 stays at the same boundary (before every step it was before), which is just
+ * after the prepended steps.
+ */
+export function replayAfterPrepend(replayIndex: number | null, prepended: number): number | null {
+  if (replayIndex === null) return null;
+  const shift = typeof prepended === 'number' && Number.isFinite(prepended) && prepended > 0
+    ? Math.trunc(prepended)
+    : 0;
+  return replayIndex + shift;
 }
 
-function writePersistedBool(key: string, value: boolean): void {
-  try {
-    window.localStorage.setItem(key, value ? '1' : '0');
-  } catch {
-    /* ignore */
+/**
+ * How many of `earlier` are new steps that belong in front of the loaded window. Rowids already
+ * loaded (an overlapping page) and repeats inside the page are not counted, because `appendEvents`
+ * drops them; counting them would move the replay too far.
+ */
+export function countPrependedEvents(existing: OmniEvent[], earlier: OmniEvent[]): number {
+  if (earlier.length === 0) return 0;
+  const known = new Set<number>();
+  let first = Number.POSITIVE_INFINITY;
+  for (const event of existing) {
+    known.add(event.rowid);
+    if (event.rowid < first) first = event.rowid;
   }
+  const seen = new Set<number>();
+  let count = 0;
+  for (const event of earlier) {
+    if (!Number.isFinite(event.rowid)) continue;
+    if (event.rowid >= first) continue;
+    if (known.has(event.rowid) || seen.has(event.rowid)) continue;
+    seen.add(event.rowid);
+    count += 1;
+  }
+  return count;
 }
 
 /** The chip's own line: product, runtime version, commit date and short commit. Every value is
@@ -309,8 +490,17 @@ export default function App() {
   const [events, setEvents] = useState<OmniEvent[]>([]);
   const eventsRef = useRef<OmniEvent[]>([]);
   const rootRef = useRef<string | null>(null);
+  // One run of the chat effect below is one visit. A chat id cannot identify a visit: A → B → A
+  // returns to the same id, and a request started before that round trip must not write into the
+  // visit it was not started for. The effect bumps this on entry and again on cleanup, so every
+  // request in flight from an older visit is stale from the moment the user leaves the chat.
+  const visitRef = useRef(0);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [earlierExhausted, setEarlierExhausted] = useState(false);
+  // A failed "Load earlier" is its own, retryable condition. It must not reuse the first-page flag:
+  // that one owns the offline banner and the context lane, and only a chat switch or a successful
+  // first page clears it — so one failed earlier page would blank them for the whole visit.
+  const [earlierFailed, setEarlierFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [socketOpen, setSocketOpen] = useState(false);
   const [eventsFetchFailed, setEventsFetchFailed] = useState(false);
@@ -348,6 +538,15 @@ export default function App() {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(new Set());
+  // A lens selection can name an event the current graph has not built yet (seeking forward
+  // rebuilds the graph from the new replay prefix). Keep that id until the node appears.
+  const [pendingLensEventId, setPendingLensEventId] = useState<string | null>(null);
+  // A selection waiting on the graph belongs to one chat; switching chats must not carry it over.
+  useEffect(() => {
+    setPendingLensEventId(null);
+    setSelectedNodeId(null);
+    setExpandedTurnIds(new Set());
+  }, [selectedRoot]);
 
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [sessionsOpen, setSessionsOpen] = useState(false);
@@ -364,63 +563,296 @@ export default function App() {
 
   const [focusToken, setFocusToken] = useState(0);
   const [resetToken, setResetToken] = useState(0);
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => readPersistedBool('omni.leftCollapsed', embedded));
-  const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => readPersistedBool('omni.rightCollapsed', embedded));
-  const [compact, setCompact] = useState<boolean>(() => readPersistedBool('omni.compact', embedded));
-  const [preset, setPreset] = useState<Preset>(readPreset);
-  const prefs = useLayoutPrefs(preset);
+  // The mode is decided once, from an explicit host marker or the remembered browser choice.
+  // Being in an iframe is not evidence of Hermes (see shell/mode.ts).
+  const [mode, setMode] = useState<InterfaceMode>(initialModeFromLocation);
+  // A marker pins the starting mode; only an unpinned browser may remember a new choice.
+  const hostPinned = useRef(isHostPinnedFromLocation()).current;
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => initialRails(mode).left);
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(() => initialRails(mode).right);
+  const [compact, setCompact] = useState<boolean>(() => readModeCompact(mode, embedded));
+  const [preset, setPresetState] = useState<Preset>(() => readModePreset(mode));
+  const prefs = useLayoutPrefs(preset, mode);
   const [panelsOpen, setPanelsOpen] = useState(false);
   // Two ways to read the same chat: the timeline the map has always drawn, and a link web.
-  const [linkView, setLinkView] = useState<boolean>(() => {
-    try {
-      return window.localStorage.getItem('omni.mapStyle') === 'links';
-    } catch {
-      return false;
-    }
-  });
+  const [linkView, setLinkView] = useState<boolean>(
+    () => readScopedPref('mapStyle', mode) === 'links',
+  );
   const chooseMapStyle = (links: boolean) => {
     setLinkView(links);
-    try {
-      window.localStorage.setItem('omni.mapStyle', links ? 'links' : 'timeline');
-    } catch {
-      /* storage unavailable */
-    }
+    writeScopedPref('mapStyle', mode, links ? 'links' : 'timeline');
   };
   const [tourNonce, setTourNonce] = useState(0);
+  // Tour owns a window-level key listener; App must know while it is on screen so the page
+  // shortcuts cannot open a dialog underneath it.
+  const [tourActive, setTourActive] = useState(false);
   const [railTab, setRailTab] = useState<'inspect' | 'warnings' | 'why'>('warnings');
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem('omni.preset', preset);
-    } catch {
-      /* storage unavailable */
-    }
-  }, [preset]);
+  /**
+   * Switch layout family. Every view preference moves with the mode: the preset, compact text, the
+   * theme, the chosen view, map style, mini view, title/context toggles, follow-newest, rail mode
+   * and the open/folded side rails. Nothing is copied between them, so a browser tab cannot
+   * inherit a setting changed in the docked pane.
+   */
+  const chooseMode = (next: InterfaceMode) => {
+    if (next === mode) return;
+    setMode(next);
+    const nextPreset = readModePreset(next);
+    const nextOverrides = readOverrides(nextPreset, undefined, next);
+    setPresetState(nextPreset);
+    setCompact(readModeCompact(next, embedded));
+    setTheme(readScopedPref('theme', next) === 'paper' ? 'paper' : 'console');
+    const savedView = readScopedPref('view', next);
+    const savedDefault = readScopedPref('defaultView', next);
+    setDefaultView(isView(savedDefault) ? savedDefault : 'graph');
+    setView(
+      isView(savedView) ? savedView : isView(savedDefault) ? savedDefault : 'graph',
+    );
+    setLinkView(readScopedPref('mapStyle', next) === 'links');
+    const savedMini = readScopedPref('miniView', next);
+    setMiniView(
+      savedMini === 'live' ||
+        savedMini === 'context' ||
+        savedMini === 'tools' ||
+        savedMini === 'tokens' ||
+        savedMini === 'time'
+        ? savedMini
+        : 'live',
+    );
+    setShowTitles(readScopedBool('showTitles', next, true));
+    setShowContext(readScopedBool('showContext', next, true));
+    setFollowNewest(readScopedBool('followNewest', next, false));
+    setRailMode(readScopedPref('railMode', next) === 'follow' ? 'follow' : 'details');
+    setLeftCollapsed(!isVisible('chats', nextPreset, nextOverrides));
+    setRightCollapsed(!isVisible('inspector', nextPreset, nextOverrides));
+    if (!hostPinned) writeStoredMode(next);
+  };
+  /** Change the preset of the mode on screen, and only that mode's stored choice. */
+  const choosePreset = (next: Preset) => {
+    setPresetState(next);
+    writeModePreset(mode, next);
+  };
+
   const chatsVisible = prefs.visible('chats');
   const inspectorVisible = prefs.visible('inspector');
   useEffect(() => setLeftCollapsed(!chatsVisible), [chatsVisible]);
   useEffect(() => setRightCollapsed(!inspectorVisible), [inspectorVisible]);
   const setChatsShown = (show: boolean) => {
     setLeftCollapsed(!show);
-    writePersistedBool('omni.leftCollapsed', !show);
     if (show !== chatsVisible) prefs.toggle('chats');
   };
   const setInspectorShown = (show: boolean) => {
     setRightCollapsed(!show);
-    writePersistedBool('omni.rightCollapsed', !show);
     if (show !== inspectorVisible) prefs.toggle('inspector');
   };
+
+  /**
+   * One Chats control, two layouts. Above 700 px it shows/hides the list column; at 700 px and
+   * below the same state opens the drawer. Focus stays with the control on close, and Escape
+   * works whenever focus is on the button or inside the list.
+   */
+  const chatsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const chatsPanelRef = useRef<HTMLElement | null>(null);
+  const chatsCloseRef = useRef<HTMLButtonElement | null>(null);
+  const narrow = useMediaQuery('(max-width: 700px)');
+  // At tablet and phone widths the secondary header controls would need four to eight rows of
+  // 48 px targets. They stay one press away in the Workspace sheet instead of being clipped or
+  // shrunk; every control is still rendered, labelled and keyboard reachable.
+  const compactHeader = useMediaQuery('(max-width: 1439px)');
+  // On a phone or small tablet the two quick toggles would add a third header row; they stay in
+  // the Workspace sheet there. Laptop widths keep them inline.
+  const phoneHeader = useMediaQuery('(max-width: 1000px)');
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const workspaceButtonRef = useRef<HTMLButtonElement | null>(null);
+  const workspaceSheetRef = useRef<HTMLDivElement | null>(null);
+  const workspaceCloseRef = useRef<HTMLButtonElement | null>(null);
+  // Focus is tracked across a width change because by the time the resize effect runs, CSS/hidden
+  // may already have blurred the old element to the body.
+  const lastChatsFocusRef = useRef(false);
+  const lastWorkspaceFocusRef = useRef(false);
+  // Set while a dialog opened from the sheet still owns the return of focus. It stays set through
+  // nested dialogs (Settings → Privacy) and is consumed only after the last one closes.
+  const workspaceReturnPending = useRef(false);
+  // Settings/Privacy can be opened from the wide header too, where there is no Workspace sheet to
+  // return to. Remember the actual opener across the whole dialog chain (Settings → Privacy).
+  const dialogReturnTargetRef = useRef<HTMLElement | null>(null);
+  const dialogReturnPending = useRef(false);
+  const refreshFocusMemory = () => {
+    const active = document.activeElement;
+    lastChatsFocusRef.current = chatsPanelRef.current?.contains(active) === true;
+    lastWorkspaceFocusRef.current =
+      workspaceSheetRef.current?.contains(active) === true ||
+      active === workspaceButtonRef.current;
+  };
+  useEffect(() => {
+    const onFocusIn = () => refreshFocusMemory();
+    // A pointer press on non-focusable background drops focus to the body without a focusin.
+    // Re-read the real active element afterwards so the resize rescue cannot act on stale memory.
+    const onPointerDown = () => {
+      window.setTimeout(refreshFocusMemory, 0);
+    };
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('pointerdown', onPointerDown, true);
+    };
+  }, []);
+  // The sheet is a disclosure, not a modal: put focus on its Close so the next Tab walks the
+  // controls instead of the page behind them.
+  useEffect(() => {
+    if (!workspaceOpen) return;
+    workspaceCloseRef.current?.focus();
+  }, [workspaceOpen]);
+  useEffect(() => {
+    if (!workspaceOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      const active = document.activeElement;
+      // A Panels/Help/Settings dialog or an open menu owns Escape for itself; the workspace sheet
+      // must not also close underneath it.
+      const nestedOverlay =
+        active instanceof Element &&
+        active.closest('[role="dialog"], [role="menu"]') !== null;
+      if (
+        !workspaceEscapeCloses(event, {
+          onControl: active === workspaceButtonRef.current,
+          inPanel: workspaceSheetRef.current?.contains(active) === true,
+          nestedOverlay,
+        })
+      ) {
+        return;
+      }
+      event.preventDefault();
+      setWorkspaceOpen(false);
+      workspaceButtonRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [workspaceOpen]);
+  /** Close the sheet, restoring focus only when no dialog is about to take it. */
+  const closeWorkspace = (restoreFocus = true) => {
+    if (!workspaceOpen) return;
+    setWorkspaceOpen(false);
+    if (restoreFocus) workspaceButtonRef.current?.focus();
+  };
+  // A dialog opened from the sheet destroys its own opener when the sheet closes. Mark that a
+  // return is owed; the effect after the dialog states are declared consumes it only when no
+  // dialog remains open, so Settings → Privacy does not lose the return.
+  const focusWorkspaceControl = () => {
+    // Workspace is gone once the header widens; Chats is the always-present equivalent.
+    (workspaceButtonRef.current ?? chatsButtonRef.current)?.focus();
+  };
+  const rememberDialogOpener = () => {
+    // Keep the first opener across Settings → Privacy; the Privacy link itself disappears with
+    // Settings and would be useless to restore to.
+    if (dialogReturnPending.current) return;
+    let active = document.activeElement;
+    if (active instanceof HTMLElement) {
+      // A menu item unmounts with its menu. Return to the menu trigger that is still on screen.
+      const menu = active.closest('[role="menu"]');
+      const trigger = menu?.closest('.mb-root')?.querySelector<HTMLElement>('.mb-trigger');
+      if (trigger) active = trigger;
+    }
+    dialogReturnTargetRef.current =
+      active instanceof HTMLElement && active !== document.body ? active : null;
+    dialogReturnPending.current = true;
+  };
+  const openPanels = () => {
+    workspaceReturnPending.current = workspaceOpen;
+    closeWorkspace(false);
+    setPanelsOpen(true);
+  };
+  const openSettings = () => {
+    rememberDialogOpener();
+    // Settings now owns its return for compact and wide openings; do not double-handle it as a
+    // Workspace-sheet dialog.
+    workspaceReturnPending.current = false;
+    closeWorkspace(false);
+    setSettingsOpen(true);
+  };
+  const openHelp = () => {
+    rememberDialogOpener();
+    // Help now returns through the same remembered-opener path as Settings/Privacy, so a wide
+    // Help menu also restores its trigger instead of dropping focus on the body.
+    workspaceReturnPending.current = false;
+    closeWorkspace(false);
+    setHelpOpen(true);
+  };
+  const chatsOpen = narrow ? sessionsOpen : chatsVisible && !leftCollapsed;
+  // Drawer sessions belong to drawer width. Also hand focus back to Chats whenever this width
+  // change hides or collapses the list (wide column → closed drawer, or narrow drawer → folded
+  // column), instead of stranding it on a hidden row or dropping it on the body.
+  useEffect(() => {
+    if (!narrow) setSessionsOpen(false);
+    const active = document.activeElement;
+    const activeInside = chatsPanelRef.current?.contains(active) === true;
+    if (!shouldRescueChatsFocus(chatsOpen, activeInside, lastChatsFocusRef.current)) return;
+    lastChatsFocusRef.current = false;
+    chatsButtonRef.current?.focus();
+  }, [narrow, chatsOpen]);
+  const openChats = () => {
+    // Account pages (Usage, Latency, Privacy, Concerns) are full-width and hide the list by
+    // design. Chats is still the control that goes to a chat: use it, do not leave it dead.
+    if (accountView) setView('graph');
+    if (drawerOpensOnChatsClick(narrow)) setSessionsOpen(true);
+    // On a narrow window the list is a drawer: opening it is a peek, not a layout change, so it
+    // must not rewrite the mode's chat-panel preference. On a wide one the column is the layout.
+    if (!narrow && !chatsVisible) setChatsShown(true);
+  };
+  const closeChats = () => {
+    setSessionsOpen(false);
+    // On a wide window the list is a column: closing it folds the column away. On a narrow one
+    // the list is a drawer, so closing must not also rewrite the panel preference.
+    if (!narrow && chatsVisible) setChatsShown(false);
+  };
+  const toggleChats = () => {
+    if (chatsOpen) closeChats();
+    else openChats();
+  };
+  const closeChatsRef = useRef(closeChats);
+  closeChatsRef.current = closeChats;
+
+  // Opening the drawer moves focus to its explicit Close button; a drawer that opens with focus
+  // still in the header is easy to miss from the keyboard.
+  useEffect(() => {
+    if (narrow && chatsOpen) chatsCloseRef.current?.focus();
+  }, [narrow, chatsOpen]);
+
+  useEffect(() => {
+    if (!chatsOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      const active = document.activeElement;
+      const engaged =
+        active === chatsButtonRef.current || chatsPanelRef.current?.contains(active) === true;
+      // On a wide window the list is a persistent column: Escape leaves it alone. On a narrow one
+      // the drawer closes when the key belongs to the list, never when a dialog owns it.
+      if (!chatsEscapeCloses(event, { narrow, open: chatsOpen, onControl: active === chatsButtonRef.current, inPanel: engaged })) {
+        return;
+      }
+      event.preventDefault();
+      closeChatsRef.current();
+      chatsButtonRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [chatsOpen, narrow]);
+
+  // The tour's first stop is Chats. Anchor it once on the always-visible Chats button: the list
+  // itself is hidden at drawer widths, and moving the marker on resize would leave the tour
+  // measuring the old target.
+  useLayoutEffect(() => {
+    const button = chatsButtonRef.current;
+    if (!button) return;
+    button.setAttribute('data-tour', 'chats');
+    return () => button.removeAttribute('data-tour');
+  }, []);
+
   const isView = (value: unknown): value is ViewMode =>
     typeof value === 'string' &&
     ['list', 'graph', 'time', 'tokens', 'usage', ...MORE_VIEWS.map(([m]) => m)].includes(value);
   const [defaultView, setDefaultView] = useState<ViewMode>(() => {
-    try {
-      const saved = window.localStorage.getItem('omni.defaultView');
-      if (isView(saved)) return saved;
-    } catch {
-      /* storage unavailable */
-    }
-    return 'graph';
+    const saved = readScopedPref('defaultView', mode);
+    return isView(saved) ? saved : 'graph';
   });
   const [view, setView] = useState<ViewMode>(() => {
     try {
@@ -431,51 +863,83 @@ export default function App() {
     } catch {
       /* storage unavailable */
     }
-    try {
-      const saved = window.localStorage.getItem('omni.view');
-      if (isView(saved)) return saved;
-    } catch {
-      /* storage unavailable */
-    }
+    const saved = readScopedPref('view', mode);
+    if (isView(saved)) return saved;
     return defaultView;
   });
-  const [showTitles, setShowTitles] = useState<boolean>(() => readPersistedBool('omni.showTitles', true));
+  const [showTitles, setShowTitles] = useState<boolean>(() => readScopedBool('showTitles', mode, true));
   // The context-per-call chart under each chat is a lens, not a default view: on
   // by default, one switch off for people who want the map and nothing else.
-  const [showContext, setShowContext] = useState<boolean>(() => readPersistedBool('omni.showContext', true));
+  const [showContext, setShowContext] = useState<boolean>(() => readScopedBool('showContext', mode, true));
   // Two faces for the same data: the console (default) and the warm paper one.
-  const [theme, setTheme] = useState<'console' | 'paper'>(() => {
-    try {
-      return window.localStorage.getItem('omni.theme') === 'paper' ? 'paper' : 'console';
-    } catch {
-      return 'console';
-    }
-  });
+  const [theme, setTheme] = useState<'console' | 'paper'>(
+    () => (readScopedPref('theme', mode) === 'paper' ? 'paper' : 'console'),
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Side-pane view (List / Context / Tools / Tokens / Time), remembered per browser.
+  // Side-pane view (List / Context / Tools / Tokens / Time), remembered per mode.
   const [miniView, setMiniView] = useState<MiniView>(() => {
-    try {
-      const saved = window.localStorage.getItem('omni.miniView');
-      if (saved === 'live' || saved === 'context' || saved === 'tools' || saved === 'tokens' || saved === 'time') return saved;
-    } catch {
-      /* storage unavailable */
-    }
+    const saved = readScopedPref('miniView', mode);
+    if (saved === 'live' || saved === 'context' || saved === 'tools' || saved === 'tokens' || saved === 'time') return saved;
     return 'live';
   });
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [followNewest, setFollowNewest] = useState<boolean>(() => readPersistedBool('omni.followNewest', false));
+  const [followNewest, setFollowNewest] = useState<boolean>(() => readScopedBool('followNewest', mode, false));
   // What the right frame shows: the usual details, or only what the user follows.
-  const [railMode, setRailMode] = useState<'details' | 'follow'>(() => {
-    try {
-      return window.localStorage.getItem('omni.railMode') === 'follow' ? 'follow' : 'details';
-    } catch {
-      return 'details';
+  const [railMode, setRailMode] = useState<'details' | 'follow'>(
+    () => (readScopedPref('railMode', mode) === 'follow' ? 'follow' : 'details'),
+  );
+
+  // A dialog chain started at the Workspace sheet returns focus only after its last dialog
+  // closes. Settings → Privacy keeps the return pending across the hand-off; Reset closes Settings
+  // without consuming it, and the effect lands focus after the modal is actually gone.
+  useEffect(() => {
+    const anyDialogOpen = panelsOpen || settingsOpen || helpOpen || privacyOpen;
+    if (!shouldReturnDialogFocus(anyDialogOpen, workspaceReturnPending.current)) return;
+    workspaceReturnPending.current = false;
+    focusWorkspaceControl();
+  }, [panelsOpen, settingsOpen, helpOpen, privacyOpen]);
+
+  // Settings/Privacy remember their real opener. Restore it when the last dialog closes; if it was
+  // inside the Workspace sheet it has unmounted, so fall back to the Workspace control (or Chats).
+  useEffect(() => {
+    const anyDialogOpen = panelsOpen || settingsOpen || helpOpen || privacyOpen;
+    if (!shouldReturnDialogFocus(anyDialogOpen, dialogReturnPending.current)) return;
+    dialogReturnPending.current = false;
+    const target = dialogReturnTargetRef.current;
+    dialogReturnTargetRef.current = null;
+    if (
+      target &&
+      shouldRestoreDialogOpener(true, target.isConnected, target === document.body)
+    ) {
+      target.focus();
+      if (document.activeElement === target) return;
     }
-  });
+    focusWorkspaceControl();
+  }, [panelsOpen, settingsOpen, helpOpen, privacyOpen]);
+
+  // Crossing out of the compact header unmounts the sheet and its toggle. If either held focus,
+  // land on the always-present Chats control (unless a dialog/tour still owns the return).
+  useEffect(() => {
+    if (compactHeader) return;
+    setWorkspaceOpen(false);
+    const anyDialogOpen = panelsOpen || settingsOpen || helpOpen || privacyOpen;
+    if (
+      !shouldRescueWorkspaceFocus(
+        compactHeader,
+        anyDialogOpen,
+        workspaceReturnPending.current,
+        lastWorkspaceFocusRef.current,
+      )
+    ) {
+      return;
+    }
+    lastWorkspaceFocusRef.current = false;
+    chatsButtonRef.current?.focus();
+  }, [compactHeader, panelsOpen, settingsOpen, helpOpen, privacyOpen]);
 
   const setReplay = useCallback((index: number | null) => {
     replayRef.current = index;
@@ -545,8 +1009,10 @@ export default function App() {
     let retryTimer: number | undefined;
     let attempt = 0;
 
+    visitRef.current += 1;
     rootRef.current = selectedRoot;
     setEarlierExhausted(false);
+    setEarlierFailed(false);
     setLoadingEarlier(false);
     setLoading(true);
     setPlaying(false);
@@ -634,6 +1100,9 @@ export default function App() {
 
     return () => {
       closed = true;
+      // Leaving the chat ends the visit: a loadEarlier still in flight must not prepend into (or
+      // report a failure against) whatever visit comes next, including a return to this same id.
+      visitRef.current += 1;
       rootRef.current = null;
       setSocketOpen(false);
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
@@ -680,7 +1149,7 @@ export default function App() {
   }, [playing, speed, setReplay]);
 
   const visibleEvents = useMemo(
-    () => (replayIndex === null ? events : events.slice(0, replayIndex)),
+    () => (replayIndex === null ? events : events.slice(0, replayPrefixCount(replayIndex, events.length))),
     [events, replayIndex],
   );
   // Something is driving a browser or this desktop, or sweeping the disk. Find the newest such
@@ -748,20 +1217,35 @@ export default function App() {
     }
   };
 
-  // Cancel obsolete computations and bound the graph before layout.
-  const [computed, setComputed] = useState<{ fullGraph: Graph; baseGraph: Graph; graph: Graph; truncated: number }>({
-    fullGraph: { nodes: [], edges: [] }, baseGraph: { nodes: [], edges: [] },
-    graph: { nodes: [], edges: [] }, truncated: 0,
-  });
+  // Cancel obsolete computations and bound the graph before layout. Every result is tagged with
+  // the chat it belongs to: a fast switch can otherwise paint the previous chat's graph under the
+  // new title, and its nodes remain clickable until the worker catches up.
+  const [computed, setComputed] = useState<typeof EMPTY_COMPUTED>(EMPTY_COMPUTED);
+  const selectedRootRef = useRef(selectedRoot);
+  selectedRootRef.current = selectedRoot;
   useEffect(() => {
+    const root = selectedRoot;
     const worker = new Worker(new URL('./graph/graph.worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (message: MessageEvent<typeof computed>) => setComputed(message.data);
+    worker.onmessage = (message: MessageEvent<typeof computed>) => {
+      if (message.data.root !== selectedRootRef.current) return;
+      setComputed(message.data);
+    };
     const timer = window.setTimeout(() => {
-      worker.postMessage({ events: visibleEvents, expanded: [...expandedTurnIds], hideTools, hideLlms, errorsOnly });
+      worker.postMessage({
+        root,
+        events: visibleEvents,
+        expanded: [...expandedTurnIds],
+        hideTools,
+        hideLlms,
+        errorsOnly,
+      });
     }, 100);
     return () => { window.clearTimeout(timer); worker.terminate(); };
-  }, [visibleEvents, expandedTurnIds, hideTools, hideLlms, errorsOnly]);
-  const { fullGraph, baseGraph, graph, truncated } = computed;
+  }, [selectedRoot, visibleEvents, expandedTurnIds, hideTools, hideLlms, errorsOnly]);
+  // A result for another chat is not a graph for this one, even for the one render before the
+  // worker replies. This is what keeps an old chat's nodes from lingering under a new title.
+  const activeComputed = computed.root === selectedRoot ? computed : EMPTY_COMPUTED;
+  const { fullGraph, baseGraph, graph, truncated } = activeComputed;
 
   const selectedNode = useMemo(
     () => baseGraph.nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -785,7 +1269,9 @@ export default function App() {
    * first (the collapse re-run then exposes the node) and select it.
    */
   const selectNodeDeep = useCallback(
-    (nodeId: string | null) => {
+    (nodeId: string | null, options?: { focus?: boolean }) => {
+      // Any explicit node choice settles a lens selection that was waiting for the graph.
+      setPendingLensEventId(null);
       if (nodeId === null) {
         setSelectedNodeId(null);
         return;
@@ -806,7 +1292,7 @@ export default function App() {
             : null;
       if (turnId) expandTurn(turnId);
       setSelectedNodeId(nodeId);
-      setFocusToken((token) => token + 1);
+      if (options?.focus !== false) setFocusToken((token) => token + 1);
     },
     [baseGraph, expandTurn],
   );
@@ -845,12 +1331,33 @@ export default function App() {
       setSelectedEventId(eventId);
       setSelectNonce((n) => n + 1);
       setRightCollapsed(false);
-      const node = baseGraph.nodes.find((candidate) => candidate.eventIds.includes(eventId));
+      // Event ids belong to the full, unfolded graph. baseGraph has replaced a busy turn's children
+      // with one group, so looking there selected the group id that disappears on expansion.
+      const node = nodeForEvent(fullGraph.nodes, eventId);
       if (node) selectNodeDeep(node.id);
       return Boolean(node);
     },
-    [baseGraph.nodes, selectNodeDeep],
+    [fullGraph.nodes, selectNodeDeep],
   );
+
+  /**
+   * A lens moment can point forward of the current replay position. Seeking first rebuilds the
+   * graph from a longer prefix, so the node may not exist in this render yet: remember the event
+   * and select it when the worker returns the graph that contains it.
+   */
+  const onSelectLensMoment = useCallback(
+    (eventId: string) => {
+      setPendingLensEventId(onSelectEvent(eventId) ? null : eventId);
+    },
+    [onSelectEvent],
+  );
+
+  useEffect(() => {
+    if (!pendingLensEventId) return;
+    const node = nodeForEvent(fullGraph.nodes, pendingLensEventId);
+    if (!node) return;
+    selectNodeDeep(node.id);
+  }, [pendingLensEventId, fullGraph.nodes, selectNodeDeep]);
 
   const failureEventIds = useMemo(
     () =>
@@ -894,33 +1401,49 @@ export default function App() {
   const selectedSession = sessions.find((session) => session.id === selectedRoot);
   const loadEarlier = async () => {
     const root = selectedRoot;
+    const visit = visitRef.current;
     const first = eventsRef.current[0]?.rowid;
     if (!root || first === undefined || loadingEarlier) return;
     setLoadingEarlier(true);
+    setEarlierFailed(false);
     try {
-      const earlier = await fetchEvents(root, 0, first);
-      if (rootRef.current !== root) return;
-      if (earlier.length < EVENT_PAGE_SIZE) setEarlierExhausted(true);
-      appendEvents(earlier);
+      const page = await fetchEventsPage(root, 0, first);
+      // A page for a chat the user has since left — or left and come back to — belongs to an older
+      // visit. It must not prepend into this one's events, mark this one exhausted, or touch its
+      // loading state; the visit's own first page owns what this visit shows.
+      if (visitRef.current !== visit || rootRef.current !== root) return;
+      // "Another page exists" is a question about the rows the server sent, not about the rows left
+      // after normalization: a full page with one unreadable row would otherwise end the history.
+      if (page.rawCount < EVENT_PAGE_SIZE) setEarlierExhausted(true);
+      // The replay is a prefix length: move it by the steps that land in front of it, or the same
+      // number would now point at older steps (and the lens would jump backwards).
+      const prepended = countPrependedEvents(eventsRef.current, page.events);
+      appendEvents(page.events);
+      if (prepended > 0) setReplay(replayAfterPrepend(replayRef.current, prepended));
+      // A page that arrived is proof the viewer is answering again, so the first-page offline banner
+      // stops claiming it is unreachable. Only an older visit's failure was ignored above.
+      setEventsFetchFailed(false);
     } catch {
-      if (rootRef.current === root) setEventsFetchFailed(true);
+      if (visitRef.current !== visit || rootRef.current !== root) return;
+      setEarlierFailed(true);
     } finally {
-      if (rootRef.current === root) setLoadingEarlier(false);
+      // Only the visit that started this request owns the spinner: a newer visit has already set
+      // its own loading state, and an older one is gone.
+      if (visitRef.current === visit) setLoadingEarlier(false);
     }
   };
 
   const onSelectSession = (id: string) => {
     setSelectedRoot(id);
     setSessionsOpen(false);
+    // The drawer closes on a narrow window; return focus to the control that opened it rather
+    // than leaving it on a row that is now off-screen.
+    if (narrow) chatsButtonRef.current?.focus();
   };
 
-  const chooseView = (mode: ViewMode) => {
-    setView(mode);
-    try {
-      window.localStorage.setItem('omni.view', mode);
-    } catch {
-      /* storage unavailable */
-    }
+  const chooseView = (next: ViewMode) => {
+    setView(next);
+    writeScopedPref('view', mode, next);
   };
 
   const exportCsv = (choice: string) => {
@@ -938,38 +1461,57 @@ export default function App() {
   };
 
   /**
-   * Put the view back the way it started.
+   * Put the view back the way it started, for the mode on screen only.
    *
-   * Anyone can end up with every panel folded, an odd zoom, filters on and a
-   * remembered chat. This forgets the saved view settings, restores the
-   * defaults, and re-frames the map. It never touches the recording.
+   * Anyone can end up with every panel folded, an odd zoom, filters on and a remembered chat.
+   * This forgets this mode's saved view preferences, restores its defaults, and re-frames the map.
+   * It never touches the recording, and the key removal is an allow list (modePrefs.ts): only
+   * keys this mode's own view settings use are removed. Privacy choices, the API token, the chat
+   * list's sort/group/collapse, the follow list, usage windows, problem acknowledgements and the
+   * other mode's keys are deliberately left alone.
    */
   // The tour teaches the screen, so it starts from the screen's defaults: a tour that begins on a
   // layout the reader has hacked away at points at panels that are not there.
   const startTour = () => {
+    // If the sheet launched it, close the sheet first and keep focus on the control that reopens
+    // it; the Tour then has a live element to return to on Escape.
+    workspaceReturnPending.current = workspaceOpen;
+    closeWorkspace(true);
     resetView();
     setTourNonce((n) => n + 1);
   };
+  /** Tour is outside the dialog-state group; consume the sheet's return when it closes. */
+  const finishTour = () => {
+    markHelpSeen();
+    if (!workspaceReturnPending.current) return;
+    workspaceReturnPending.current = false;
+    focusWorkspaceControl();
+  };
 
   const resetView = () => {
+    // Reset the in-memory layout first; its write is then removed by the sweep below, so Reset
+    // does not leave an empty layout key behind for the preset that was on screen.
+    const resetPreset = defaultPreset(mode);
+    const empty: Overrides = { hidden: [], shown: [] };
+    prefs.reset();
     try {
       const keys: string[] = [];
       for (let i = 0; i < window.localStorage.length; i += 1) {
         const key = window.localStorage.key(i);
-        // Keep the reader's own choices that are not part of the layout: whether privacy alerts
-        // are on, and the tour having been seen. Clearing these turned alerts back on behind the
-        // Settings checkbox and left the screen showing a setting that was no longer stored.
-        if (key && key.startsWith('omni.') && key !== 'omni.tourSeen' && key !== 'omni.privacyAlerts') keys.push(key);
+        if (!key) continue;
+        if (isModePrefKey(key, mode)) keys.push(key);
       }
       for (const key of keys) window.localStorage.removeItem(key);
     } catch {
       /* storage unavailable: still reset what is on screen */
     }
-    prefs.reset();
-    setPreset('simple');
-    setCompact(embedded);
-    setLeftCollapsed(embedded);
-    setRightCollapsed(embedded);
+    // The rails are part of the layout, not a separate memory: in Simple the reset preset hides
+    // both side panels, and the rails must follow it even though the visibility did not change.
+    choosePreset(resetPreset);
+    setCompact(defaultCompact(mode, embedded));
+    writeModeCompact(mode, defaultCompact(mode, embedded));
+    setLeftCollapsed(!isVisible('chats', resetPreset, empty));
+    setRightCollapsed(!isVisible('inspector', resetPreset, empty));
     setShowTitles(true);
     setFollowNewest(false);
     setTheme('console');
@@ -983,6 +1525,7 @@ export default function App() {
     setErrorsOnly(false);
     setSessionsOpen(false);
     setSelectedNodeId(null);
+    setPendingLensEventId(null);
     setExpandedTurnIds(new Set());
     setReplay(null);
     setPlaying(false);
@@ -990,6 +1533,11 @@ export default function App() {
     setFocusToken(0);
     setResetToken((token) => token + 1);
     setSettingsOpen(false);
+  };
+  /** Reset from the header: retire the sheet that held the control before resetting the view. */
+  const resetFromHeader = () => {
+    closeWorkspace(true);
+    resetView();
   };
 
   const viewerSettings: ViewerSettings = { defaultView, compact, followNewest, showTitles, theme, showContext };
@@ -1000,16 +1548,13 @@ export default function App() {
     setShowTitles(next.showTitles);
     setTheme(next.theme);
     setShowContext(next.showContext);
-    writePersistedBool('omni.compact', next.compact);
-    writePersistedBool('omni.followNewest', next.followNewest);
-    writePersistedBool('omni.showTitles', next.showTitles);
-    writePersistedBool('omni.showContext', next.showContext);
-    try {
-      window.localStorage.setItem('omni.theme', next.theme);
-      window.localStorage.setItem('omni.defaultView', next.defaultView);
-    } catch {
-      /* storage unavailable */
-    }
+    // Every viewer setting is remembered for the mode on screen only.
+    writeModeCompact(mode, next.compact);
+    writeScopedBool('followNewest', mode, next.followNewest);
+    writeScopedBool('showTitles', mode, next.showTitles);
+    writeScopedBool('showContext', mode, next.showContext);
+    writeScopedPref('theme', mode, next.theme);
+    writeScopedPref('defaultView', mode, next.defaultView);
   };
   const toggleFullscreen = () => {
     try {
@@ -1049,22 +1594,20 @@ export default function App() {
   const modeBlurb = followNewest
     ? 'Following newest: the map jumps to whichever chat is working and keeps the newest step in view.'
     : leftCollapsed
-      ? 'Watching one chat: the list is hidden. Press all chats to see every recorded chat.'
+      ? 'Watching one chat: the list is hidden. Press Chats to see every recorded chat.'
       : 'Watching all chats: the list is open and you pick which one to follow.';
 
   if (mini) {
     const fullUrl = () => {
       const url = new URL(window.location.href);
       url.searchParams.delete('mini');
+      // The browser tab is web mode: never carry the desktop's host marker into it.
+      url.searchParams.delete('host');
       return url.toString();
     };
     const chooseMiniView = (next: MiniView) => {
       setMiniView(next);
-      try {
-        window.localStorage.setItem('omni.miniView', next);
-      } catch {
-        /* storage unavailable */
-      }
+      writeScopedPref('miniView', mode, next);
     };
     return (
       <div className="app app-mini">
@@ -1131,9 +1674,21 @@ export default function App() {
   const shortcutRef = useRef<(event: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
-    // A modal is open: the sheet traps Tab, but a click on its backdrop moves focus out of the
-    // dialog and the single-key shortcuts would then act on the page behind it.
-    if (panelsOpen || helpOpen) return;
+    // Any modal surface owns the keyboard: Settings, Privacy, Help, the insight writeup, Panels
+    // and the Tour. The DOM check closes the one-render gap after a dialog opens.
+    if (
+      shortcutsBlockedByOverlay({
+        panelsOpen,
+        helpOpen,
+        settingsOpen,
+        privacyOpen,
+        insightOpen,
+        tourActive,
+      }) ||
+      document.querySelector('[role="dialog"][aria-modal="true"], .tour-card, .tour-offer') !== null
+    ) {
+      return;
+    }
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]')) return;
     const index = ['1', '2', '3', '4', '5'].indexOf(event.key);
@@ -1141,8 +1696,8 @@ export default function App() {
     else if (event.key === '[') onPrevError();
     else if (event.key === ']') onNextError();
     else if (event.key === 'b' && !accountView && selectedRoot) prefs.toggle('briefing');
-    else if (event.key === 'p') setPanelsOpen(true);
-    else if (event.key === '?') setHelpOpen(true);
+    else if (event.key === 'p') openPanels();
+    else if (event.key === '?') openHelp();
     else return;
     event.preventDefault();
   };
@@ -1154,8 +1709,220 @@ export default function App() {
   const briefingOpen = prefs.visible('briefing');
   const warningGroups = useMemo(() => groupWarnings(warnings).length, [warnings]);
 
+  /** The build chip and the optional counts. One element, rendered in the header or the sheet. */
+  const telemetryStrip = (
+    <TelemetryStrip
+      build={build}
+      telemetryVisible={prefs.visible('telemetry')}
+      events={events.length}
+      lost={lost}
+      replayIndex={replayIndex}
+      visibleCount={visibleCount}
+      onCopyVersion={(line) => {
+        void navigator.clipboard?.writeText(line);
+        setExportNote('Version copied');
+      }}
+    />
+  );
+
+  const layout = headerLayout(compactHeader, phoneHeader);
+
+  /** Follow Newest: in the primary row at laptop widths, otherwise in the action row/sheet. */
+  const followNewestControl = (
+    <div className="mode-switch" role="group" aria-label="What you are watching">
+      <button
+        type="button"
+        className={`chip ${followNewest ? 'is-active' : ''}`}
+        aria-pressed={followNewest}
+        onClick={() => {
+          setFollowNewest((value) => {
+            writeScopedBool('followNewest', mode, !value);
+            return !value;
+          });
+        }}
+        title="Follow newest: jump to whichever chat is working right now and keep the newest step in view."
+      >
+        {followNewest ? '● Following' : 'Follow Newest'}
+      </button>
+    </div>
+  );
+
+  /** Timeline/Links: the map style belongs beside the map views it changes. */
+  const mapStyleControl = (
+    <span className="map-style" role="group" aria-label="How to draw this chat">
+      <button
+        type="button"
+        className={`chip${linkView ? '' : ' is-on'}`}
+        aria-pressed={!linkView}
+        onClick={() => chooseMapStyle(false)}
+        title="Timeline: steps left to right, in the order they happened."
+      >
+        Timeline
+      </button>
+      <button
+        type="button"
+        className={`chip${linkView ? ' is-on' : ''}`}
+        aria-pressed={linkView}
+        onClick={() => chooseMapStyle(true)}
+        title="Links: the same steps as a web, arranged by what led to what."
+      >
+        Links
+      </button>
+    </span>
+  );
+
+  /**
+   * The secondary header controls, in one place because they render in two arrangements: the
+   * inline action row on a wide window, and the Workspace sheet on a narrow one. Moving a control
+   * between those two containers must not change what it does, so both use this same fragment.
+   */
+  const headerActions = (
+    <>
+      {layout.quickControlsInline ? null : followNewestControl}
+      {embedded ? (
+        <a
+          className="popout-link"
+          // A browser tab is web mode: drop the desktop's explicit host marker.
+          href={withoutHostMarker(window.location.href)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open this view in your web browser for more room."
+          onClick={(event) => {
+            // Hermes desktop blocks new windows from embedded pages; ask the host page instead.
+            try {
+              window.parent.postMessage(
+                { type: 'omniscience:open-external', url: withoutHostMarker(window.location.href) },
+                '*',
+              );
+              event.preventDefault();
+            } catch {
+              /* fall back to the plain link */
+            }
+          }}
+        >
+          Open in Browser ↗
+        </a>
+      ) : null}
+      {embedded ? (
+        <button
+          type="button"
+          className="chip"
+          onClick={() => {
+            try {
+              window.parent.postMessage({ type: 'omniscience:toggle-pane' }, '*');
+            } catch {
+              /* not inside Hermes */
+            }
+          }}
+          title="Send a mini Omniscience to the right-hand side panel (next to your chat): pick any chat and switch between Live, Context, Tools, Tokens and Time there. Click again to close it."
+        >
+          ⇥ Side panel
+        </button>
+      ) : null}
+      {layout.showResetIcon ? (
+        <button
+          type="button"
+          className="icon-button"
+          onClick={resetFromHeader}
+          title="Reset view: put the panels, zoom, filters and view back the way they started. Nothing is deleted."
+          aria-label="Reset view"
+        >
+          ↺
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="icon-button"
+        onClick={toggleFullscreen}
+        title="Maximize: show only Omniscience, full screen (Esc to leave)."
+        aria-label="Maximize"
+      >
+        ⛶
+      </button>
+      <button
+        type="button"
+        className={`chip mini-chip ${railMode === 'follow' ? 'is-active' : ''}`}
+        aria-pressed={railMode === 'follow'}
+        aria-label={railMode === 'follow' ? 'Close the mini panel' : 'Open the mini panel'}
+        onClick={() => {
+          const next = railMode === 'follow' ? 'details' : 'follow';
+          setRailMode(next);
+          writeScopedPref('railMode', mode, next);
+          if (next === 'follow') setInspectorShown(true);
+        }}
+        title="Mini panel: a small frame on the right that shows only what you chose to watch in your chats. Add or remove items with its edit button."
+      >
+        <span className="mini-glyph" aria-hidden="true">
+          ⬒
+        </span>
+        <span className="mini-label">Mini Panel</span>
+      </button>
+      <button
+        type="button"
+        className="chip panels-button"
+        data-tour={layout.panelsTourAnchor === 'panels' ? 'panels' : undefined}
+        aria-haspopup="dialog"
+        aria-expanded={panelsOpen}
+        onClick={openPanels}
+        title="Panels: show, hide and resize any panel, switch between Simple, Standard and Everything, or reset the layout."
+      >
+        <span aria-hidden="true">⊞</span> Panels
+      </button>
+      {layout.showResetChip ? (
+        <button
+          type="button"
+          className="chip reset-view-chip"
+          onClick={resetFromHeader}
+          title="Reset View: back to how Omniscience first opens. Recordings are not touched."
+        >
+          <span aria-hidden="true">↺</span> Reset View
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="chip tour-chip"
+        onClick={startTour}
+        title="Take the Tour: five stops, about thirty seconds."
+      >
+        <span aria-hidden="true">◎</span> Tour
+      </button>
+      {!layout.quickControlsInline && view === 'graph' && !accountView ? mapStyleControl : null}
+      {!accountView && !prefs.visible('context') ? (
+        <button
+          type="button"
+          className="chip restore-chart-chip"
+          onClick={() => prefs.toggle('context')}
+          title="Bring back the Tokens per call chart you closed."
+        >
+          <span aria-hidden="true">▤</span> Tokens chart
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="icon-button"
+        onClick={openSettings}
+        title="Settings: views, compact text, chat titles, recording and privacy."
+        aria-label="Settings"
+      >
+        ⚙
+      </button>
+      <MenuButton label="Help" icon="?" tip="Help: a guided explanation, or a short tour of the screen." align="end">
+        <MenuItem onSelect={openHelp} hint="What every box, colour and number means.">
+          What Am I Looking At?
+        </MenuItem>
+        <MenuItem onSelect={startTour} hint="Five stops, about 30 seconds. Resets the layout to its defaults first.">
+          Take the Tour
+        </MenuItem>
+      </MenuButton>
+    </>
+  );
+
   return (
-    <div className={`app ${compact ? 'is-compact' : ''} preset-${preset} ${accountView ? 'is-account' : ''}${riskActive ? ' is-privacy' : ''}`}>
+    <PrefScopeProvider mode={mode}>
+    <div
+      className={`app mode-${mode} ${compact ? 'is-compact' : ''} preset-${preset} ${accountView ? 'is-account' : ''}${riskActive ? ' is-privacy' : ''}`}
+      data-mode={mode}
+    >
       {riskActive ? <div className="privacy-glow" aria-hidden="true" /> : null}
       {stopNote ? (
         <div className="privacy-note-toast" role="status">
@@ -1165,7 +1932,10 @@ export default function App() {
           </button>
         </div>
       ) : null}
-      <HelpPanel open={helpOpen} onClose={closeHelp} />
+      <HelpPanel
+        open={helpOpen}
+        onClose={closeHelp}
+      />
       <InsightPanel open={insightOpen} onClose={() => setInsightOpen(false)} />
       <SettingsPanel
         open={settingsOpen}
@@ -1183,33 +1953,42 @@ export default function App() {
         open={panelsOpen}
         onClose={() => setPanelsOpen(false)}
         preset={preset}
-        onPreset={setPreset}
+        onPreset={choosePreset}
         prefs={prefs}
       />
-      <Tour forceStart={tourNonce} onClose={markHelpSeen} />
+      <Tour forceStart={tourNonce} onClose={finishTour} onActiveChange={setTourActive} />
       <TipLayer extra={guide.tips} />
 
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">
-            <Seal size={30} />
-          </span>
-          <span className="brand-name">OMNISCIENCE</span>
-          <span className="brand-sub">Every run, made legible</span>
-          <span className={`brand-status${followNewest ? ' is-following' : ''}`} title={modeBlurb}>
-            · {modeLabel}
-          </span>
-          <button
-            type="button"
-            className="sessions-toggle"
-            aria-expanded={sessionsOpen}
-            onClick={() => setSessionsOpen((value) => !value)}
-            title="Show/hide the conversation list."
-          >
-            Sessions
-          </button>
+      <header className={`topbar${compactHeader ? ' is-compact-header' : ''}`}>
+        <div className="topbar-main">
+          <div className="brand">
+            <span className="brand-mark">
+              <Seal size={52} />
+            </span>
+            <span className="brand-name">OMNISCIENCE</span>
+            <span className="brand-sub">Every run, made legible</span>
+            <span className={`brand-status${followNewest ? ' is-following' : ''}`} title={modeBlurb}>
+              · {modeLabel}
+            </span>
+          </div>
+          <div className="topbar-primary" role="group" aria-label="Primary controls">
+            <ChatsButton
+              open={chatsOpen}
+              // A failed sessions request is unknown, not zero: do not label it as no chats.
+              count={sessionsLoading || sessionsError !== null ? null : sessions.length}
+              onToggle={toggleChats}
+              buttonRef={chatsButtonRef}
+            />
+            <ModeSwitch mode={mode} onChange={chooseMode} />
+            {layout.quickControlsInline ? (
+              <>
+                {followNewestControl}
+                {view === 'graph' && !accountView ? mapStyleControl : null}
+              </>
+            ) : null}
+          </div>
         </div>
-        <div className="top-metrics">
+        <div className="topbar-status">
           <span
             className={`live-badge is-${connection}`}
             title={`${connectionText.tooltip}${ageText ? ` Last event ${ageText}.` : ''}`}
@@ -1218,200 +1997,54 @@ export default function App() {
             {connectionText.label}
             {ageText ? <span className="live-age">· {ageText}</span> : null}
           </span>
-          <TelemetryStrip
-            build={build}
-            telemetryVisible={prefs.visible('telemetry')}
-            events={events.length}
-            lost={lost}
-            replayIndex={replayIndex}
-            visibleCount={visibleCount}
-            onCopyVersion={(line) => {
-              void navigator.clipboard?.writeText(line);
-              setExportNote('Version copied');
-            }}
-          />
-          {/* The two ways to change what you are watching, side by side where they can be found. */}
-          <div className="mode-switch" role="group" aria-label="What you are watching">
+          {compactHeader ? null : telemetryStrip}
+          {compactHeader ? (
             <button
+              ref={workspaceButtonRef}
               type="button"
-              className={`chip ${followNewest ? 'is-active' : ''}`}
-              aria-pressed={followNewest}
-              onClick={() => {
-                setFollowNewest((value) => {
-                  writePersistedBool('omni.followNewest', !value);
-                  return !value;
-                });
-              }}
-              title="Follow newest: jump to whichever chat is working right now and keep the newest step in view."
+              className={`chip workspace-toggle${workspaceOpen ? ' is-active' : ''}`}
+              data-tour={layout.panelsTourAnchor === 'workspace' ? 'panels' : undefined}
+              aria-expanded={workspaceOpen}
+              aria-controls="workspace-controls"
+              onClick={() => setWorkspaceOpen((open) => !open)}
+              title="Workspace controls: follow newest, the mini panel, panels, reset, tour, map style, settings and help — all kept at full size."
             >
-              {followNewest ? '● Following' : 'Follow Newest'}
-            </button>
-            <button
-              type="button"
-              className={`all-chats ${leftCollapsed ? '' : 'is-active'}`}
-              aria-expanded={!leftCollapsed}
-              onClick={() => {
-                setChatsShown(leftCollapsed);
-                setSessionsOpen((value) => !value);
-              }}
-              title="Show every recorded chat, not just this one."
-            >
-              {leftCollapsed ? '⤢ All Chats' : '⤡ This Chat Only'}
-            </button>
-          </div>
-          {embedded ? (
-            <a
-              className="popout-link"
-              href={window.location.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open this view in your web browser for more room."
-              onClick={(event) => {
-                // Hermes desktop blocks new windows from embedded pages; ask the host page instead.
-                try {
-                  window.parent.postMessage({ type: 'omniscience:open-external', url: window.location.href }, '*');
-                  event.preventDefault();
-                } catch {
-                  /* fall back to the plain link */
-                }
-              }}
-            >
-              Open in Browser ↗
-            </a>
-          ) : null}
-          {embedded ? (
-            <button
-              type="button"
-              className="chip"
-              onClick={() => {
-                try {
-                  window.parent.postMessage({ type: 'omniscience:toggle-pane' }, '*');
-                } catch {
-                  /* not inside Hermes */
-                }
-              }}
-              title="Send a mini Omniscience to the right-hand side panel (next to your chat): pick any chat and switch between Live, Context, Tools, Tokens and Time there. Click again to close it."
-            >
-              ⇥ Side panel
+              <span aria-hidden="true">⌘</span> Workspace
             </button>
           ) : null}
-          <button
-            type="button"
-            className="icon-button"
-            onClick={resetView}
-            title="Reset view: put the panels, zoom, filters and view back the way they started. Nothing is deleted."
-            aria-label="Reset view"
-          >
-            ↺
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={toggleFullscreen}
-            title="Maximize: show only Omniscience, full screen (Esc to leave)."
-            aria-label="Maximize"
-          >
-            ⛶
-          </button>
-          <button
-            type="button"
-            className={`chip mini-chip ${railMode === 'follow' ? 'is-active' : ''}`}
-            aria-pressed={railMode === 'follow'}
-            aria-label={railMode === 'follow' ? 'Close the mini panel' : 'Open the mini panel'}
-            onClick={() => {
-              const next = railMode === 'follow' ? 'details' : 'follow';
-              setRailMode(next);
-              try {
-                window.localStorage.setItem('omni.railMode', next);
-              } catch {
-                /* storage unavailable */
-              }
-              if (next === 'follow') setInspectorShown(true);
-            }}
-            title="Mini panel: a small frame on the right that shows only what you chose to watch in your chats. Add or remove items with its edit button."
-          >
-            <span className="mini-glyph" aria-hidden="true">
-              ⬒
-            </span>
-            <span className="mini-label">Mini Panel</span>
-          </button>
-          <button
-            type="button"
-            className="chip panels-button"
-            data-tour="panels"
-            aria-haspopup="dialog"
-            aria-expanded={panelsOpen}
-            onClick={() => setPanelsOpen(true)}
-            title="Panels: show, hide and resize any panel, switch between Simple, Standard and Everything, or reset the layout."
-          >
-            <span aria-hidden="true">⊞</span> Panels
-          </button>
-          <button
-            type="button"
-            className="chip reset-view-chip"
-            onClick={resetView}
-            title="Reset View: back to how Omniscience first opens. Recordings are not touched."
-          >
-            <span aria-hidden="true">↺</span> Reset View
-          </button>
-          <button
-            type="button"
-            className="chip tour-chip"
-            onClick={startTour}
-            title="Take the Tour: five stops, about thirty seconds."
-          >
-            <span aria-hidden="true">◎</span> Tour
-          </button>
-          {view === 'graph' && !accountView ? (
-            <span className="map-style" role="group" aria-label="How to draw this chat">
-              <button
-                type="button"
-                className={`chip${linkView ? '' : ' is-on'}`}
-                aria-pressed={!linkView}
-                onClick={() => chooseMapStyle(false)}
-                title="Timeline: steps left to right, in the order they happened."
-              >
-                Timeline
-              </button>
-              <button
-                type="button"
-                className={`chip${linkView ? ' is-on' : ''}`}
-                aria-pressed={linkView}
-                onClick={() => chooseMapStyle(true)}
-                title="Links: the same steps as a web, arranged by what led to what."
-              >
-                Links
-              </button>
-            </span>
-          ) : null}
-          {!accountView && !prefs.visible('context') ? (
-            <button
-              type="button"
-              className="chip restore-chart-chip"
-              onClick={() => prefs.toggle('context')}
-              title="Bring back the Tokens per call chart you closed."
-            >
-              <span aria-hidden="true">▤</span> Tokens chart
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="icon-button"
-            onClick={() => setSettingsOpen(true)}
-            title="Settings: views, compact text, chat titles, recording and privacy."
-            aria-label="Settings"
-          >
-            ⚙
-          </button>
-          <MenuButton label="Help" icon="?" tip="Help: a guided explanation, or a short tour of the screen." align="end">
-            <MenuItem onSelect={() => setHelpOpen(true)} hint="What every box, colour and number means.">
-              What Am I Looking At?
-            </MenuItem>
-            <MenuItem onSelect={startTour} hint="Five stops, about 30 seconds. Resets the layout to its defaults first.">
-              Take the Tour
-            </MenuItem>
-          </MenuButton>
         </div>
+        {compactHeader ? (
+          workspaceOpen ? (
+            <div
+              id="workspace-controls"
+              ref={workspaceSheetRef}
+              className="workspace-sheet"
+              role="region"
+              aria-label="Workspace controls"
+            >
+              <div className="workspace-sheet-head">
+                <span className="workspace-sheet-title">Workspace</span>
+                <button
+                  ref={workspaceCloseRef}
+                  type="button"
+                  className="workspace-close"
+                  aria-label="Close workspace controls"
+                  onClick={() => closeWorkspace()}
+                >
+                  ✕
+                </button>
+              </div>
+              {telemetryStrip}
+              <div className="workspace-actions" role="group" aria-label="Workspace actions">
+                {headerActions}
+              </div>
+            </div>
+          ) : null
+        ) : (
+          <div className="topbar-actions" role="group" aria-label="Workspace controls">
+            {headerActions}
+          </div>
+        )}
       </header>
 
       <main
@@ -1419,10 +2052,19 @@ export default function App() {
       >
         <div
           className={`rail-backdrop ${sessionsOpen ? 'is-open' : ''}`}
-          onClick={() => setSessionsOpen(false)}
+          onClick={() => {
+            setSessionsOpen(false);
+            chatsButtonRef.current?.focus();
+          }}
         />
         <aside
-          data-tour="chats"
+          id="chats-panel"
+          ref={chatsPanelRef}
+          aria-label="Chats"
+          // At drawer widths the closed list is not just off-screen: it is out of the tab order
+          // and the accessibility tree. The attribute is inert on wide windows, where it is a
+          // visible column and `hidden` is false.
+          hidden={narrow && !chatsOpen}
           data-panel="chats"
           className={`rail-left ${sessionsOpen ? 'is-open' : ''} ${leftCollapsed ? 'is-collapsed' : ''}`}
         >
@@ -1437,12 +2079,29 @@ export default function App() {
               Chats ›
             </button>
           ) : null}
+          {/* A drawer needs a label and a Close of its own; the 20 px corner chevron reads as
+              "expand" at drawer widths. Hidden on wide windows, where the column is obvious. */}
+          <div className="chats-drawer-head">
+            <span className="chats-drawer-title">Chats</span>
+            <button
+              ref={chatsCloseRef}
+              type="button"
+              className="chats-close"
+              aria-label="Close chats"
+              onClick={() => {
+                closeChats();
+                chatsButtonRef.current?.focus();
+              }}
+            >
+              ✕
+            </button>
+          </div>
           <div className="rail-content">
             <button
               type="button"
               className="rail-collapse"
               aria-label="Hide conversation list"
-              onClick={() => setChatsShown(false)}
+              onClick={() => closeChats()}
             >
               ‹
             </button>
@@ -1489,16 +2148,11 @@ export default function App() {
                   className={`chip more-views ${MORE_VIEWS.some(([m]) => m === view) ? 'is-active' : ''}`}
                   value={MORE_VIEWS.some(([m]) => m === view) ? view : ''}
                   onChange={(event) => {
-                    const mode = event.target.value as ViewMode;
-                    if (!mode) return;
-                    setView(mode);
-                    try {
-                      window.localStorage.setItem('omni.view', mode);
-                    } catch {
-                      /* storage unavailable */
-                    }
+                    const next = event.target.value as ViewMode;
+                    if (!next) return;
+                    chooseView(next);
                   }}
-                  title="More views: flame, tools, context growth, helper agents, recording coverage."
+                  title="More views: the run lens, flame, tools, context growth, helper agents, recording coverage."
                   aria-label="More views"
                 >
                   <option value="">More Views ▾</option>
@@ -1532,7 +2186,7 @@ export default function App() {
                   }
                   onFlag={() => void flagChat()}
                   onIgnore={() => dismissPrivacy(privacy.id)}
-                  onOpenSettings={() => setSettingsOpen(true)}
+                  onOpenSettings={openSettings}
                   onDismiss={() => dismissPrivacy(privacy.id)}
                 />
               ) : null}
@@ -1564,10 +2218,10 @@ export default function App() {
                 <MenuItem disabled={!selectedRoot} onSelect={() => exportCsv('models:chat')}>Per Model, This Chat</MenuItem>
                 <MenuItem onSelect={() => exportCsv('models:all')}>Per Model, All Chats</MenuItem>
                 <MenuSep />
-                <MenuItem onSelect={() => setPanelsOpen(true)} hint="Show, hide and resize panels; switch Simple, Standard, Everything.">
+                <MenuItem onSelect={openPanels} hint="Show, hide and resize panels; switch Simple, Standard, Everything.">
                   Panels…
                 </MenuItem>
-                <MenuItem onSelect={resetView} hint="Back to how Omniscience first opens. Recordings are not touched.">
+                <MenuItem onSelect={resetFromHeader} hint="Back to how Omniscience first opens. Recordings are not touched.">
                   ↺ Reset View
                 </MenuItem>
               </MenuButton>
@@ -1581,11 +2235,22 @@ export default function App() {
 
           {!accountView && selectedRoot && !loading && !earlierExhausted && events.length > 0 &&
             (selectedSession?.events ?? 0) > events.length ? (
-            <div className="stage-window-note" style={{ position: 'static' }}>
-              Showing {events.length.toLocaleString()} recent recorded events; earlier activity is not loaded.{' '}
-              <button type="button" onClick={() => void loadEarlier()} disabled={loadingEarlier}>
-                {loadingEarlier ? 'Loading…' : 'Load earlier activity'}
-              </button>
+            <div className="stage-window-note is-actionable" style={{ position: 'static' }} role="status">
+              {earlierFailed ? (
+                <>
+                  Couldn't load earlier activity. Nothing was lost, and live updates keep arriving.{' '}
+                  <button type="button" onClick={() => void loadEarlier()} disabled={loadingEarlier}>
+                    {loadingEarlier ? 'Loading…' : 'Try again'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  Showing {events.length.toLocaleString()} recent recorded events; earlier activity is not loaded.{' '}
+                  <button type="button" onClick={() => void loadEarlier()} disabled={loadingEarlier}>
+                    {loadingEarlier ? 'Loading…' : 'Load earlier activity'}
+                  </button>
+                </>
+              )}
             </div>
           ) : null}
           {staleBuild ? (
@@ -1789,9 +2454,26 @@ export default function App() {
             <div className="graph-surface tv-surface">
               <TimeView events={visibleEvents} nowTs={nowSec} onSelectEvent={onSelectEvent} />
             </div>
+          ) : view === 'lens' ? (
+            // The lens reads the whole loaded recording, not the replay prefix: a later moment is
+            // still a recorded moment, and selecting it moves replay forward instead of pretending
+            // it does not exist. The replay prefix is passed in and shown as a cursor.
+            <div className="graph-surface lens-surface">
+              <RunLens
+                events={events}
+                replayIndex={replayIndex}
+                selectedEventId={selectedEventId}
+                loading={loading}
+                hasChat={Boolean(selectedRoot)}
+                partial={(selectedSession?.events ?? 0) > events.length}
+                onSeek={onIndex}
+                onSelectEvent={onSelectLensMoment}
+              />
+            </div>
           ) : (
             <div className="graph-surface" data-tour="map">
               <GraphView
+                key={selectedRoot ?? 'none'}
                 graph={graph}
                 linkView={linkView}
                 selectedId={selectedNodeId}
@@ -1840,7 +2522,13 @@ export default function App() {
               className="rail-expand"
               aria-label="Show details"
               aria-expanded={false}
-              onClick={() => setInspectorShown(true)}
+              onClick={() => {
+                // This control promises details. If the rail was left in mini/follow mode, switch
+                // back so Inspect/Warnings/Why and the Slowest list are actually available.
+                setRailMode('details');
+                writeScopedPref('railMode', mode, 'details');
+                setInspectorShown(true);
+              }}
             >
               ‹ Details
             </button>
@@ -1969,5 +2657,6 @@ export default function App() {
         />
       ) : null}
     </div>
+    </PrefScopeProvider>
   );
 }

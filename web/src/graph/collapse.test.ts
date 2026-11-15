@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collapseBusyTurns, COLLAPSE_THRESHOLD, groupMembers } from './collapse';
+import { collapseBusyTurns, COLLAPSE_THRESHOLD, groupMembers, markExpandedTurns } from './collapse';
 import { makeEvent } from '../test-fixtures/streams';
 import { reduce, type GNode, type Graph } from './reduce';
 
@@ -43,6 +43,30 @@ function nodeById(graph: Graph, id: string): GNode {
   const node = graph.nodes.find((candidate) => candidate.id === id);
   if (!node) throw new Error(`missing node ${id}`);
   return node;
+}
+
+function graphWithBusyAndSmallTurn(): Graph {
+  const events = [makeEvent(1, 'session.start')];
+  let rowid = 2;
+  for (let index = 0; index < 2; index += 1) {
+    events.push(makeEvent(rowid++, 'llm.request', { turn_id: 't1', api_request_id: `r${index}` }));
+    events.push(makeEvent(rowid++, 'llm.response', { turn_id: 't1', api_request_id: `r${index}` }));
+  }
+  for (let index = 0; index < 8; index += 1) {
+    events.push(
+      makeEvent(rowid++, 'tool.end', {
+        turn_id: 't1',
+        api_request_id: 'r0',
+        tool_call_id: `c-${index}`,
+        event_id: `evt-${index}`,
+        attrs: { tool_name: 'grep' },
+      }),
+    );
+  }
+  events.push(makeEvent(rowid++, 'turn.start', { turn_id: 't2' }));
+  events.push(makeEvent(rowid++, 'llm.request', { turn_id: 't2', api_request_id: 'r2' }));
+  events.push(makeEvent(rowid++, 'llm.response', { turn_id: 't2', api_request_id: 'r2' }));
+  return reduce(events);
 }
 
 
@@ -176,5 +200,50 @@ describe('collapseBusyTurns', () => {
     const unique = new Set(groupEdges.map((edge) => edge.id));
     expect(unique.size).toBe(groupEdges.length);
     expect(groupEdges.length).toBeGreaterThan(0);
+  });
+
+  it('marks an expanded turn so the canvas can offer Fold', () => {
+    const graph = graphWithBusyTurn(2, 20);
+    const expanded = collapseBusyTurns(graph, new Set(['t1']));
+    const turn = nodeById(expanded, 'turn:t1');
+    expect(turn.data.expanded).toBe(true);
+    expect(expanded.nodes.some((node) => node.type === 'group')).toBe(false);
+    expect(expanded.nodes.filter((node) => node.type === 'tool')).toHaveLength(20);
+  });
+
+  it('accepts both raw and prefixed turn ids when marking expanded', () => {
+    const graph = graphWithBusyTurn(2, 20);
+    expect(nodeById(markExpandedTurns(graph, new Set(['turn:t1'])), 'turn:t1').data.expanded).toBe(true);
+    expect(nodeById(markExpandedTurns(graph, new Set(['t1'])), 'turn:t1').data.expanded).toBe(true);
+  });
+
+  it('clears the expanded marker when the turn folds', () => {
+    const graph = graphWithBusyTurn(2, 20);
+    const expanded = collapseBusyTurns(graph, new Set(['t1']));
+    expect(nodeById(expanded, 'turn:t1').data.expanded).toBe(true);
+    const folded = collapseBusyTurns(expanded);
+    expect(folded.nodes.some((node) => node.id === 'group:turn:t1')).toBe(true);
+    expect(nodeById(folded, 'turn:t1').data.expanded).not.toBe(true);
+  });
+
+  it('marking expanded does not mutate the graph', () => {
+    const graph = graphWithBusyTurn(2, 20);
+    const snapshot = structuredClone(graph);
+    markExpandedTurns(graph, new Set(['t1']));
+    expect(graph).toEqual(snapshot);
+  });
+
+  it('does not mark a small turn as expanded, even when its id is requested', () => {
+    const graph = graphWithBusyAndSmallTurn();
+    const marked = collapseBusyTurns(graph, new Set(['t1', 't2']));
+    expect(nodeById(marked, 'turn:t1').data.expanded).toBe(true);
+    expect(nodeById(marked, 'turn:t2').data.expanded).not.toBe(true);
+  });
+
+  it('marks every expanded busy turn, not just the first', () => {
+    const graph = graphWithBusyAndSmallTurn();
+    const marked = markExpandedTurns(graph, new Set(['t1', 't2']), new Set(['t1', 't2']));
+    expect(nodeById(marked, 'turn:t1').data.expanded).toBe(true);
+    expect(nodeById(marked, 'turn:t2').data.expanded).toBe(true);
   });
 });

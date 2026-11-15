@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { UsageReport } from '../types';
+import type { UsageChat, UsageReport } from '../types';
 import { fetchUsage } from '../api';
 import { CancelledError, withRetry } from '../graph/retry';
 import { Tip } from './Tip';
@@ -76,6 +76,72 @@ function Stat({
         <span className="us-stat-value" title={exact}>{value}</span>
       </div>
     </Tip>
+  );
+}
+
+/**
+ * One chat in the ranking. The first cell holds a real button, which is the single keyboard
+ * stop; the row itself stays the mouse target. The button stops its click from bubbling so the
+ * chat opens exactly once, whichever way it was activated.
+ */
+export function ChatRow({
+  chat,
+  onOpenChat,
+}: {
+  chat: UsageChat;
+  onOpenChat: (sessionId: string) => void;
+}) {
+  const open = () => onOpenChat(chat.id);
+  return (
+    <tr className="us-chatrow" onClick={open}>
+      <td title={chat.id}>
+        <button
+          type="button"
+          aria-label={`Open chat ${chat.id}`}
+          // A button, not a link: the reset keeps the row's own type and colours.
+          style={{
+            font: 'inherit',
+            color: 'inherit',
+            background: 'none',
+            border: 0,
+            padding: 0,
+            margin: 0,
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+          onClick={(e) => {
+            // The row opens the same chat; do not run the action twice.
+            e.stopPropagation();
+            open();
+          }}
+          onKeyDown={(e) => {
+            // A real button already clicks on Enter and Space. A held key or a shortcut
+            // combination is not ours: a repeat would open the chat again, and
+            // Ctrl/Cmd/Alt+Enter belongs to whatever else is listening.
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) e.preventDefault();
+          }}
+        >
+          {chat.id.slice(0, 18)}…
+        </button>
+      </td>
+      <td className="us-num">{chat.cost === null ? '—' : usd(chat.cost)}</td>
+      <td className="us-num">{exactNum(chat.calls)}</td>
+      <td className="us-num" title={exactNum(chat.prompt_now)}>
+        {compactNum(chat.prompt_now)}
+      </td>
+      <td className="us-num" title={exactNum(chat.prompt_max)}>
+        {compactNum(chat.prompt_max)}
+      </td>
+      <td className="us-num">{exactNum(chat.tools)}</td>
+      <td className="us-num">{secs(chat.p95_s)}</td>
+      <td className="us-num">
+        {new Date(chat.last_ts * 1000).toLocaleTimeString(undefined, {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </td>
+    </tr>
   );
 }
 
@@ -647,25 +713,7 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
                 </thead>
                 <tbody>
                   {report.chats.slice(0, 15).map((chat) => (
-                    <tr key={chat.id} onClick={() => onOpenChat(chat.id)} className="us-chatrow">
-                      <td title={chat.id}>{chat.id.slice(0, 18)}…</td>
-                      <td className="us-num">{chat.cost === null ? '—' : usd(chat.cost)}</td>
-                      <td className="us-num">{exactNum(chat.calls)}</td>
-                      <td className="us-num" title={exactNum(chat.prompt_now)}>
-                        {compactNum(chat.prompt_now)}
-                      </td>
-                      <td className="us-num" title={exactNum(chat.prompt_max)}>
-                        {compactNum(chat.prompt_max)}
-                      </td>
-                      <td className="us-num">{exactNum(chat.tools)}</td>
-                      <td className="us-num">{secs(chat.p95_s)}</td>
-                      <td className="us-num">
-                        {new Date(chat.last_ts * 1000).toLocaleTimeString(undefined, {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                    </tr>
+                    <ChatRow key={chat.id} chat={chat} onOpenChat={onOpenChat} />
                   ))}
                 </tbody>
               </table>

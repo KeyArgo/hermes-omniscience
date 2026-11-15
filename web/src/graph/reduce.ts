@@ -53,12 +53,12 @@ export interface Graph {
 }
 
 export const NODE_SIZE: Record<GNodeType, { width: number; height: number }> = {
-  session: { width: 224, height: 78 },
-  turn: { width: 184, height: 66 },
-  llm: { width: 208, height: 92 },
-  tool: { width: 184, height: 66 },
-  gap: { width: 168, height: 52 },
-  group: { width: 216, height: 66 },
+  session: { width: 260, height: 96 },
+  turn: { width: 220, height: 84 },
+  llm: { width: 244, height: 112 },
+  tool: { width: 220, height: 84 },
+  gap: { width: 200, height: 60 },
+  group: { width: 252, height: 84 },
 };
 
 const MISSING = '—';

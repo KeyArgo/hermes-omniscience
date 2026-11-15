@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import {
+  EVENT_PAGE_SIZE,
   fetchDiagnose,
+  fetchEvents,
+  fetchEventsPage,
   fetchWarnings,
   getPrefs,
   setPrefs,
@@ -266,6 +269,99 @@ describe('fetchWarnings', () => {
           session_id: 's1',
         },
       ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('fetchEventsPage', () => {
+  const row = (rowid: number) => ({
+    rowid,
+    event_id: `evt-${rowid}`,
+    schema: 'omni.v1',
+    boot_id: 'boot',
+    seq: rowid,
+    ts: 1762400000 + rowid,
+    kind: 'llm.request',
+  });
+
+  it('reports the rows the server sent, not only the ones it could read', async () => {
+    // A page is full when the server had EVENT_PAGE_SIZE rows to give, even though one of them is
+    // unreadable. Counting the survivors would call this the end of the chat's history.
+    const rows = Array.from({ length: EVENT_PAGE_SIZE }, (_, index) => row(index + 1));
+    // Late in the page, so normalization cannot be accused of only dropping a leading row.
+    rows[EVENT_PAGE_SIZE - 1] = { ...rows[EVENT_PAGE_SIZE - 1], event_id: '' };
+    const fetchMock = vi.fn(async (_input: string) => ({ ok: true, json: async () => rows }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const page = await fetchEventsPage('root-1', 0, 5000);
+      expect(page.rawCount).toBe(EVENT_PAGE_SIZE);
+      expect(page.events).toHaveLength(EVENT_PAGE_SIZE - 1);
+      expect(page.events.at(-1)?.rowid).toBe(EVENT_PAGE_SIZE - 1);
+      // The page window and the page size are still the ones the caller asked for.
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(url).toContain('root=root-1');
+      expect(url).toContain('after=0');
+      expect(url).toContain('before=5000');
+      expect(url).toContain(`limit=${EVENT_PAGE_SIZE}`);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('counts rows it cannot even treat as objects', async () => {
+    const rows = [row(3), null, 'not a row', row(1), { event_id: 'no-rowid' }];
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => rows })));
+    try {
+      const page = await fetchEventsPage('root-1');
+      expect(page.rawCount).toBe(5);
+      // Readable rows come back sorted, so a prepend can rely on the order.
+      expect(page.events.map((event) => event.rowid)).toEqual([1, 3]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('accepts a short page as the last one and an empty chat as no page at all', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => [row(1), row(2)] })),
+    );
+    try {
+      const page = await fetchEventsPage('root-1', 0, 2);
+      expect(page.rawCount).toBe(2);
+      expect(page.events).toHaveLength(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    try {
+      expect(await fetchEventsPage('root-1')).toEqual({ events: [], rawCount: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps fetchEvents as the normalized rows alone', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => [row(2), row(1)] })),
+    );
+    try {
+      expect((await fetchEvents('root-1')).map((event) => event.rowid)).toEqual([1, 2]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('throws on a viewer error instead of reporting an empty page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' })),
+    );
+    try {
+      await expect(fetchEventsPage('root-1')).rejects.toThrow('503');
     } finally {
       vi.unstubAllGlobals();
     }

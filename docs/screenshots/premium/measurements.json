@@ -1,0 +1,2119 @@
+{
+  "hermes-console-400": {
+    "headerHeight": 125,
+    "stage": "400x628",
+    "graph": {
+      "visible": 411,
+      "surface": 411,
+      "top": 342,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 329,
+      "chipsScroll": 978,
+      "scrollableControls": 7
+    },
+    "controls": 27,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 20,
+        "width": 170,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 18,
+        "width": 83,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 220,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-console-700": {
+    "headerHeight": 129,
+    "stage": "700x624",
+    "graph": {
+      "visible": 455,
+      "surface": 455,
+      "top": 298,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 544,
+      "chipsScroll": 978,
+      "scrollableControls": 5
+    },
+    "controls": 27,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 21,
+        "width": 171,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 19,
+        "width": 89,
+        "height": 46
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 520,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-console-900": {
+    "headerHeight": 141,
+    "stage": "852x650",
+    "graph": {
+      "visible": 455,
+      "surface": 455,
+      "top": 336,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 654,
+      "chipsScroll": 1088,
+      "scrollableControls": 4
+    },
+    "controls": 28,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 400,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-console-1280": {
+    "headerHeight": 145,
+    "stage": "1184x646",
+    "graph": {
+      "visible": 427,
+      "surface": 427,
+      "top": 364,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 5,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "turnokMessage 11 · 18:13cli · gpt-5",
+        "llmokgpt-513k in480 out4.40sreq-11"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 848,
+      "chipsScroll": 1088,
+      "scrollableControls": 2
+    },
+    "controls": 32,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 780,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-console-1920": {
+    "headerHeight": 163,
+    "stage": "1824x628",
+    "graph": {
+      "visible": 360,
+      "surface": 360,
+      "top": 431,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "turnokMessage 11 · 18:13cli · gpt-5",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": false,
+      "chipsClient": 1183,
+      "chipsScroll": 1183,
+      "scrollableControls": 0
+    },
+    "controls": 41,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".version-chip": {
+        "font": 15,
+        "width": 346,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".icon-button": {
+        "font": 28,
+        "width": 56,
+        "height": 56
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 1420,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-paper-400": {
+    "headerHeight": 125,
+    "stage": "400x628",
+    "graph": {
+      "visible": 411,
+      "surface": 411,
+      "top": 342,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 329,
+      "chipsScroll": 978,
+      "scrollableControls": 7
+    },
+    "controls": 27,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 20,
+        "width": 170,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 18,
+        "width": 83,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 220,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-paper-700": {
+    "headerHeight": 129,
+    "stage": "700x624",
+    "graph": {
+      "visible": 455,
+      "surface": 455,
+      "top": 298,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 544,
+      "chipsScroll": 978,
+      "scrollableControls": 5
+    },
+    "controls": 27,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 21,
+        "width": 171,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 19,
+        "width": 89,
+        "height": 46
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 520,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-paper-900": {
+    "headerHeight": 141,
+    "stage": "852x650",
+    "graph": {
+      "visible": 455,
+      "surface": 455,
+      "top": 336,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 654,
+      "chipsScroll": 1088,
+      "scrollableControls": 4
+    },
+    "controls": 28,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 400,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-paper-1280": {
+    "headerHeight": 145,
+    "stage": "1184x646",
+    "graph": {
+      "visible": 427,
+      "surface": 427,
+      "top": 364,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 5,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokgrep479ms",
+        "turnokMessage 11 · 18:13cli · gpt-5",
+        "llmokgpt-513k in480 out4.40sreq-11"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 848,
+      "chipsScroll": 1088,
+      "scrollableControls": 2
+    },
+    "controls": 32,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 780,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-paper-1920": {
+    "headerHeight": 163,
+    "stage": "1824x628",
+    "graph": {
+      "visible": 360,
+      "surface": 360,
+      "top": 431,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "turnokMessage 11 · 18:13cli · gpt-5",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": false,
+      "chipsClient": 1183,
+      "chipsScroll": 1183,
+      "scrollableControls": 0
+    },
+    "controls": 41,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".version-chip": {
+        "font": 15,
+        "width": 346,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".icon-button": {
+        "font": 28,
+        "width": 56,
+        "height": 56
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 1420,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "web-console-400": {
+    "headerHeight": 125,
+    "stage": "400x628",
+    "graph": {
+      "visible": 10,
+      "surface": 320,
+      "top": 743,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 2,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 329,
+      "chipsScroll": 978,
+      "scrollableControls": 7
+    },
+    "controls": 31,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 20,
+        "width": 170,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 18,
+        "width": 83,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".pf-btn": {
+        "font": 21,
+        "width": 48,
+        "height": 48
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 220,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "web-console-700": {
+    "headerHeight": 129,
+    "stage": "700x624",
+    "graph": {
+      "visible": 54,
+      "surface": 320,
+      "top": 699,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 544,
+      "chipsScroll": 978,
+      "scrollableControls": 5
+    },
+    "controls": 31,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 21,
+        "width": 171,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 19,
+        "width": 89,
+        "height": 46
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".pf-btn": {
+        "font": 21,
+        "width": 48,
+        "height": 48
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 520,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "web-console-900": {
+    "headerHeight": 141,
+    "stage": "630x650",
+    "graph": {
+      "visible": 72,
+      "surface": 320,
+      "top": 719,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 506,
+      "chipsScroll": 1088,
+      "scrollableControls": 5
+    },
+    "controls": 41,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 249,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 170,
+        "height": 22
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 400,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      }
+    }
+  },
+  "web-console-1280": {
+    "headerHeight": 145,
+    "stage": "620x646",
+    "graph": {
+      "visible": 0,
+      "surface": 320,
+      "top": 827,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 499,
+      "chipsScroll": 1088,
+      "scrollableControls": 3
+    },
+    "controls": 49,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 279,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 200,
+        "height": 22
+      },
+      ".ctx-strip-cost": {
+        "font": 14,
+        "width": 91,
+        "height": 44
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 780,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      }
+    }
+  },
+  "web-console-1920": {
+    "headerHeight": 163,
+    "stage": "1260x628",
+    "graph": {
+      "visible": 0,
+      "surface": 320,
+      "top": 797,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "turnokMessage 11 · 18:13cli · gpt-5",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 888,
+      "chipsScroll": 1088,
+      "scrollableControls": 0
+    },
+    "controls": 57,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".version-chip": {
+        "font": 15,
+        "width": 346,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".icon-button": {
+        "font": 28,
+        "width": 56,
+        "height": 56
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 279,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 200,
+        "height": 22
+      },
+      ".ctx-strip-cost": {
+        "font": 14,
+        "width": 91,
+        "height": 44
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 1420,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      }
+    }
+  },
+  "web-paper-400": {
+    "headerHeight": 125,
+    "stage": "400x628",
+    "graph": {
+      "visible": 10,
+      "surface": 320,
+      "top": 743,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 2,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 329,
+      "chipsScroll": 978,
+      "scrollableControls": 7
+    },
+    "controls": 31,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 20,
+        "width": 170,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 18,
+        "width": 83,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".pf-btn": {
+        "font": 21,
+        "width": 48,
+        "height": 48
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 220,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "web-paper-700": {
+    "headerHeight": 129,
+    "stage": "700x624",
+    "graph": {
+      "visible": 54,
+      "surface": 320,
+      "top": 699,
+      "stageBottom": 753,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 111,
+      "replayRows": 2,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 17,
+      "nodeLabelPx": 17,
+      "graphScale": 1,
+      "nodeLabels": [
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 544,
+      "chipsScroll": 978,
+      "scrollableControls": 5
+    },
+    "controls": 31,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 21,
+        "width": 171,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 19,
+        "width": 89,
+        "height": 46
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".pf-btn": {
+        "font": 21,
+        "width": 48,
+        "height": 48
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 520,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "web-paper-900": {
+    "headerHeight": 141,
+    "stage": "630x650",
+    "graph": {
+      "visible": 72,
+      "surface": 320,
+      "top": 719,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 506,
+      "chipsScroll": 1088,
+      "scrollableControls": 5
+    },
+    "controls": 41,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 249,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 170,
+        "height": 22
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 400,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      }
+    }
+  },
+  "web-paper-1280": {
+    "headerHeight": 145,
+    "stage": "620x646",
+    "graph": {
+      "visible": 0,
+      "surface": 320,
+      "top": 827,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 3,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms",
+        "toolokgrep463ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 499,
+      "chipsScroll": 1088,
+      "scrollableControls": 3
+    },
+    "controls": 49,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 279,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 200,
+        "height": 22
+      },
+      ".ctx-strip-cost": {
+        "font": 14,
+        "width": 91,
+        "height": 44
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 780,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      }
+    }
+  },
+  "web-paper-1920": {
+    "headerHeight": 163,
+    "stage": "1260x628",
+    "graph": {
+      "visible": 0,
+      "surface": 320,
+      "top": 797,
+      "stageBottom": 791,
+      "toolbarHeight": 61,
+      "toolbarRows": 1,
+      "replayHeight": 65,
+      "replayRows": 1,
+      "nodeCount": 4,
+      "nodeWidth": 220,
+      "nodeFont": 16,
+      "nodeLabelPx": 16,
+      "graphScale": 1,
+      "nodeLabels": [
+        "turnokMessage 11 · 18:13cli · gpt-5",
+        "llmokgpt-513k in480 out4.40sreq-11",
+        "toolokterminal410ms"
+      ],
+      "chipsScrollable": true,
+      "chipsClient": 888,
+      "chipsScroll": 1088,
+      "scrollableControls": 0
+    },
+    "controls": 57,
+    "clipped": 0,
+    "tiny": 0,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".version-chip": {
+        "font": 15,
+        "width": 346,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".icon-button": {
+        "font": 28,
+        "width": 56,
+        "height": 56
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 279,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 200,
+        "height": 22
+      },
+      ".ctx-strip-cost": {
+        "font": 14,
+        "width": 91,
+        "height": 44
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 1420,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      }
+    }
+  },
+  "hermes-console-400-workspace": {
+    "actions": 11,
+    "targets": {
+      ".chats-toggle": {
+        "font": 20,
+        "width": 170,
+        "height": 60
+      },
+      ".mode-option": {
+        "font": 18,
+        "width": 83,
+        "height": 44
+      },
+      ".version-chip": {
+        "font": 15,
+        "width": 354,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".icon-button": {
+        "font": 28,
+        "width": 354,
+        "height": 56
+      },
+      ".transport": {
+        "font": 18,
+        "width": 48,
+        "height": 44
+      },
+      ".speed": {
+        "font": 15,
+        "width": 46,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 15,
+        "width": 56,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 220,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "hermes-console-900-workspace": {
+    "actions": 11,
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".version-chip": {
+        "font": 15,
+        "width": 842,
+        "height": 44
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".icon-button": {
+        "font": 28,
+        "width": 56,
+        "height": 56
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 400,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      }
+    }
+  },
+  "web-console-1280-panels": {
+    "targets": {
+      ".chats-toggle": {
+        "font": 22,
+        "width": 212,
+        "height": 64
+      },
+      ".mode-option": {
+        "font": 20,
+        "width": 109,
+        "height": 50
+      },
+      ".stage-toolbar .chip": {
+        "font": 16,
+        "width": 55,
+        "height": 46
+      },
+      ".session-item": {
+        "font": 17,
+        "width": 279,
+        "height": 93
+      },
+      ".session-item .session-title": {
+        "font": 17,
+        "width": 200,
+        "height": 22
+      },
+      ".ctx-strip-cost": {
+        "font": 14,
+        "width": 91,
+        "height": 44
+      },
+      ".pf-btn": {
+        "font": 24,
+        "width": 52,
+        "height": 52
+      },
+      ".transport": {
+        "font": 20,
+        "width": 52,
+        "height": 48
+      },
+      ".speed": {
+        "font": 16,
+        "width": 52,
+        "height": 44
+      },
+      ".live-button": {
+        "font": 16,
+        "width": 66,
+        "height": 44
+      },
+      ".replay-range": {
+        "font": 13.3,
+        "width": 780,
+        "height": 44
+      },
+      ".react-flow__controls-button": {
+        "font": 13.3,
+        "width": 56,
+        "height": 56
+      },
+      "input": {
+        "font": 13.3,
+        "width": 26,
+        "height": 26
+      },
+      ".ps-close": {
+        "font": 24,
+        "width": 56,
+        "height": 56
+      },
+      ".ps-switch": {
+        "font": 13.3,
+        "width": 64,
+        "height": 36
+      }
+    }
+  },
+  "target:.chats-toggle": {
+    "current": {
+      "font": 22,
+      "width": 212,
+      "height": 64
+    },
+    "baseline": {
+      "font": 14,
+      "height": 44,
+      "width": 141
+    },
+    "fontRatio": 1.57,
+    "heightRatio": 1.45,
+    "areaRatio": 2.29
+  },
+  "target:.mode-option": {
+    "current": {
+      "font": 20,
+      "width": 109,
+      "height": 50
+    },
+    "baseline": {
+      "font": 13,
+      "height": 36,
+      "width": 70
+    },
+    "fontRatio": 1.54,
+    "heightRatio": 1.39,
+    "areaRatio": 2.14
+  },
+  "target:.version-chip": {
+    "current": {
+      "font": 15,
+      "width": 346,
+      "height": 44
+    },
+    "baseline": {
+      "font": 10.5,
+      "height": 16,
+      "width": 234
+    },
+    "fontRatio": 1.43,
+    "heightRatio": 2.75,
+    "areaRatio": 3.93
+  },
+  "target:.stage-toolbar .chip": {
+    "current": {
+      "font": 16,
+      "width": 55,
+      "height": 46
+    },
+    "baseline": {
+      "font": 12,
+      "height": 30,
+      "width": 50
+    },
+    "fontRatio": 1.33,
+    "heightRatio": 1.53,
+    "areaRatio": 2.04
+  },
+  "target:.icon-button": {
+    "current": {
+      "font": 28,
+      "width": 56,
+      "height": 56
+    },
+    "baseline": {
+      "font": 14,
+      "height": 28,
+      "width": 28
+    },
+    "fontRatio": 2,
+    "heightRatio": 2,
+    "areaRatio": 4
+  },
+  "target:.session-item": {
+    "current": {
+      "font": 17,
+      "width": 279,
+      "height": 93
+    },
+    "baseline": {
+      "font": 13.3,
+      "height": 54,
+      "width": 257
+    },
+    "fontRatio": 1.28,
+    "heightRatio": 1.72,
+    "areaRatio": 2.2
+  },
+  "target:.session-item .session-title": {
+    "current": {
+      "font": 17,
+      "width": 200,
+      "height": 22
+    },
+    "baseline": {
+      "font": 12,
+      "height": 14,
+      "width": 160
+    },
+    "fontRatio": 1.42,
+    "heightRatio": 1.57,
+    "areaRatio": 2.23
+  },
+  "target:.ctx-strip-cost": {
+    "current": {
+      "font": 14,
+      "width": 91,
+      "height": 44
+    },
+    "baseline": {
+      "font": 11,
+      "height": 18,
+      "width": 60
+    },
+    "fontRatio": 1.27,
+    "heightRatio": 2.44,
+    "areaRatio": 3.11
+  },
+  "target:.pf-btn": {
+    "current": {
+      "font": 24,
+      "width": 52,
+      "height": 52
+    },
+    "baseline": {
+      "font": 12,
+      "height": 26,
+      "width": 26
+    },
+    "fontRatio": 2,
+    "heightRatio": 2,
+    "areaRatio": 4
+  },
+  "target:.transport": {
+    "current": {
+      "font": 20,
+      "width": 52,
+      "height": 48
+    },
+    "baseline": {
+      "font": 11,
+      "height": 28,
+      "width": 34
+    },
+    "fontRatio": 1.82,
+    "heightRatio": 1.71,
+    "areaRatio": 3.12
+  },
+  "target:.speed": {
+    "current": {
+      "font": 16,
+      "width": 52,
+      "height": 44
+    },
+    "baseline": {
+      "font": 10,
+      "height": 24,
+      "width": 32
+    },
+    "fontRatio": 1.6,
+    "heightRatio": 1.83,
+    "areaRatio": 2.93
+  },
+  "target:.live-button": {
+    "current": {
+      "font": 16,
+      "width": 66,
+      "height": 44
+    },
+    "baseline": {
+      "font": 10,
+      "height": 24,
+      "width": 58
+    },
+    "fontRatio": 1.6,
+    "heightRatio": 1.83,
+    "areaRatio": 2.93
+  },
+  "target:.replay-range": {
+    "current": {
+      "font": 13.3,
+      "width": 1420,
+      "height": 44
+    },
+    "baseline": {
+      "font": 13.3,
+      "height": 8,
+      "width": 500
+    },
+    "fontRatio": 1,
+    "heightRatio": 5.5,
+    "areaRatio": 5.5
+  },
+  "target:.react-flow__controls-button": {
+    "current": {
+      "font": 13.3,
+      "width": 56,
+      "height": 56
+    },
+    "baseline": {
+      "font": 13.3,
+      "height": 26,
+      "width": 26
+    },
+    "fontRatio": 1,
+    "heightRatio": 2.15,
+    "areaRatio": 2.15
+  },
+  "target:.fp-toggle": {
+    "current": {
+      "font": 15,
+      "width": 99,
+      "height": 48
+    },
+    "baseline": {
+      "font": 11.5,
+      "height": 16,
+      "width": 66
+    },
+    "fontRatio": 1.3,
+    "heightRatio": 3,
+    "areaRatio": 3.91
+  },
+  "target:input": {
+    "current": {
+      "font": 13.3,
+      "width": 26,
+      "height": 26
+    },
+    "baseline": {
+      "font": 13.3,
+      "height": 13,
+      "width": 13
+    },
+    "fontRatio": 1,
+    "heightRatio": 2,
+    "areaRatio": 2
+  },
+  "target:.ps-close": {
+    "current": {
+      "font": 24,
+      "width": 56,
+      "height": 56
+    },
+    "baseline": {
+      "font": 14,
+      "height": 28,
+      "width": 28
+    },
+    "fontRatio": 1.71,
+    "heightRatio": 2,
+    "areaRatio": 3.43
+  },
+  "target:.ps-switch": {
+    "current": {
+      "font": 13.3,
+      "width": 64,
+      "height": 36
+    },
+    "baseline": {
+      "font": 12,
+      "height": 20,
+      "width": 34
+    },
+    "fontRatio": 1.11,
+    "heightRatio": 1.8,
+    "areaRatio": 2
+  }
+}

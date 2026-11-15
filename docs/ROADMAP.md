@@ -1,12 +1,13 @@
 # Roadmap
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
-> **Revised:** 2026-11-13 · **Body hash:** 403a6649
+> **Applies to:** Omniscience 1.0.0 · written at commit 2f13567
+> **Revised:** 2026-11-13 · **Body hash:** 4f9bc918
 
 
 
-What is built in 1.0.0, what is next, and what is parked. Status is read from the code at this
-commit, not from intention.
+
+What is built, what is next, and what is parked. The recovered backlog below also includes ideas
+from earlier design and testing sessions; a checkbox there is not a claim that a feature is absent.
 
 ## Phase 1 — vertical slice (done)
 
@@ -42,6 +43,58 @@ Hook to sanitized event to SQLite to viewer to live graph.
 | Read-only Hermes tools (`omni_query_events`, `omni_explain_failure`) | Not built; the `/omni` command covers chat triage today |
 | OTLP export | Not built |
 | Opt-in redacted previews of prompts or tool output | Not built; the recorder remains metadata-only |
+
+## Recovered backlog — review before scheduling
+
+The following consolidates the November 11 interface plan, handover and later review. **Check**
+means the item was open in an earlier handover but has not been verified against this branch;
+some underlying capability may already exist. Ideas are candidates, not promises or approved
+designs. Preserve existing workflows, privacy, accessibility and platform support.
+
+### Interface and readability
+
+- [ ] **Planned:** Audit rendered contrast, small text and clipped graph labels; test dark and
+  Paper themes, keyboard focus, forced colors, reduced motion and smaller screens.
+- [ ] **Planned:** Simplify crowded header controls and typography without removing actions or
+  making them inaccessible. Verify actual current layout before changing it.
+- [ ] **Explore:** Restrained partial glass on selected surfaces with solid, readable fallbacks;
+  measure contrast and multi-tab rendering cost. Earlier reviewers differed on the right extent.
+- [ ] **Check:** Finish the glance strip: cost estimate, response latency, turns, event count and
+  a clear description of the loaded window. Show unknown values as unavailable.
+- [ ] **Check:** Improve retry chains, distinguish recovered retries from fatal errors, and show
+  cost per turn, compaction impact and model-mix changes where the recorded data permits.
+- [ ] **Explore:** Glance / Work / Forensic density modes with preserved selection, filters and
+  position; compare with the existing Simple / Standard / Everything presets.
+- [ ] **Explore:** Improve the timeline and graph together, chart scaling and outlier labels;
+  prototype timeline-first and split layouts before changing the default or demoting the map.
+- [ ] **Check:** Review privacy drawer, empty-panel treatment and persistent screen clutter.
+
+### Capabilities and integrations
+
+- [ ] **Check:** Add a problem-bundle control if users cannot reach the existing preview and write
+  routes; improve path detection in pre-rendered argument text and verify redaction end to end.
+- [ ] **Check:** Detect repeated calls and label sessions that used browser, desktop or wide-sweep
+  tools; distinguish these ideas from existing warnings and privacy features.
+- [ ] **Check:** Let users choose what the mini panel watches.
+- [ ] **Check:** Verify Cursor token-data availability and the usefulness of its existing source
+  explanation; investigate `agy` as a source.
+- [ ] **Check:** Reconcile Spark usage against Sparkdash. The existing optional TensorFold source
+  already reads configured counters; this is an accuracy and coverage question, not a claim that
+  no Spark integration exists.
+- [ ] **Check:** Verify the coverage of the existing Usage **All** window and older history.
+- [ ] **Explore:** A timestamped in-chat notice; earlier notes say this requires Hermes core.
+
+### Reliability and release
+
+- [ ] **Check:** Review the unmerged multi-tab viewer performance work, including cache correctness,
+  deletion and concurrent writes; benchmark zero, one and multiple tabs before integration.
+- [ ] **Check:** Re-test short-window graph sizing and scrolling, Usage/Latency layouts, completion
+  verdicts, tool medians, custom-tool advice, AI-writeup data sent to the provider, duplicate
+  polling and the one-hour Usage view.
+- [ ] **Check:** Recheck plugin validation, version-chip consistency, documentation currency,
+  demo capture and release health against the actual final commit.
+- [ ] **Release:** Independently review the Hermes-requested changes and obtain green Linux,
+  macOS and Windows CI on the final release commit before updating the catalog pin.
 
 ## Parked
 

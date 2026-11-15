@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getPrefs, setPrefs } from '../api';
 import type { ChatPrefs } from '../types';
 import './SettingsPanel.css';
 
 export type ViewMode =
   | 'list' | 'graph' | 'time' | 'tokens' | 'usage' | 'privacy' | 'concerns'
-  | 'flame' | 'tools' | 'context' | 'helpers' | 'coverage' | 'latency';
+  | 'flame' | 'tools' | 'context' | 'helpers' | 'coverage' | 'latency' | 'lens';
 
 export type ThemeName = 'console' | 'paper';
 
@@ -42,10 +42,15 @@ const VIEW_LABELS: Record<ViewMode, string> = {
   helpers: 'Helpers (helper agents side by side)',
   latency: 'Latency (how long models really take)',
   coverage: 'Coverage (how complete the recording is)',
+  lens: 'Lens (recorded moments as one ring)',
 };
 
 /** Every Omniscience setting in one place. Viewer settings apply at once; recording settings are chat commands. */
 export function SettingsPanel({ open, settings, onChange, onOpenPrivacy, onResetView, onClose }: Props) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [alertsOn, setAlertsOn] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('omni.privacyAlerts') !== 'off';
@@ -53,14 +58,47 @@ export function SettingsPanel({ open, settings, onChange, onOpenPrivacy, onReset
       return true;
     }
   });
+  // A dialog must own focus from the moment it opens, whichever header (wide or Workspace sheet)
+  // launched it. Close is the predictable landing point; Tab/Shift+Tab wrap inside the dialog and
+  // Escape closes it without reaching the page or a window-level Tour listener.
   useEffect(() => {
     if (!open) return;
+    closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const items = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.getClientRects().length > 0);
+      if (items.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (active === first || active === dialog || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   // The in-chat summary lives in the plugin's own settings file, not in this browser.
   const [prefs, setLocalPrefs] = useState<ChatPrefs | null>(null);
@@ -104,10 +142,10 @@ export function SettingsPanel({ open, settings, onChange, onOpenPrivacy, onReset
 
   return (
     <div className="sp-backdrop" onClick={onClose}>
-      <div className="sp-dialog" role="dialog" aria-modal="true" aria-label="Omniscience settings" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} tabIndex={-1} className="sp-dialog" role="dialog" aria-modal="true" aria-label="Omniscience settings" onClick={(e) => e.stopPropagation()}>
         <div className="sp-head">
           <h2>Settings</h2>
-          <button type="button" className="sp-close" onClick={onClose} aria-label="Close settings">
+          <button ref={closeRef} type="button" className="sp-close" onClick={onClose} aria-label="Close settings">
             ×
           </button>
         </div>

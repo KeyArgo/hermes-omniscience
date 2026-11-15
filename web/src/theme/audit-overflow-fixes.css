@@ -1,0 +1,90 @@
+/* ==========================================================================
+   audit-overflow-fixes.css — scoped overflow fixes from the browser audit.
+
+   Load this file LAST, after theme/pass12-premium.css, so it only has to
+   override layout the shipped passes got wrong. It adds no controls and
+   changes no behaviour; every rule is limited to the element that overflowed.
+
+   Reported at:
+     * 416px  Settings dialog: the two long <select>s kept their max-content
+              width (up to 523px) and ran off the right edge of the viewport.
+     * 700px  Help menu in the compact Workspace sheet: the menu is end-aligned
+              to a ~154px grid cell, so a 320px panel opened at x = -130.
+     * 901px+ Details rail: the 48px absolutely positioned "Hide details"
+              button overlapped the top-right "Why" tab by a few pixels.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Settings selects (SettingsPanel.css: .sp-row / .sp-row select)
+
+   A <select> is a replaced element: its flex min-width resolves to the width
+   of its longest option (523px here), so it cannot shrink inside .sp-row and
+   simply overflows the dialog. Allow it to shrink, and let the row wrap the
+   select onto its own line when label + select genuinely cannot share one.
+   -------------------------------------------------------------------------- */
+
+.sp-dialog .sp-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.sp-dialog .sp-row select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   2. Help menu in the compact Workspace sheet
+
+   At compact-header widths the sheet's actions are a grid of ~150px cells up to
+   700px, then a wrapping flex row. The Help menu is end-aligned
+   (`right: 0`) to its own cell, so a 320px panel grows leftwards past x = 0
+   whenever that cell is not in the last column — confirmed at 700px and still
+   reproducible at 1300px. Make the menu's row span the sheet and size the
+   panel to that row instead of to the viewport: it then starts at the sheet's
+   left edge and can never cross it, at any width down to 320px. The trigger
+   stays visible and full-size. 1440px is where the header stops being compact
+   and the sheet/button no longer exists.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1439px) {
+  .workspace-actions .mb-root {
+    grid-column: 1 / -1;
+    /* At 701–900px the actions are still a wrapping flex row, not the sheet's grid. */
+    flex: 1 0 100%;
+  }
+
+  .workspace-actions .mb-pop {
+    left: 0;
+    right: auto;
+    width: min(100%, 440px);
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3. Details rail: keep the "Why" tab clear of the close/hide controls
+
+   pass12-premium makes the collapse control a 48x48 absolutely positioned
+   button at the rail's top-right; the tab strip starts 49px below the rail
+   top, so on an open rail the button's bottom 3px sit over the Why tab.
+   Give the strip the button's height as clearance while the rail is a column.
+
+   Below 900px the rail is a drawer and uses the 56px "Close details" X in the
+   same corner. It covered the Why tab by 43x9px at 416 and 700. The same
+   clearance keeps the strip below that X without moving, hiding or reordering
+   any control; the X stays first in the DOM and fully focusable.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 901px) {
+  .rail-right:not(.is-collapsed) .rail-tabs {
+    margin-top: 26px;
+  }
+}
+
+@media (max-width: 900px) {
+  .rail-right:not(.is-collapsed) .rail-tabs {
+    margin-top: 30px;
+  }
+}

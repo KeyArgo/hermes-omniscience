@@ -74,3 +74,28 @@ def test_messages_from_the_sandboxed_viewer_are_recognised():
     assert re.search(r"VIEWER_ORIGINS\s*=\s*new Set\(", text)
     assert "'null'" in text
     assert "event.origin !== VIEWER_URL" not in text
+
+
+def test_every_embedded_frame_is_told_it_is_in_hermes():
+    """Host mode is explicit.
+
+    The viewer decides Hermes vs web from ``?host=hermes`` in its src, never from being framed:
+    a browser tab and any other embed are web mode. Both the full page and the docked mini pane
+    must carry the marker, or the pane silently loses its readable defaults.
+    """
+    text = source()
+    assert re.search(r"HOST_MARKER\s*=\s*\{\s*host:\s*'hermes'\s*\}", text)
+    assert "viewerSrc(session, key.token, HOST_MARKER)" in text, (
+        "the full embedded page does not pass the Hermes marker"
+    )
+    assert re.search(
+        r"viewerSrc\(session, key\.token, \{\s*\.\.\.HOST_MARKER,\s*mini:\s*'1'", text
+    ), "the docked mini pane does not pass the Hermes marker"
+
+
+def test_opening_in_the_browser_does_not_carry_the_hermes_marker():
+    """A browser tab is web mode; it must not inherit the desktop pane's marker."""
+    text = source()
+    assert "viewerSrc(session, key.token)" in text, (
+        "the open-in-browser action should build the viewer URL without the host marker"
+    )

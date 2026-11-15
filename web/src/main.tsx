@@ -16,6 +16,12 @@ import './theme/pass9-nous.css';
 import './theme/pass10-bridge.css';
 import './theme/tokens.css';
 import './theme/pass10-paper.gen.css';
+// Slice 2: interface modes and the always-visible Chats control (loaded last, scoped to them).
+import './theme/pass11-modes.css';
+// Slice 3: the premium navy/teal surface, larger targets and readable content.
+import './theme/pass12-premium.css';
+// Audit overflow fixes: loaded last so its scoped rules override the passes above.
+import './theme/audit-overflow-fixes.css';
 
 // Before anything renders: the desktop embeds this page in a sandboxed frame, where
 // window.localStorage throws on access and the first preference read would blank the page.

@@ -4,8 +4,17 @@ import { filterGraph } from './filter';
 import { windowGraph } from './window';
 import type { OmniEvent } from '../types';
 
-self.onmessage = (message: MessageEvent<{ events: OmniEvent[]; expanded: string[]; hideTools: boolean; hideLlms: boolean; errorsOnly: boolean }>) => {
-  const { events, expanded, hideTools, hideLlms, errorsOnly } = message.data;
+self.onmessage = (
+  message: MessageEvent<{
+    root: string | null;
+    events: OmniEvent[];
+    expanded: string[];
+    hideTools: boolean;
+    hideLlms: boolean;
+    errorsOnly: boolean;
+  }>,
+) => {
+  const { root, events, expanded, hideTools, hideLlms, errorsOnly } = message.data;
   const fullGraph = reduce(events);
   // Bound layout, not just the number of DOM elements drawn afterward.
   // Fold before windowing: a busy turn's own node is its oldest, so windowing first can drop it
@@ -22,5 +31,5 @@ self.onmessage = (message: MessageEvent<{ events: OmniEvent[]; expanded: string[
         return layout(windowGraph(errorsOnly ? filtered : foldBusyTurns(filtered, expandedSet)).graph);
       })()
     : baseGraph;
-  self.postMessage({ fullGraph, baseGraph, graph, truncated: windowed.truncated });
+  self.postMessage({ root, fullGraph, baseGraph, graph, truncated: windowed.truncated });
 };

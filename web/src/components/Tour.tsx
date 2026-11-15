@@ -40,11 +40,22 @@ function targetRect(sel: string): Rect | null {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-export function Tour({ forceStart, onClose }: { forceStart?: number; onClose?: () => void }) {
+export function Tour({
+  forceStart,
+  onClose,
+  onActiveChange,
+}: {
+  forceStart?: number;
+  onClose?: () => void;
+  onActiveChange?: (active: boolean) => void;
+}) {
   const [mode, setMode] = useState<Mode>('hidden');
   const [step, setStep] = useState(0);
   const [ring, setRing] = useState<Rect | null>(null);
   const [pos, setPos] = useState<CardPos | null>(null);
+  // The viewport is state, not just an event listener: React's responsive layout commits after the
+  // browser's resize event, so measuring in a post-commit effect is what catches the final position.
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const cardRef = useRef<HTMLDivElement | null>(null);
   const nextRef = useRef<HTMLButtonElement | null>(null);
   const prevFocusRef = useRef<HTMLElement | null>(null);
@@ -100,16 +111,56 @@ export function Tour({ forceStart, onClose }: { forceStart?: number; onClose?: (
   }, [forceStart, begin]);
 
   useEffect(() => {
+    onActiveChange?.(mode !== 'hidden');
+  }, [mode, onActiveChange]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () =>
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    onResize();
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Re-measure after every committed viewport change, so a breakpoint-crossing tour rings the
+  // target where React finally placed it rather than where the resize event first saw it.
+  useEffect(() => {
+    if (mode !== 'run') return;
+    measure(step);
+    // React's responsive commit and CSS media layout can both settle one frame later.
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => measure(step));
+    });
+    return () => {
+      window.cancelAnimationFrame(first);
+      if (second) window.cancelAnimationFrame(second);
+    };
+  }, [mode, step, measure, viewport.width, viewport.height]);
+
+  // React's responsive re-render can resize or move the target after the viewport effect has run.
+  // Observe the target and the header that reflows it (the 1000/1440 breakpoints move controls
+  // without necessarily resizing the target) so a moved ring is measured again.
+  useEffect(() => {
+    if (mode !== 'run' || typeof ResizeObserver === 'undefined') return;
+    const el = document.querySelector(stop.target);
+    const header = document.querySelector('.topbar');
+    if (!el && !header) return;
+    const observer = new ResizeObserver(() => measure(step));
+    if (el) observer.observe(el);
+    if (header) observer.observe(header);
+    return () => observer.disconnect();
+  }, [mode, step, stop.target, measure, viewport.width, viewport.height]);
+
+  useEffect(() => {
     if (mode !== 'run') return;
     const el = document.querySelector(stop.target);
     el?.scrollIntoView({ block: 'nearest' });
-    measure(step);
     const onReflow = () => measure(step);
-    window.addEventListener('resize', onReflow, { passive: true });
     window.addEventListener('scroll', onReflow, { passive: true, capture: true });
     const t = window.setTimeout(() => nextRef.current?.focus(), 0);
     return () => {
-      window.removeEventListener('resize', onReflow);
       window.removeEventListener('scroll', onReflow, { capture: true });
       window.clearTimeout(t);
     };
@@ -118,6 +169,14 @@ export function Tour({ forceStart, onClose }: { forceStart?: number; onClose?: (
   useEffect(() => {
     if (mode !== 'run') return;
     const onKey = (e: KeyboardEvent) => {
+      // A Settings/Privacy/Help/Insight modal owns the keyboard; the Tour must not close or step
+      // behind it. Escape is handled by the topmost dialog.
+      if (
+        e.defaultPrevented ||
+        document.querySelector('[role="dialog"][aria-modal="true"]') !== null
+      ) {
+        return;
+      }
       const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable="true"]');
       if (e.key === 'Escape') finish();
       else if (typing) return;
