@@ -36,6 +36,20 @@ try {
   if (errors.length) throw new Error(`Page errors: ${errors.join('; ')}`);
   if (!workers) throw new Error('Graph worker did not start');
   console.log('PASS sandboxed frame loaded the actual bundled interface and Chats control');
+  // The real SDK frame has an opaque origin: localStorage cannot survive its reload.
+  // Dismiss the offer, then create a fresh frame so only viewer-backed state can remember it.
+  await frame.getByRole('button', { name: 'Not Now' }).click();
+  await page.waitForFunction(async (url) => {
+    const response = await fetch(url);
+    return response.ok && (await response.json()).seen === true;
+  }, `http://127.0.0.1:${port}/api/v1/tour-seen`);
+  await page.locator('iframe').evaluate((element) => { element.src = element.src; });
+  await frame.locator('.chats-toggle').waitFor({ timeout: 15000 });
+  await page.waitForTimeout(1000);
+  if (await frame.getByRole('dialog', { name: 'Quick tour offer' }).count()) {
+    throw new Error('Tour offer returned after the opaque-origin frame reloaded');
+  }
+  console.log('PASS onboarding dismissal survives a fresh opaque-origin frame');
 } finally {
   if (browser) await browser.close();
   server.kill('SIGTERM');
