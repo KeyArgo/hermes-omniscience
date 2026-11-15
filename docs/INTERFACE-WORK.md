@@ -1,7 +1,8 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit e3e1a82
-> **Revised:** 2026-11-15 · **Body hash:** 15f258a8
+> **Applies to:** Omniscience 1.0.0 · written at commit 9b802c7
+> **Revised:** 2026-11-15 · **Body hash:** 1452f5d6
+
 
 
 
@@ -63,7 +64,9 @@ current as fixes land; report tests and unresolved issues against the exact comm
 - The graph focus-guard resize fix has a browser regression for selection, resize and manual pan.
   Still verify it against real data in Hermes. A browser regression attempting to double-click a
   graph node did not enlarge it as the on-screen hint promises: the first click opens the details
-  rail and moves the node before the second click lands. Fix that interaction separately.
+  rail and moves the node before the second click lands. An unverified attempt is preserved locally
+  in `/home/dev/omni-checkpoints/double-click-wip.patch`: it zoomed but failed to select the step,
+  so it was not included in the branch. Fix and retest that interaction separately.
   Remaining earlier issues: exact 2x button sizing,
   real Windows/macOS testing, owner visual acceptance, final independent review.
 

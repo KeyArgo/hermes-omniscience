@@ -90,7 +90,7 @@ def test_a_dirty_checkout_is_reported_as_modified(build_info, monkeypatch):
     monkeypatch.setattr(version_stamp, "_git",
                         lambda *a: "deadbeef" if a[0] == "rev-parse" else " M store.py")
     assert version_stamp.as_dict()["dirty"] is True
-    assert version_stamp.describe().endswith("(modified)")
+    assert version_stamp.describe().endswith(" · modified")
 
 
 def test_the_manifest_is_the_last_resort(build_info, monkeypatch):
@@ -110,7 +110,7 @@ def test_describe_stays_on_one_line_and_shortens_the_hash(build_info, monkeypatc
     build_info.update({"version": "1.0.0", "commit": "0123456789abcdef", "dirty": False,
                        "commit_date": "2026-11-05T12:00:00Z"})
     line = version_stamp.describe()
-    assert line == "1.0.0 · 01234567 · 2026-11-05", line
+    assert line == "v1.0.0 · 01234567 · 2026-11-05", line
     assert "\n" not in line
 
 

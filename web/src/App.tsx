@@ -339,7 +339,12 @@ export function countPrependedEvents(existing: OmniEvent[], earlier: OmniEvent[]
 /** The chip's own line: product, runtime version, commit date and short commit. Every value is
  *  read from the running viewer, so the chip can never announce a version it is not. */
 export function versionChipText(build: BuildInfo): string {
-  return `v${build.version} · ${(build.commit_date || '').slice(0, 10)} · ${build.commit_short}`;
+  if (typeof build.chip_line === 'string' && build.chip_line.trim()) return build.chip_line;
+  const parts = [`v${build.version || 'unknown'}`];
+  if (build.commit_short) parts.push(build.commit_short.slice(0, 8));
+  if (build.commit_date) parts.push(build.commit_date.slice(0, 10));
+  if (build.dirty) parts.push('modified');
+  return parts.join(' · ');
 }
 
 /** The tooltip: the runtime metadata, and a note when the installed copy has local changes. */
@@ -371,7 +376,6 @@ export function VersionChip({
       onClick={() => onCopy(line)}
     >
       {line}
-      {build.dirty ? ' · modified' : ''}
     </button>
   );
 }

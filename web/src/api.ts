@@ -444,6 +444,8 @@ export async function fetchInsight(): Promise<InsightState> {
 /** Which build is answering: version from the manifest, commit from the stamp. */
 export interface BuildInfo {
   version: string;
+  /** Exact user-facing line produced by the running backend's version stamp. */
+  chip_line?: string;
   /** The release this tree is heading to, e.g. "1.0.0" while the build reads "1.0.0-dev.183". */
   release?: string;
   channel?: string;

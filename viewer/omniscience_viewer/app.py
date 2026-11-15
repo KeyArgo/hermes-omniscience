@@ -616,13 +616,16 @@ def create_app(db_path: str, static_dir: str | None = None,
     def version_route() -> dict:
         """Exactly which build is answering, so a screenshot can be matched to a commit."""
         try:
-            from .version_stamp import as_dict
+            from .version_stamp import as_dict, chip_line
         except Exception:  # pragma: no cover - the stamp is optional
             info: dict = {"version": "unknown", "commit": "", "commit_short": "", "dirty": None}
+            line = "vunknown"
         else:
             info = as_dict()
+            line = chip_line(info)
         return {
             **info,
+            "chip_line": line,
             "build": _build_id(),
             "static_dir": os.path.abspath(static_dir) if static_dir else "",
         }
