@@ -410,7 +410,7 @@ function GraphCanvas({
   }, [focusToken]);
 
   const handleNodeClick = (
-    event: React.MouseEvent,
+    event: React.SyntheticEvent,
     node: { id: string; type?: string; data?: Record<string, unknown> },
   ) => {
     // A click always means "show me this", even when it also expands or folds. Returning early
@@ -493,7 +493,7 @@ function GraphCanvas({
         if (!node) return;
         event.preventDefault();
         event.stopPropagation();
-        onSelect(node.id, { focus: true });
+        handleNodeClick(event, node);
       }}>
     <ReactFlow
       nodes={nodes}

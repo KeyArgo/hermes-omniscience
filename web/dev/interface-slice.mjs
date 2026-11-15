@@ -657,7 +657,8 @@ try {
     );
 
     const beforeExpand = await camera();
-    await page.locator('.react-flow__node-group').first().evaluate((el) => el.click());
+    await page.locator('.react-flow__node-group').first().focus();
+    await page.keyboard.press('Enter');
     await page.waitForFunction(
       (count) => document.querySelectorAll('.react-flow__node').length !== count,
       beforeExpand.nodes,
