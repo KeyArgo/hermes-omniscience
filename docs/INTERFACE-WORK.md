@@ -1,7 +1,9 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 8f348b0
-> **Revised:** 2026-11-15 · **Body hash:** 62600f46
+> **Applies to:** Omniscience 1.0.0 · written at commit d38cc96
+> **Revised:** 2026-11-15 · **Body hash:** a23215d0
+
+
 
 
 
@@ -42,7 +44,10 @@ current as fixes land; report tests and unresolved issues against the exact comm
   and its flags request could hold back the runs. Changes show a loading state, request
   flags separately, and default to seven days. The exact cause of the owner's Concerns symptom is
   not yet proven; timeout and retry make stalled requests visible. An unavailable or malformed
-  recording now returns an error rather than silently appearing empty.
+  recording now returns an error rather than silently appearing empty. An isolated sandboxed
+  browser test against the owner's local events database rendered Privacy rows and completed
+  Concerns without errors. The same test checked the red accent and expand/restore; the newer build
+  still needs verification in the real Hermes pane.
 - Current Preferences use in-memory fallback inside the opaque Hermes frame, so settings may not
   survive a Desktop pane reload. Do not claim persistent accent preferences there.
 - The right-hand live pane was registered globally and defaulted on. Changes make it
