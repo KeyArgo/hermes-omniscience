@@ -265,7 +265,16 @@ def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool, state_db: str 
             cmd = viewer_command(db_path, state_db=state_db, static_dir=str(static_dir), port=port)
 
             # Prepare environment
-            env = os.environ.copy()
+            # Do not hand Hermes' provider credentials to a detached child. Keep only the
+            # operating-system and documented viewer settings the viewer needs to start.
+            allowed = (
+                "PATH", "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "SYSTEMROOT",
+                "WINDIR", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE",
+                "HERMES_HOME", "PYTHONPATH", "OMNISCIENCE_POLL_INTERVAL_S",
+                "OMNISCIENCE_IDLE_POLL_INTERVAL_S", "OMNISCIENCE_VIEWER_CONTENT_LABELS",
+                "OMNISCIENCE_TENSORFOLD_HOSTS", "OMNISCIENCE_DIGEST",
+            )
+            env = {name: os.environ[name] for name in allowed if name in os.environ}
             # The child resolves chat titles from this store; nothing else is implied.
             if state_db:
                 env["OMNISCIENCE_STATE_DB"] = str(state_db)

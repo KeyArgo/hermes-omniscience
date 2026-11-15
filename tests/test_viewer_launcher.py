@@ -194,3 +194,25 @@ def test_the_spawn_command_passes_the_active_profiles_state_database(tmp_path):
     bare = viewer_command(str(tmp_path / 'events.db'), state_db=None,
                           static_dir=str(tmp_path / 'static'), port=8797)
     assert '--state-db' not in bare
+
+
+def test_spawn_passes_viewer_settings_but_not_provider_secrets(tmp_path, monkeypatch):
+    from omniscience import viewer_launcher as launcher
+
+    monkeypatch.setenv('OPENAI_API_KEY', 'test-secret')
+    monkeypatch.setenv('OMNISCIENCE_TENSORFOLD_HOSTS', 'spark=http://127.0.0.1:1234')
+    monkeypatch.setenv('OMNISCIENCE_VIEWER_AUTOSTART', '1')
+    monkeypatch.setattr(launcher, '_ping_with_fingerprint', MagicMock(side_effect=[
+        (False, None), (False, None), (True, None),
+    ]))
+    popen = MagicMock()
+    monkeypatch.setattr(launcher.subprocess, 'Popen', popen)
+    state_db = str(tmp_path / 'state.db')
+    result = launcher.ensure_viewer(str(tmp_path / 'events.db'), log_dir=str(tmp_path),
+                                    autostart=True, state_db=state_db)
+    assert result['started'] is True
+    env = popen.call_args.kwargs['env']
+    assert 'OPENAI_API_KEY' not in env
+    assert env['OMNISCIENCE_TENSORFOLD_HOSTS'] == 'spark=http://127.0.0.1:1234'
+    assert env['OMNISCIENCE_STATE_DB'] == state_db
+    assert env['OMNISCIENCE_PARENT_PID'] == str(os.getpid())
