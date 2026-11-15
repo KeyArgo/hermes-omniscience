@@ -6,6 +6,7 @@ import { recoverStaleKey } from './token';
 import type { OmniEvent, SessionMeta, Warning } from './types';
 import { groupMembers } from './graph/collapse';
 import { type Graph, type GNode } from './graph/reduce';
+import GraphWorker from './graph/graph.worker?worker&inline';
 import {
   CONNECTION_TEXT,
   activityAge,
@@ -1239,7 +1240,9 @@ export default function App() {
   selectedRootRef.current = selectedRoot;
   useEffect(() => {
     const root = selectedRoot;
-    const worker = new Worker(new URL('./graph/graph.worker.ts', import.meta.url), { type: 'module' });
+    // The Hermes sandbox has an opaque origin; a same-site worker URL is cross-origin there.
+    // Vite's inline worker creates a blob in the frame's own origin instead.
+    const worker = new GraphWorker();
     worker.onmessage = (message: MessageEvent<typeof computed>) => {
       if (message.data.root !== selectedRootRef.current) return;
       setComputed(message.data);

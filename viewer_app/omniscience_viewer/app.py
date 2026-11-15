@@ -83,6 +83,19 @@ class SandboxedFrameCors:
             key.decode("latin-1").lower(): value.decode("latin-1")
             for key, value in (scope.get("headers") or [])
         }
+        # The sandbox's opaque origin also makes module scripts and stylesheets cross-origin.
+        # Public hashed assets need CORS, but never expose the token-bearing HTML document.
+        is_asset = path.startswith("/assets/") and scope.get("method", "").upper() in ("GET", "HEAD")
+        if is_asset:
+            async def asset_cors(message: dict) -> None:
+                if message.get("type") == "http.response.start":
+                    extra = [(b"vary", b"origin")]
+                    if headers.get("origin") == "null":
+                        extra.append((b"access-control-allow-origin", b"null"))
+                    message = {**message, "headers": list(message.get("headers") or []) + extra}
+                await send(message)
+            await self.app(scope, receive, asset_cors)
+            return
         if not path.startswith("/api/") or headers.get("origin") != "null":
             await self.app(scope, receive, send)
             return

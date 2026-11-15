@@ -185,6 +185,34 @@ def test_a_foreign_site_is_not_granted_cors(tmp_path):
     assert got.headers.get("access-control-allow-origin") in (None, "")
 
 
+@pytest.mark.parametrize("module", ["omniscience_viewer.app", "omniscience.viewer_app.omniscience_viewer.app"])
+def test_sandboxed_frame_can_load_static_assets_without_exposing_page(tmp_path, module):
+    import importlib
+    from fastapi.testclient import TestClient
+
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    (assets / "app.js").write_text("export const ready = true;")
+    (assets / "app.css").write_text("body { color: white; }")
+    (tmp_path / "index.html").write_text("<html><head></head></html>")
+    client = TestClient(importlib.import_module(module).create_app(
+        str(tmp_path / "events.db"), static_dir=str(tmp_path), token="secret"
+    ), base_url="http://127.0.0.1")
+    for asset in ("app.js", "app.css"):
+        path = "/assets/" + asset
+        frame = client.get(path, headers={"Origin": "null"})
+        assert frame.status_code == 200
+        assert frame.headers.get("access-control-allow-origin") == "null"
+        assert "origin" in frame.headers.get("vary", "").lower()
+        for origin in ("https://evil.example", None):
+            headers = {"Origin": origin} if origin else {}
+            response = client.get(path, headers=headers)
+            assert "access-control-allow-origin" not in response.headers
+            assert "origin" in response.headers.get("vary", "").lower()
+    assert "access-control-allow-origin" not in client.get("/", headers={"Origin": "null"}).headers
+    assert client.get("/api/v1/sessions", headers={"Origin": "null"}).status_code == 401
+
+
 def test_a_sandboxed_frame_may_open_the_live_feed():
     """The WebSocket Origin check must accept the opaque origin the sandboxed frame reports."""
     from omniscience_viewer.app import _origin_allowed
