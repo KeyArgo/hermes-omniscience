@@ -822,6 +822,20 @@ export default function App() {
     if (!chatsOpen) return;
     const onKey = (event: KeyboardEvent) => {
       const active = document.activeElement;
+      if (narrow && event.key === 'Tab' && !event.defaultPrevented && chatsPanelRef.current) {
+        const items = Array.from(chatsPanelRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        )).filter((item) => item.tabIndex >= 0 && item.getClientRects().length > 0 &&
+          getComputedStyle(item).visibility !== 'hidden' && !item.closest('[inert], [hidden]'));
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (items.length && (!chatsPanelRef.current.contains(active) || active === chatsPanelRef.current ||
+          (event.shiftKey && active === first) || (!event.shiftKey && active === last))) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
+        return;
+      }
       const engaged =
         active === chatsButtonRef.current || chatsPanelRef.current?.contains(active) === true;
       // On a wide window the list is a persistent column: Escape leaves it alone. On a narrow one
@@ -2061,6 +2075,8 @@ export default function App() {
           id="chats-panel"
           ref={chatsPanelRef}
           aria-label="Chats"
+          role={narrow && chatsOpen ? 'dialog' : undefined}
+          aria-modal={narrow && chatsOpen ? true : undefined}
           // At drawer widths the closed list is not just off-screen: it is out of the tab order
           // and the accessibility tree. The attribute is inert on wide windows, where it is a
           // visible column and `hidden` is false.

@@ -1237,6 +1237,13 @@ try {
     const close = await page.getByRole('button', { name: 'Close chats' }).boundingBox();
     check(drawer !== null && drawer.y <= 1 && drawer.height >= 700, `400px drawer is ${JSON.stringify(drawer)}`);
     check(close !== null && close.y >= 0 && close.y < 120, `400px drawer Close is ${JSON.stringify(close)}`);
+    for (const key of ['Tab', 'Shift+Tab']) {
+      for (let i = 0; i < 25; i += 1) {
+        await page.keyboard.press(key);
+        check(await page.evaluate(() => document.querySelector('#chats-panel')?.contains(document.activeElement)),
+          `Chats drawer lost focus on ${key} press ${i + 1}`);
+      }
+    }
     await page.screenshot({ path: `${SHOT_DIR}hermes-console-400-chats.png` });
     await page.getByRole('button', { name: 'Close chats' }).click();
     await page.waitForTimeout(300);

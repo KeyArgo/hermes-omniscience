@@ -405,7 +405,7 @@ function GraphCanvas({
       cancelled = true;
       window.clearTimeout(timer);
     };
-    // center only when the app explicitly asks (Next error or a deep selection), not on every click
+    // Centre when the app requests focus, including a selected graph node.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusToken]);
 
@@ -427,7 +427,7 @@ function GraphCanvas({
             ? turnId
             : `turn:${turnId}`
           : node.id,
-        { focus: false },
+        { focus: true },
       );
       return;
     }
@@ -440,7 +440,7 @@ function GraphCanvas({
       return;
     }
     void event;
-    onSelect(node.id, { focus: false });
+    onSelect(node.id, { focus: true });
   };
 
   // Resize the window (or collapse a rail) and the nodes keep their old coordinates: a graph
@@ -484,7 +484,17 @@ function GraphCanvas({
   );
 
   return (
-    <div className="graph-shell" ref={shellRef} style={{ width: '100%', height: '100%', minHeight: 0 }}>
+    <div className="graph-shell" ref={shellRef} style={{ width: '100%', height: '100%', minHeight: 0 }}
+      onKeyDownCapture={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        const target = event.target as HTMLElement;
+        if (!target.classList.contains('react-flow__node')) return;
+        const node = getNodes().find((candidate) => candidate.id === target.dataset.id);
+        if (!node) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect(node.id, { focus: true });
+      }}>
     <ReactFlow
       nodes={nodes}
       edges={edges}
