@@ -1831,6 +1831,12 @@ button.ctx-strip-cost:hover {
    12. Responsive layout — wrap, never clip
    ========================================================================== */
 
+@media (max-width: 1750px) {
+  .topbar.is-compact-header { min-height: 0; padding: 10px 16px; gap: 8px 12px; }
+  .topbar.is-compact-header .topbar-main { gap: 8px 14px; }
+  .topbar.is-compact-header .brand-sub { display: none; }
+}
+
 @media (max-width: 1439px) {
   .app:not(.app-mini) {
     grid-template-rows: auto minmax(0, 1fr) auto auto;

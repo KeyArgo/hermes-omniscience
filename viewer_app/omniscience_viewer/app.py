@@ -697,6 +697,27 @@ def create_app(db_path: str, static_dir: str | None = None,
         """The settings the chat and the viewer share (today: the in-chat summary)."""
         return prefs_mod.load(prefs_mod.path_for(db_path))
 
+    @app.get("/api/v1/tour-seen")
+    def get_tour_seen() -> dict:
+        """Remember onboarding across opaque-origin desktop frame reloads."""
+        path = os.path.join(os.path.dirname(prefs_mod.path_for(db_path)), ".tour-seen")
+        return {"seen": os.path.isfile(path)}
+
+    @app.post("/api/v1/tour-seen")
+    def set_tour_seen() -> dict:
+        path = os.path.join(os.path.dirname(prefs_mod.path_for(db_path)), ".tour-seen")
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            # No user content is stored. Exclusive creation avoids following an existing symlink.
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
+        except FileExistsError:
+            if not os.path.isfile(path) or os.path.islink(path):
+                raise HTTPException(status_code=500, detail="could not save tour state")
+        except OSError:
+            raise HTTPException(status_code=500, detail="could not save tour state")
+        return {"seen": True}
+
     @app.post("/api/v1/prefs")
     def set_prefs(payload: dict = Body(...)) -> dict:
         """Change a shared setting. Unknown keys are ignored; values are validated."""

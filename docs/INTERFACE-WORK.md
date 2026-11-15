@@ -1,7 +1,8 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit d38cc96
-> **Revised:** 2026-11-15 · **Body hash:** a23215d0
+> **Applies to:** Omniscience 1.0.0 · written at commit fcf4812
+> **Revised:** 2026-11-15 · **Body hash:** 8ecb2944
+
 
 
 
@@ -75,6 +76,13 @@ current as fixes land; report tests and unresolved issues against the exact comm
   real Windows/macOS testing, owner visual acceptance, final independent review.
 
 ## Verification and release
+
+- The first-run tour dismissal is saved by the authenticated viewer so it can survive an opaque
+  Hermes frame reload; Help includes optional subject lessons. The compact header now applies up
+  to 1750 px to leave more vertical room. These changes need verification in the real Desktop.
+- Hermes does not currently expose a supported temporary host layout override for plugins. Automatic
+  Focus on entry and restoration on exit requires a scoped host SDK API that preserves user edits;
+  do not mutate host-owned layout storage. Until then the user chooses Focus in Hermes.
 
 - Run meaningful browser interaction checks in an actual opaque-origin frame, plus frontend and
   Python checks appropriate to the changes. Verify built `viewer_app/static` matches web source.

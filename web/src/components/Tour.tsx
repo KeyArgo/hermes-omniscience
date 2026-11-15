@@ -8,6 +8,8 @@ import {
   type Rect,
 } from '../help/tour';
 import './Tour.css';
+import { tokenHeaders } from '../token';
+import { API_BASE } from '../api';
 
 type Mode = 'hidden' | 'offer' | 'run';
 
@@ -31,6 +33,7 @@ function writeSeen() {
   } catch {
     /* storage may throw; tour still ends */
   }
+  void fetch(`${API_BASE}/tour-seen`, { method: 'POST', headers: tokenHeaders() }).catch(() => {});
 }
 
 function targetRect(sel: string): Rect | null {
@@ -59,6 +62,7 @@ export function Tour({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const nextRef = useRef<HTMLButtonElement | null>(null);
   const prevFocusRef = useRef<HTMLElement | null>(null);
+  const interactedRef = useRef(false);
   const stop = TOUR_STOPS[step];
   const last = step === TOUR_STOPS.length - 1;
 
@@ -75,6 +79,7 @@ export function Tour({
   }, []);
 
   const begin = useCallback(() => {
+    interactedRef.current = true;
     prevFocusRef.current = document.activeElement as HTMLElement | null;
     setStep(0);
     setMode('run');
@@ -100,9 +105,24 @@ export function Tour({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const decision = shouldOfferTour(readSeen(), window.location.search);
+    let cancelled = false;
+    const localSeen = readSeen();
+    const decision = shouldOfferTour(localSeen, window.location.search);
     if (decision === 'start') begin();
-    else if (decision === 'offer') setMode('offer');
+    else if (decision === 'offer') {
+      void fetch(`${API_BASE}/tour-seen`, { headers: tokenHeaders() })
+        .then((response) => {
+          if (!response.ok) throw new Error('Tour state unavailable');
+          return response.json() as Promise<{ seen: boolean }>;
+        })
+        .then((state) => {
+          if (!cancelled && !interactedRef.current && !state.seen) setMode((current) => current === 'hidden' ? 'offer' : current);
+        })
+        .catch(() => {
+          if (!cancelled && !interactedRef.current) setMode((current) => current === 'hidden' ? 'offer' : current);
+        });
+    }
+    return () => { cancelled = true; };
   }, [begin]);
 
   useEffect(() => {

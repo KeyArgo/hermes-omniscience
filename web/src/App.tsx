@@ -677,7 +677,7 @@ export default function App() {
   // At tablet and phone widths the secondary header controls would need four to eight rows of
   // 48 px targets. They stay one press away in the Workspace sheet instead of being clipped or
   // shrunk; every control is still rendered, labelled and keyboard reachable.
-  const compactHeader = useMediaQuery('(max-width: 1439px)');
+  const compactHeader = useMediaQuery('(max-width: 1750px)');
   // On a phone or small tablet the two quick toggles would add a third header row; they stay in
   // the Workspace sheet there. Laptop widths keep them inline.
   const phoneHeader = useMediaQuery('(max-width: 1000px)');

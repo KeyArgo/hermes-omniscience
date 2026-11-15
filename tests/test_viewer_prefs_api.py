@@ -9,6 +9,20 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "viewer"))
 
 import prefs
+
+
+def test_tour_state_survives_new_viewer_and_requires_auth(tmp_path):
+    from omniscience_viewer.app import create_app
+
+    db = str(tmp_path / "events.db")
+    client = TestClient(create_app(db, token="secret"), base_url="http://127.0.0.1")
+    headers = {"X-Omni-Token": "secret"}
+    assert client.get("/api/v1/tour-seen", headers=headers).json() == {"seen": False}
+    assert client.post("/api/v1/tour-seen").status_code in (401, 403)
+    assert client.post("/api/v1/tour-seen", headers=headers).json() == {"seen": True}
+    restarted = TestClient(create_app(db, token="secret"), base_url="http://127.0.0.1")
+    assert restarted.get("/api/v1/tour-seen", headers=headers).json() == {"seen": True}
+    assert restarted.post("/api/v1/tour-seen", headers=headers).status_code == 200
 from omniscience_viewer.app import create_app
 
 

@@ -82,6 +82,14 @@ export function HelpPanel({ open, onClose }: { open: boolean; onClose: () => voi
           </button>
         </div>
         <div className="help-body">
+          <section aria-label="Subject lessons">
+            <h2>Learn at your own pace</h2>
+            <p>Start with the quick tour, then open a subject when you need more detail.</p>
+            <details><summary>Investigate a failure</summary><p>Choose a chat, open its Summary or Briefing, and use the failure arrows to move between recorded failures. Select a step to inspect its details. A warning is a clue, not proof of a cause.</p></details>
+            <details><summary>Read the map and timeline</summary><p>The map groups activity into messages and steps. Expand a group to inspect it, select a box for details, and use the timeline to move through recorded activity. The List and Time views offer other ways to follow the same run.</p></details>
+            <details><summary>Understand tokens and privacy</summary><p>Tokens shows how much text model calls used. Privacy shows recorded privacy activity for the selected time period; change the period if you are looking for older activity. Missing recordings are not evidence that nothing happened.</p></details>
+            <details><summary>Make room for the data</summary><p>Use Expand view or Expand details to focus on one area. Workspace contains panel controls and the tour. In Hermes, the host layout controls determine how much room Omniscience receives.</p></details>
+          </section>
           <section className="help-example" aria-label="Example walkthrough">
             <h2>Try an example · {exampleStep + 1} of {EXAMPLE.length}</h2>
             <strong>{EXAMPLE[exampleStep].title}</strong>
