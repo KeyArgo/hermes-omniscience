@@ -292,6 +292,8 @@ async function measure(page) {
         chipsScrollable: chips ? chips.scrollWidth > chips.clientWidth + 1 : false,
         chipsClient: chips?.clientWidth ?? 0,
         chipsScroll: chips?.scrollWidth ?? 0,
+        chipsOverflow: chips ? getComputedStyle(chips).overflowX : '',
+        chipsControls: chips?.querySelectorAll('button, select, input, a[href]').length ?? 0,
         scrollableControls: controls.filter((c) => c.scrollable).length,
       },
       controls,
@@ -453,7 +455,8 @@ try {
             `${name}: replay bar is ${state.graph.replayHeight}px over ${state.graph.replayRows} row(s)`,
           );
           check(
-            !state.graph.chipsScrollable || state.graph.scrollableControls > 0,
+            !state.graph.chipsScrollable ||
+              (['auto', 'scroll'].includes(state.graph.chipsOverflow) && state.graph.chipsControls > 0),
             `${name}: toolbar overflow has no scrollable control`,
           );
         }

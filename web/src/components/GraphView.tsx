@@ -25,6 +25,9 @@ const TYPES: NodeTypes = nodeTypes;
 // whole shape.
 const MIN_FIT_ZOOM = 0.9;
 const OVERVIEW_ZOOM = 1;
+// Leave enough time for a double-click to arrive before a single click opens the inspector and
+// changes the graph viewport under the second click.
+const NODE_CLICK_DELAY_MS = 280;
 
 const STATUS_COLOR: Record<string, string> = {
   running: '#22d3ee',
@@ -104,6 +107,9 @@ function GraphCanvas({
   const userCameraMovedRef = useRef(false);
   const lastShellSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pendingResizeRef = useRef<{ before: { width: number; height: number } } | null>(null);
+  const singleClickTimerRef = useRef<number | null>(null);
+  const pendingClickRef = useRef<{ nodeId: string; graphKey: string } | null>(null);
+  const previousFocusTokenRef = useRef(focusToken);
   const markCameraIntent = () => {
     userCameraMovedRef.current = true;
     userCameraRevisionRef.current += 1;
@@ -114,6 +120,20 @@ function GraphCanvas({
     focusGuardRef.current = 0;
     userCameraRevisionRef.current += 1;
   };
+  const cancelPendingNodeClick = useCallback(() => {
+    if (singleClickTimerRef.current !== null) {
+      window.clearTimeout(singleClickTimerRef.current);
+      singleClickTimerRef.current = null;
+    }
+    pendingClickRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (previousFocusTokenRef.current !== focusToken) cancelPendingNodeClick();
+    previousFocusTokenRef.current = focusToken;
+  }, [focusToken, cancelPendingNodeClick]);
+
+  useEffect(() => () => cancelPendingNodeClick(), [cancelPendingNodeClick]);
 
   const clearInitialTimers = useCallback(() => {
     for (const timer of initialTimersRef.current) window.clearTimeout(timer);
@@ -320,6 +340,7 @@ function GraphCanvas({
   useEffect(() => {
     if (previousLinkView.current === linkView) return;
     previousLinkView.current = linkView;
+    cancelPendingNodeClick();
     userCameraMovedRef.current = false;
     focusedNodeRef.current = null;
     focusGuardRef.current = 0;
@@ -343,7 +364,7 @@ function GraphCanvas({
       window.clearTimeout(timer);
       if (linkFrameTimerRef.current === timer) linkFrameTimerRef.current = null;
     };
-  }, [linkView, fitView]);
+  }, [linkView, fitView, cancelPendingNodeClick]);
 
   useEffect(() => {
     if (nodes.length === 0) {
@@ -351,6 +372,7 @@ function GraphCanvas({
       // cancel its timers, or the new graph inherits "already fitted" from the stale old one and
       // never gets framed.
       fittedFor.current = null;
+      cancelPendingNodeClick();
       userCameraMovedRef.current = false;
       focusedNodeRef.current = null;
       focusGuardRef.current = 0;
@@ -368,6 +390,7 @@ function GraphCanvas({
     }
     if (fittedFor.current === graphKey) return;
     fittedFor.current = graphKey;
+    cancelPendingNodeClick();
     userCameraMovedRef.current = false;
     focusedNodeRef.current = null;
     focusGuardRef.current = 0;
@@ -390,11 +413,12 @@ function GraphCanvas({
     ];
     return clearInitialTimers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphKey, nodes.length === 0, clearInitialTimers]);
+  }, [graphKey, nodes.length === 0, clearInitialTimers, cancelPendingNodeClick]);
 
   // Reset view: forget the "already fitted" mark so the camera frames everything again.
   useEffect(() => {
     if (!resetToken) return;
+    cancelPendingNodeClick();
     fittedFor.current = null;
     focusGuardRef.current = 0;
     clearInitialTimers();
@@ -415,7 +439,7 @@ function GraphCanvas({
     focusedNodeRef.current = null;
     void fitView({ padding: 0.22, maxZoom: 1.2, duration: 260 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetToken]);
+  }, [resetToken, cancelPendingNodeClick]);
 
   useEffect(() => {
     if (!focusToken || !selectedId) return;
@@ -470,6 +494,7 @@ function GraphCanvas({
     event: React.SyntheticEvent,
     node: { id: string; type?: string; data?: Record<string, unknown> },
   ) => {
+    cancelPendingNodeClick();
     // A click always means "show me this", even when it also expands or folds. Returning early
     // here left the Inspect rail untouched for groups and for expanded turns, so the one thing a
     // reader tries first — click a step, see its details — silently did nothing.
@@ -496,8 +521,27 @@ function GraphCanvas({
       onFoldTurn?.(turnId.replace(/^turn:/, ''));
       return;
     }
-    void event;
-    onSelect(node.id, { focus: true });
+    const nativeEvent = event.nativeEvent;
+    const isPointerClick = nativeEvent instanceof MouseEvent && nativeEvent.type === 'click';
+    if (!isPointerClick) {
+      // Keyboard activation stays immediate and predictable; only pointer clicks wait briefly to
+      // distinguish a single select from the first half of a double-click.
+      onSelect(node.id, { focus: true });
+      return;
+    }
+    if (nativeEvent.detail > 1) {
+      // The node-level double-click handler below owns selection and zoom for this gesture.
+      return;
+    }
+    pendingClickRef.current = { nodeId: node.id, graphKey };
+    singleClickTimerRef.current = window.setTimeout(() => {
+      singleClickTimerRef.current = null;
+      const pending = pendingClickRef.current;
+      pendingClickRef.current = null;
+      if (!pending || pending.nodeId !== node.id || pending.graphKey !== graphKey) return;
+      if (!getNodes().some((candidate) => candidate.id === node.id)) return;
+      onSelect(node.id, { focus: true });
+    }, NODE_CLICK_DELAY_MS);
   };
 
   // Resize the window (or collapse a rail) and the nodes keep their old coordinates: a graph
@@ -588,10 +632,15 @@ function GraphCanvas({
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable
+      zoomOnDoubleClick={false}
       onNodeClick={(event, node) => handleNodeClick(event, node)}
       onNodeDoubleClick={(event, node) => {
         event.stopPropagation();
+        cancelPendingNodeClick();
         markCameraIntent();
+        // The first click was deferred, so this handler must also select the node and open its
+        // inspector. focus:false avoids a competing selection-centering animation.
+        onSelect(node.id, { focus: false });
         const size = NODE_SIZE[node.type as keyof typeof NODE_SIZE] ?? { width: 200, height: 60 };
         void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
           zoom: Math.max(getZoom(), 1.5), duration: 250,
@@ -603,7 +652,10 @@ function GraphCanvas({
         // reframing it. This also cancels the delayed second centering pass after a click.
         if (event !== null) markCameraIntent();
       }}
-      onPaneClick={() => onSelect(null)}
+      onPaneClick={() => {
+        cancelPendingNodeClick();
+        onSelect(null);
+      }}
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={28} size={1} color="#221f1b" />

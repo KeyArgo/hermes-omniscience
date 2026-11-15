@@ -169,8 +169,57 @@ try {
     Math.abs(afterControlResize.worldY - beforeControlResize.worldY) < 18,
   'zoom-control resize changed the graph center');
 
+  // Start fresh so the inspector is closed. On the first double-click, the first click must not
+  // open the inspector and move the graph away from the second click's screen coordinate.
+  await page.reload();
+  await page.waitForTimeout(3200);
+  const freshSession = page.locator('.session-item').first();
+  await freshSession.evaluate((element) => element.click());
+  await page.waitForTimeout(900);
+  const firstDoubleClickId = await page.evaluate(() => {
+    const shell = document.querySelector('.graph-shell')?.getBoundingClientRect();
+    if (!shell) return null;
+    const node = [...document.querySelectorAll('.graph-surface .react-flow__node')].find((candidate) => {
+      if (candidate.classList.contains('selected')) return false;
+      if (candidate.classList.contains('react-flow__node-group') || candidate.classList.contains('react-flow__node-turn')) return false;
+      const rect = candidate.getBoundingClientRect();
+      return rect.right > shell.left && rect.left < shell.right && rect.bottom > shell.top && rect.top < shell.bottom;
+    });
+    return node?.getAttribute('data-id') ?? null;
+  });
+  assert.ok(firstDoubleClickId, 'no unselected regular node available for a first double-click');
+  const doubleTargetSelector = await page.evaluate((nodeId) =>
+    `.react-flow__node[data-id="${CSS.escape(nodeId)}"]`, firstDoubleClickId);
+  const doubleTarget = page.locator(doubleTargetSelector);
+  await doubleTarget.dblclick({ delay: 80 });
+  await page.waitForTimeout(900);
+  const doubleClickCamera = await camera();
+  assert.ok(await page.locator('.rail-right.has-selection').count(),
+    'first double-click did not select its previously unselected node');
+  assert.ok(doubleClickCamera && doubleClickCamera.zoom >= 1.45,
+    `first double-click did not zoom to the node: ${doubleClickCamera?.zoom}`);
+
+  // Keyboard activation remains immediate; it must not wait out the pointer single-click delay.
+  const keyboardTargetId = await page.evaluate((excludedId) => {
+    const node = [...document.querySelectorAll('.graph-surface .react-flow__node')].find((candidate) =>
+      candidate.getAttribute('data-id') !== excludedId &&
+      !candidate.classList.contains('react-flow__node-group') &&
+      !candidate.classList.contains('react-flow__node-turn'));
+    return node?.getAttribute('data-id') ?? null;
+  }, firstDoubleClickId);
+  assert.ok(keyboardTargetId, 'no regular node available for keyboard selection');
+  const keyboardTargetSelector = await page.evaluate((nodeId) =>
+    `.react-flow__node[data-id="${CSS.escape(nodeId)}"]`, keyboardTargetId);
+  const keyboardTarget = page.locator(keyboardTargetSelector);
+  await keyboardTarget.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(900);
+  const keyboardCenter = await centered(keyboardTargetId);
+  assert.ok(keyboardCenter && keyboardCenter.dx < 42 && keyboardCenter.dy < 42,
+    `keyboard selection did not immediately focus its node: ${JSON.stringify(keyboardCenter)}`);
+
   assert.deepEqual(pageErrors, [], `browser page errors: ${pageErrors.join('; ')}`);
-  console.log('PASS selection, pan and zoom-control camera survive resize');
+  console.log('PASS selection, resize camera, first double-click and keyboard selection');
 } finally {
   await browser?.close();
   await server.close();

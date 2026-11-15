@@ -1563,8 +1563,9 @@ input[type="range"] {
 }
 
 .fold-button {
-  min-width: 40px;
-  min-height: 40px;
+  /* The map can auto-frame at 0.9×; 50px leaves a 45px target at that scale. */
+  min-width: 50px;
+  min-height: 50px;
   padding: 6px 10px;
   font-size: 13px;
 }
