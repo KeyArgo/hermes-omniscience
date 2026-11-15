@@ -15,7 +15,10 @@
     "check:events": "node dev/app-events-harness.mjs",
     "check:visual": "node dev/interface-slice.mjs",
     "check:selection-resize": "node dev/selection-resize.mjs",
-    "check:readability": "node dev/readability-check.mjs"
+    "check:readability": "node dev/readability-check.mjs",
+    "check:sandbox-viewer": "node dev/sandbox-viewer-check.mjs",
+    "check:pane-lifecycle": "node dev/pane-lifecycle.mjs",
+    "check:graph-resize": "node dev/graph-resize-guard.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",

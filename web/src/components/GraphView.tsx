@@ -84,7 +84,7 @@ function GraphCanvas({
   resetToken = 0,
   graphKey,
 }: CanvasProps) {
-  const { fitView, setCenter, getNodes, getZoom, getNodesBounds } = useReactFlow();
+  const { fitView, setCenter, getNodes, getZoom, getViewport, getNodesBounds } = useReactFlow();
   const fittedFor = useRef<string | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   // The camera code must not be recreated when the graph grows. `frameGraph` used to close over
@@ -93,11 +93,27 @@ function GraphCanvas({
   // count and the callback in refs so the observer and its debounce survive node-count changes.
   const nodesCountRef = useRef(0);
   const frameGraphRef = useRef<() => void>(() => {});
+  const centerNodeRef = useRef<(id: string, duration?: number) => boolean>(() => false);
   const retryRef = useRef<{ timer: number | null; attempts: number }>({ timer: null, attempts: 0 });
   const initialTimersRef = useRef<number[]>([]);
   const observerTimerRef = useRef<number | null>(null);
   const linkFrameTimerRef = useRef<number | null>(null);
   const focusGuardRef = useRef(0);
+  const focusedNodeRef = useRef<string | null>(null);
+  const userCameraRevisionRef = useRef(0);
+  const userCameraMovedRef = useRef(false);
+  const lastShellSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const pendingResizeRef = useRef<{ before: { width: number; height: number } } | null>(null);
+  const markCameraIntent = () => {
+    userCameraMovedRef.current = true;
+    userCameraRevisionRef.current += 1;
+  };
+  const clearCameraIntent = () => {
+    userCameraMovedRef.current = false;
+    focusedNodeRef.current = null;
+    focusGuardRef.current = 0;
+    userCameraRevisionRef.current += 1;
+  };
 
   const clearInitialTimers = useCallback(() => {
     for (const timer of initialTimersRef.current) window.clearTimeout(timer);
@@ -280,6 +296,23 @@ function GraphCanvas({
   }, [getNodes, getNodesBounds, setCenter]);
   frameGraphRef.current = frameGraph;
 
+  // Keep a selected node centered after a layout resize while the inspector is opening. This is
+  // deliberately separate from frameGraph: fitting the whole graph here would undo the explicit
+  // selection the reader just made.
+  const centerNode = useCallback((id: string, duration = 0) => {
+    const node = getNodes().find((candidate) => candidate.id === id);
+    if (!node || node.position == null) return false;
+    const nodeType = node.type as keyof typeof NODE_SIZE | undefined;
+    const nodeSize = (nodeType && NODE_SIZE[nodeType]) || { width: 200, height: 60 };
+    void setCenter(
+      (node.position.x ?? 0) + (node.width ?? nodeSize.width) / 2,
+      (node.position.y ?? 0) + (node.height ?? nodeSize.height) / 2,
+      { zoom: Math.max(getZoom(), 0.9), duration },
+    );
+    return true;
+  }, [getNodes, getZoom, setCenter]);
+  centerNodeRef.current = centerNode;
+
   // Switching Timeline/Links changes every position. Frame the new layout after it renders;
   // otherwise the old camera can be looking at empty canvas. Explicit layout change, so moving the
   // camera is expected.
@@ -287,6 +320,14 @@ function GraphCanvas({
   useEffect(() => {
     if (previousLinkView.current === linkView) return;
     previousLinkView.current = linkView;
+    userCameraMovedRef.current = false;
+    focusedNodeRef.current = null;
+    focusGuardRef.current = 0;
+    if (observerTimerRef.current !== null) {
+      window.clearTimeout(observerTimerRef.current);
+      observerTimerRef.current = null;
+    }
+    pendingResizeRef.current = null;
     // Links is an explicit layout change, so frame the whole web rather than keep the timeline
     // camera. This may zoom far out on a large chat, but an empty canvas is worse; the user can
     // zoom back in from a visible shape.
@@ -310,15 +351,31 @@ function GraphCanvas({
       // cancel its timers, or the new graph inherits "already fitted" from the stale old one and
       // never gets framed.
       fittedFor.current = null;
+      userCameraMovedRef.current = false;
+      focusedNodeRef.current = null;
+      focusGuardRef.current = 0;
       clearInitialTimers();
       if (retryRef.current.timer !== null) {
         window.clearTimeout(retryRef.current.timer);
         retryRef.current.timer = null;
       }
+      if (observerTimerRef.current !== null) {
+        window.clearTimeout(observerTimerRef.current);
+        observerTimerRef.current = null;
+      }
+      pendingResizeRef.current = null;
       return;
     }
     if (fittedFor.current === graphKey) return;
     fittedFor.current = graphKey;
+    userCameraMovedRef.current = false;
+    focusedNodeRef.current = null;
+    focusGuardRef.current = 0;
+    if (observerTimerRef.current !== null) {
+      window.clearTimeout(observerTimerRef.current);
+      observerTimerRef.current = null;
+    }
+    pendingResizeRef.current = null;
     // A new graph or the first boxes: frame now and once after the store settles. The second pass
     // catches a late batch; appends on the same graph no longer enter this effect at all.
     if (retryRef.current.timer !== null) {
@@ -349,10 +406,13 @@ function GraphCanvas({
       window.clearTimeout(observerTimerRef.current);
       observerTimerRef.current = null;
     }
+    pendingResizeRef.current = null;
     if (linkFrameTimerRef.current !== null) {
       window.clearTimeout(linkFrameTimerRef.current);
       linkFrameTimerRef.current = null;
     }
+    userCameraMovedRef.current = false;
+    focusedNodeRef.current = null;
     void fitView({ padding: 0.22, maxZoom: 1.2, duration: 260 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetToken]);
@@ -363,6 +423,11 @@ function GraphCanvas({
     let attempts = 0;
     let recentred = false;
     let timer: number | undefined;
+    const cameraRevision = userCameraRevisionRef.current;
+    // An explicit selection supersedes an older manual pan. A new manual gesture during the
+    // centering window will increment the revision and cancel the delayed second center.
+    userCameraMovedRef.current = false;
+    focusedNodeRef.current = selectedId;
     // Opening the inspector is a real resize, and its 140 ms reframe would otherwise land after
     // this explicit focus and centre the newest node instead. Let the requested selection win.
     focusGuardRef.current = performance.now() + 2500;
@@ -371,28 +436,20 @@ function GraphCanvas({
       window.clearTimeout(observerTimerRef.current);
       observerTimerRef.current = null;
     }
+    pendingResizeRef.current = null;
     const centre = () => {
       if (cancelled) return;
-      const node = getNodes().find((candidate) => candidate.id === selectedId);
+      if (cameraRevision !== userCameraRevisionRef.current) return;
       // A selection inside a folded group expands the group first; the child node does not exist
       // in React Flow until the worker returns the expanded graph. Retry for a bounded time rather
       // than centring once against nothing and giving up.
-      if (!node || node.position == null) {
+      if (!centerNodeRef.current(selectedId, 320)) {
         if (attempts < 12) {
           attempts += 1;
           timer = window.setTimeout(centre, 120);
         }
         return;
       }
-      const nodeType = node.type as keyof typeof NODE_SIZE | undefined;
-      const nodeSize = (nodeType && NODE_SIZE[nodeType]) || { width: 200, height: 60 };
-      const width = node.width ?? nodeSize.width;
-      const height = node.height ?? nodeSize.height;
-      void setCenter(
-        (node.position.x ?? 0) + width / 2,
-        (node.position.y ?? 0) + height / 2,
-        { zoom: Math.max(getZoom(), 0.9), duration: 320 },
-      );
       // The inspector rail finishes resizing after the first centre. A second pass at the settled
       // geometry puts the node at the real middle of the map.
       if (!recentred) {
@@ -451,15 +508,41 @@ function GraphCanvas({
   useEffect(() => {
     const shell = shellRef.current;
     if (!shell) return;
-    let last = `${Math.round(shell.clientWidth)}x${Math.round(shell.clientHeight)}`;
+    lastShellSizeRef.current = { width: shell.clientWidth, height: shell.clientHeight };
     const observer = new ResizeObserver(() => {
-      if (performance.now() < focusGuardRef.current) return;
-      const key = `${Math.round(shell.clientWidth)}x${Math.round(shell.clientHeight)}`;
-      if (key === last) return;
-      last = key;
+      const next = { width: shell.clientWidth, height: shell.clientHeight };
+      const previous = lastShellSizeRef.current;
+      if (!previous || (Math.round(next.width) === Math.round(previous.width) &&
+        Math.round(next.height) === Math.round(previous.height))) return;
+
+      // Always consume the observed size, even when this is the inspector's own resize. Otherwise
+      // a real window resize inside the old long guard can be swallowed with no later callback.
+      lastShellSizeRef.current = next;
+      pendingResizeRef.current ??= { before: previous };
       if (observerTimerRef.current !== null) window.clearTimeout(observerTimerRef.current);
       observerTimerRef.current = window.setTimeout(() => {
         observerTimerRef.current = null;
+        const pending = pendingResizeRef.current;
+        pendingResizeRef.current = null;
+        if (userCameraMovedRef.current && pending) {
+          // React Flow keeps the world transform when its viewport changes. Re-center the same
+          // world point at the new viewport dimensions, preserving the reader's pan and zoom.
+          const size = pending.before;
+          const viewport = getViewport();
+          if (size.width > 0 && size.height > 0 && viewport.zoom > 0) {
+            void setCenter(
+              (size.width / 2 - viewport.x) / viewport.zoom,
+              (size.height / 2 - viewport.y) / viewport.zoom,
+              { zoom: viewport.zoom, duration: 0 },
+            );
+          }
+          return;
+        }
+        if (performance.now() < focusGuardRef.current) {
+          const focusedNode = focusedNodeRef.current;
+          if (focusedNode) centerNodeRef.current(focusedNode, 0);
+          return;
+        }
         frameGraphRef.current();
       }, 140);
     });
@@ -470,8 +553,9 @@ function GraphCanvas({
         window.clearTimeout(observerTimerRef.current);
         observerTimerRef.current = null;
       }
+      pendingResizeRef.current = null;
     };
-  }, []);
+  }, [getViewport, setCenter]);
 
   useEffect(
     () => () => {
@@ -507,16 +591,29 @@ function GraphCanvas({
       onNodeClick={(event, node) => handleNodeClick(event, node)}
       onNodeDoubleClick={(event, node) => {
         event.stopPropagation();
+        markCameraIntent();
         const size = NODE_SIZE[node.type as keyof typeof NODE_SIZE] ?? { width: 200, height: 60 };
         void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
           zoom: Math.max(getZoom(), 1.5), duration: 250,
         });
       }}
+      onMoveStart={(event) => {
+        // Programmatic setCenter/fitView reports a null event. Only real pointer/touch/wheel moves
+        // count as user intent, so later pane/window resizes preserve that camera instead of
+        // reframing it. This also cancels the delayed second centering pass after a click.
+        if (event !== null) markCameraIntent();
+      }}
       onPaneClick={() => onSelect(null)}
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={28} size={1} color="#221f1b" />
-      <Controls showInteractive={false} position="bottom-left" />
+      <Controls
+        showInteractive={false}
+        position="bottom-left"
+        onZoomIn={markCameraIntent}
+        onZoomOut={markCameraIntent}
+        onFitView={clearCameraIntent}
+      />
       <Panel position="top-right" className="graph-zoom-hint">Use + / − to zoom · double-click a box to enlarge</Panel>
       <MiniMap
         pannable

@@ -34,6 +34,7 @@ from . import brake as brake_mod
 from . import concerns as concerns_mod
 from . import bundle as bundle_mod
 from . import privacy as privacy_mod
+from .live_queries import LiveQueryCoalescer
 from .auth import TokenMiddleware
 
 log = logging.getLogger("omniscience")
@@ -378,6 +379,7 @@ def create_app(db_path: str, static_dir: str | None = None,
     the plugin has, and a wrong guess labels chats from someone else's profile.
     """
     _watch_parent()
+    live_queries = LiveQueryCoalescer()
     app = FastAPI(title="Hermes Omniscience Viewer", docs_url=None, redoc_url=None)
     # Blocks DNS-rebinding: a hostile page can't reach us under its own hostname.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or LOCAL_HOSTS)
@@ -768,8 +770,13 @@ def create_app(db_path: str, static_dir: str | None = None,
             while True:
                 if root:
                     try:
-                        rows, error = await asyncio.to_thread(
-                            db_mod.events_for_root_checked, db_path, root, cursor, 1000
+                        rows, error = await live_queries.run(
+                            (db_path, root, cursor, 1000),
+                            db_mod.events_for_root_checked,
+                            db_path,
+                            root,
+                            cursor,
+                            1000,
                         )
                     except Exception:
                         # Never let a transient failure kill the feed silently.

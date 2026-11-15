@@ -1,7 +1,9 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit a5db339
-> **Revised:** 2026-11-15 · **Body hash:** f265e05c
+> **Applies to:** Omniscience 1.0.0 · written at commit 5e9baac
+> **Revised:** 2026-11-15 · **Body hash:** 997452c0
+
+
 
 
 This is the working checklist for the interface branch, not a release announcement. Keep it
@@ -41,9 +43,13 @@ current as fixes land; report tests and unresolved issues against the exact comm
   opt-in, add a close button, and use the host workspace API where available; verify on real Desktop.
 - One owner report observed 13 live connections and high load; a later local snapshot showed two.
   Do not claim the counts are constant. Changes fix a disabled idle-poll throttle and
-  avoid resetting reconnect backoff on a brief handshake. Both need further verification; each
-  live socket still independently polls, and shared polling is not implemented.
-- Remaining earlier issues: graph resize events during its focus guard, exact 2x button sizing,
+  avoid resetting reconnect backoff on a brief handshake. Identical queries that overlap in the
+  same viewer app are coalesced, with tests for cursor isolation, failures and disconnects. This
+  does not guarantee one query per chat per tick: staggered or different-cursor queries still run.
+- The graph focus-guard resize fix has a browser regression for selection, resize and manual pan.
+  Still verify it against real data in Hermes. A browser regression attempting to double-click a
+  graph node did not enlarge it as the on-screen hint promises; reproduce and fix that separately.
+  Remaining earlier issues: exact 2x button sizing,
   real Windows/macOS testing, owner visual acceptance, final independent review.
 
 ## Verification and release
