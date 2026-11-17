@@ -77,4 +77,28 @@ describe("desktop plugin wiring", () => {
     expect(source).not.toContain("readFileText");
     expect(typeof rest).toBe("function");
   });
+
+  it("builds the browser link itself, from its own key, and ignores what it cannot validate", async () => {
+    const mod = await loadPlugin();
+    expect(mod.browserLinkFor({ session: "abc_1", view: "graph" }, null)).toBeNull();
+    const link = new URL(mod.browserLinkFor({ session: "abc_1", view: "graph", url: "http://evil/" }, "k"));
+    expect(link.origin).toBe("http://127.0.0.1:8797");
+    expect(link.searchParams.get("t")).toBe("k");
+    expect(link.searchParams.get("host")).toBe("web");
+    expect(link.searchParams.get("session")).toBe("abc_1");
+    const odd = new URL(mod.browserLinkFor({ session: "a b/../x", view: "<script>" }, "k"));
+    expect(odd.searchParams.get("session")).toBeNull();
+    expect(odd.searchParams.get("view")).toBeNull();
+  });
+
+  it("answers an open-web request only from the viewer, and says when it cannot open", async () => {
+    const mod = await loadPlugin();
+    const replies = [];
+    const source = { postMessage: m => replies.push(m) };
+    mod.handleViewerMessage({ origin: "https://evil.example", source, data: { type: "omniscience:open-web", requestId: "r0" } });
+    expect(replies).toEqual([]);
+    // No ctx registered and no key yet: an honest "no".
+    mod.handleViewerMessage({ origin: "null", source, data: { type: "omniscience:open-web", requestId: "r1" } });
+    expect(replies).toEqual([{ type: "omniscience:open-web-result", requestId: "r1", ok: false }]);
+  });
 });

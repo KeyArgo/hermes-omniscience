@@ -1,5 +1,53 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import './MenuButton.css';
+
+/** Gap kept between a menu and the window edge, and between the trigger and the menu. */
+const EDGE = 8;
+const GAP = 6;
+const MAX_WIDTH = 440;
+
+export interface MenuPlacement {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+}
+
+/**
+ * Where a menu goes, in window coordinates. The menu is drawn in a layer above the page, so no
+ * toolbar, sheet or scrolling panel can cut it off: it opens below the trigger, flips above when
+ * there is more room there, never crosses a window edge, and scrolls inside itself when even the
+ * larger side cannot hold it.
+ */
+export function placeMenu(
+  trigger: { top: number; bottom: number; left: number; right: number },
+  contentHeight: number,
+  viewport: { width: number; height: number },
+  align: 'start' | 'end',
+): MenuPlacement {
+  const width = Math.max(0, Math.min(MAX_WIDTH, viewport.width - EDGE * 2));
+  const preferred = align === 'end' ? trigger.right - width : trigger.left;
+  const left = Math.max(EDGE, Math.min(preferred, viewport.width - EDGE - width));
+  const below = viewport.height - trigger.bottom - GAP - EDGE;
+  const above = trigger.top - GAP - EDGE;
+  const openUp = contentHeight > below && above > below;
+  const room = Math.max(120, openUp ? above : below);
+  const height = Math.min(contentHeight, room);
+  const top = openUp
+    ? Math.max(EDGE, trigger.top - GAP - height)
+    : Math.min(trigger.bottom + GAP, Math.max(EDGE, viewport.height - EDGE - height));
+  return { top, left, width, maxHeight: room };
+}
 
 export function moveFocusIndex(current: number, key: string, count: number): number {
   if (count <= 0) return -1;
@@ -91,9 +139,46 @@ export function MenuButton({
   children: ReactNode | ((close: () => void) => ReactNode);
 }) {
   const [open, setOpen] = useState(false);
+  const [placement, setPlacement] = useState<MenuPlacement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  // Measure after render and before paint, then follow the trigger while the page scrolls or the
+  // window resizes. Scroll is captured so a scrolling sheet or toolbar moves the menu with it.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlacement(null);
+      return;
+    }
+    const place = () => {
+      const trigger = triggerRef.current;
+      const pop = popRef.current;
+      if (!trigger || !pop) return;
+      const next = placeMenu(
+        trigger.getBoundingClientRect(),
+        pop.scrollHeight,
+        { width: window.innerWidth, height: window.innerHeight },
+        align,
+      );
+      setPlacement((prev) =>
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.width === next.width &&
+        prev.maxHeight === next.maxHeight
+          ? prev
+          : next,
+      );
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, align]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -108,13 +193,15 @@ export function MenuButton({
     ).filter((el) => !(el as HTMLButtonElement).disabled);
     if (items.length === 0) return;
     const target = items[Math.max(0, Math.min(index, items.length - 1))];
-    target?.focus();
+    target?.focus({ preventScroll: true });
   }, []);
 
+  const placed = placement !== null;
   useEffect(() => {
-    if (!open) return;
+    if (!open || !placed) return;
+    // preventScroll: focusing before the first paint must not scroll a clipped ancestor.
     focusItem(0);
-  }, [open, focusItem]);
+  }, [open, placed, focusItem]);
 
   useEffect(() => {
     if (!open) return;
@@ -192,21 +279,36 @@ export function MenuButton({
           <span className="mb-badge">{badge}</span>
         ) : null}
       </button>
-      {open ? (
-        <div
-          ref={popRef}
-          id={menuId}
-          className={`mb-pop mb-pop-${align}`}
-          role="menu"
-          aria-label={label}
-          onClick={(e) => {
-            const item = (e.target as HTMLElement).closest('[role="menuitem"]') as HTMLButtonElement | null;
-            if (item && !item.disabled) close();
-          }}
-        >
-          {content}
-        </div>
-      ) : null}
+      {open
+        ? createPortal(
+            <div
+              ref={popRef}
+              id={menuId}
+              className={`mb-pop mb-pop-${align} mb-pop-floating`}
+              role="menu"
+              aria-label={label}
+              style={popStyle(placement)}
+              onClick={(e) => {
+                const item = (e.target as HTMLElement).closest('[role="menuitem"]') as HTMLButtonElement | null;
+                if (item && !item.disabled) close();
+              }}
+            >
+              {content}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
+}
+
+/** First frame: measured but not yet placed, so it is laid out off-screen and invisible. */
+function popStyle(placement: MenuPlacement | null): CSSProperties {
+  if (!placement) return { top: 0, left: 0, visibility: 'hidden' };
+  return {
+    top: placement.top,
+    left: placement.left,
+    width: placement.width,
+    maxHeight: placement.maxHeight,
+  };
 }

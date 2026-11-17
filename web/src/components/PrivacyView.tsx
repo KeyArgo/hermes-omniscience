@@ -88,6 +88,24 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
     return () => { loadId.current += 1; };
   }, [days, load]);
 
+  /** Which runs are flagged now, so each row offers Flag or Unflag. */
+  const flagByEvent = useMemo(() => {
+    const by = new Map<string, string>();
+    for (const entry of flags) if (entry.event_id) by.set(entry.event_id, entry.file);
+    return by;
+  }, [flags]);
+
+  const unflag = async (file: string, busyKey: string) => {
+    setBusy(busyKey);
+    try {
+      const ok = await unflagFile(file);
+      setNote(ok ? 'Unflagged. The saved file was moved aside, not deleted.' : 'The viewer could not unflag that.');
+      if (ok) setFlags((current) => current.filter((entry) => entry.file !== file));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const counts = useMemo(() => {
     const by: Record<string, number> = {};
     for (const run of runs) by[run.cls] = (by[run.cls] ?? 0) + 1;
@@ -182,14 +200,27 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
                 </td>
                 <td>{run.duration_ms === null ? '—' : `${(run.duration_ms / 1000).toFixed(1)}s`}</td>
                 <td>
-                  <button
-                    type="button"
-                    className="pv-flag"
-                    disabled={busy === run.event_id || !run.session_id}
-                    onClick={() => void flag(run)}
-                  >
-                    {busy === run.event_id ? 'Flagging…' : 'Flag'}
-                  </button>
+                  {flagByEvent.has(run.event_id) ? (
+                    <button
+                      type="button"
+                      className="pv-flag is-flagged"
+                      disabled={busy === run.event_id}
+                      aria-pressed={true}
+                      title="Flagged. Press to take the flag off; its saved file is kept aside."
+                      onClick={() => void unflag(flagByEvent.get(run.event_id) as string, run.event_id)}
+                    >
+                      {busy === run.event_id ? 'Unflagging…' : 'Unflag'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="pv-flag"
+                      disabled={busy === run.event_id || !run.session_id}
+                      onClick={() => void flag(run)}
+                    >
+                      {busy === run.event_id ? 'Flagging…' : 'Flag'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -203,7 +234,15 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
           <ul>
             {flags.slice(0, 10).map((entry) => (
               <li key={entry.file}>
-                <b>{entry.tool || 'action'}</b> · {entry.flagged_at_local} · {entry.file}
+                <b>{entry.tool || 'action'}</b> · {entry.flagged_at_local} · {entry.file}{' '}
+                <button
+                  type="button"
+                  className="pv-flag is-flagged"
+                  disabled={busy === entry.file}
+                  onClick={() => void unflag(entry.file, entry.file)}
+                >
+                  {busy === entry.file ? 'Unflagging…' : 'Unflag'}
+                </button>
               </li>
             ))}
           </ul>
@@ -211,4 +250,19 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
       ) : null}
     </div>
   );
+}
+
+/** Take one flag off the list. The viewer keeps its file aside rather than deleting it. */
+export async function unflagFile(file: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE}/privacy/unflag`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...tokenHeaders() },
+      body: JSON.stringify({ file }),
+    });
+    const body = (await response.json().catch(() => null)) as { ok?: boolean } | null;
+    return response.ok && body?.ok === true;
+  } catch {
+    return false;
+  }
 }

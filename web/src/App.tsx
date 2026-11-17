@@ -24,7 +24,7 @@ import { ActivitySummary } from './components/ActivitySummary';
 import { EventTimeline } from './components/EventTimeline';
 import { HelpPanel, markHelpSeen } from './components/HelpPanel';
 import { PrivacyAlert } from './components/PrivacyAlert';
-import { PrivacyView } from './components/PrivacyView';
+import { PrivacyView, unflagFile } from './components/PrivacyView';
 import { ConcernsView } from './components/ConcernsView';
 import { findPrivacyHit, quietCounts, type PrivacyHit } from './privacy/alert';
 import { addDismissed, readDismissed } from './privacy/dismissed';
@@ -51,7 +51,7 @@ import { LatencyView } from './components/LatencyView';
 import { InsightPanel } from './components/InsightPanel';
 import { FailurePanel } from './components/FailurePanel';
 import { SessionContextStrip } from './components/SessionContextStrip';
-import { VerdictHeader } from './components/VerdictHeader';
+import { VerdictHeader, levelColors, levelLabels } from './components/VerdictHeader';
 import { buildVerdict } from './graph/verdict';
 import { applyFilter, buildRows } from './graph/rows';
 import { replayPrefixCount } from './graph/lens';
@@ -60,6 +60,7 @@ import { ReplayBar, type Speed } from './components/ReplayBar';
 import { SessionList } from './components/SessionList';
 import { ChatsButton } from './components/ChatsButton';
 import { ModeSwitch } from './components/ModeSwitch';
+import { DetailSwitch } from './components/DetailSwitch';
 import { SlowestList } from './components/SlowestList';
 import { SummaryBar } from './components/SummaryBar';
 import { WarningsPanel, groupWarnings } from './components/WarningsPanel';
@@ -69,10 +70,13 @@ import { MenuButton, MenuCheck, MenuItem, MenuLabel, MenuSep } from './component
 import { PanelsSheet } from './components/PanelsSheet';
 import { PanelFrame } from './components/PanelFrame';
 import { Tour } from './components/Tour';
+import { BrowserLaunchNote, type BrowserLaunch } from './components/BrowserLaunchNote';
+import { requestBrowserOpen } from './shell/browserOpen';
 import { useLayoutPrefs, isVisible, readOverrides, type Overrides, type Preset } from './shell/layoutPrefs';
 import {
   initialModeFromLocation,
   isHostPinnedFromLocation,
+  markedMode,
   withoutHostMarker,
   writeStoredMode,
   type InterfaceMode,
@@ -275,6 +279,18 @@ const embedded = (() => {
     return window.self !== window.top;
   } catch {
     return true;
+  }
+})();
+
+/**
+ * Inside the Hermes page (framed, and told so by `?host=hermes`). Here the Web choice and Open in
+ * Browser ask Hermes to open the browser; the frame itself keeps the Hermes layout.
+ */
+const hermesFrame = (() => {
+  try {
+    return embedded && markedMode(window.location.search) === 'hermes';
+  } catch {
+    return false;
   }
 })();
 
@@ -579,6 +595,24 @@ export default function App() {
   const [preset, setPresetState] = useState<Preset>(() => readModePreset(mode));
   const prefs = useLayoutPrefs(preset, mode);
   const [panelsOpen, setPanelsOpen] = useState(false);
+  // Minimized status card: remembered per mode (a Hermes frame keeps it for the session only,
+  // because its storage does not outlive the frame). Warnings stay on the minimized bar.
+  const [statusCollapsed, setStatusCollapsedState] = useState<boolean>(() =>
+    readScopedBool('statusCollapsed', mode, false),
+  );
+  const statusToggleRef = useRef<HTMLButtonElement | null>(null);
+  const statusToggleFocus = useRef(false);
+  const setStatusCollapsed = (next: boolean, focus = false) => {
+    statusToggleFocus.current = focus;
+    setStatusCollapsedState(next);
+    writeScopedBool('statusCollapsed', mode, next);
+  };
+  // The toggle changes place (card row ↔ minimized bar); keep keyboard focus on it.
+  useEffect(() => {
+    if (!statusToggleFocus.current) return;
+    statusToggleFocus.current = false;
+    statusToggleRef.current?.focus({ preventScroll: true });
+  }, [statusCollapsed]);
   // Two ways to read the same chat: the timeline the map has always drawn, and a link web.
   const [linkView, setLinkView] = useState<boolean>(
     () => readScopedPref('mapStyle', mode) === 'links',
@@ -612,8 +646,40 @@ export default function App() {
    * and the open/folded side rails. Nothing is copied between them, so a browser tab cannot
    * inherit a setting changed in the docked pane.
    */
+  const [browserLaunch, setBrowserLaunch] = useState<BrowserLaunch>(null);
+  const browserLaunchTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(browserLaunchTimer.current), []);
+  /**
+   * Ask Hermes to open the full workspace in the user's browser. The frame stays as it is; the
+   * note under the mode switch says what happened, including when Hermes could not do it.
+   */
+  const openInBrowser = () => {
+    window.clearTimeout(browserLaunchTimer.current);
+    setBrowserLaunch('opening');
+    void requestBrowserOpen(
+      { session: selectedRoot, view },
+      { parent: window.parent, listenOn: window },
+    ).then((result) => {
+      setBrowserLaunch(result);
+      if (result === 'opened') {
+        browserLaunchTimer.current = window.setTimeout(
+          () => setBrowserLaunch((current) => (current === 'opened' ? null : current)),
+          8000,
+        );
+      }
+    });
+  };
+  /** In the Hermes page, Web means "open it on the web"; elsewhere it switches the layout. */
   const chooseMode = (next: InterfaceMode) => {
+    if (next === 'web' && hermesFrame && mode === 'hermes') {
+      openInBrowser();
+      return;
+    }
+    applyMode(next);
+  };
+  const applyMode = (next: InterfaceMode) => {
     if (next === mode) return;
+    setBrowserLaunch(null);
     setMode(next);
     const nextPreset = readModePreset(next);
     const nextOverrides = readOverrides(nextPreset, undefined, next);
@@ -640,6 +706,7 @@ export default function App() {
     );
     setShowTitles(readScopedBool('showTitles', next, true));
     setShowContext(readScopedBool('showContext', next, true));
+    setStatusCollapsedState(readScopedBool('statusCollapsed', next, false));
     setFollowNewest(readScopedBool('followNewest', next, false));
     setRailMode(readScopedPref('railMode', next) === 'follow' ? 'follow' : 'details');
     setLeftCollapsed(!isVisible('chats', nextPreset, nextOverrides));
@@ -1218,6 +1285,8 @@ export default function App() {
   // broken button.
   const [dismissed, setDismissed] = useState<string[]>(() => readDismissed());
   const [stopNote, setStopNote] = useState<string | null>(null);
+  // The flag just written from the title bar, so the note can offer to take it back.
+  const [lastFlag, setLastFlag] = useState<string | null>(null);
   const privacy = useMemo<PrivacyHit | null>(() => {
     if (privacyOff) return null;
     return findPrivacyHit(visibleEvents, Date.now() / 1000);
@@ -1237,6 +1306,7 @@ export default function App() {
     if (!selectedRoot) return;
     const eventId = privacy?.id ?? null;
     if (privacy) dismissPrivacy(privacy.id);
+    setLastFlag(null);
     setStopNote('Flagging this chat…');
     try {
       const response = await fetch(`${API_BASE}/privacy/flag`, {
@@ -1252,6 +1322,7 @@ export default function App() {
         setStopNote(detail ?? `The viewer answered ${response.status}.`);
         return;
       }
+      setLastFlag(body.flag ?? null);
       setStopNote(`Flagged: ${body.flag}. The action, this chat and the steps around it are in the file.`);
     } catch {
       setStopNote('Could not reach the viewer to flag this chat.');
@@ -1562,6 +1633,7 @@ export default function App() {
     setLinkView(false);
     window.dispatchEvent(new Event('omni:privacy'));
     setShowContext(true);
+    setStatusCollapsedState(false);
     setDefaultView('graph');
     setView('graph');
     setHideTools(false);
@@ -1697,11 +1769,8 @@ export default function App() {
                 }
               }}
               onOpenBrowser={() => {
-                try {
-                  window.parent.postMessage({ type: 'omniscience:open-external', url: fullUrl() }, '*');
-                } catch {
-                  window.open(fullUrl(), '_blank', 'noopener');
-                }
+                if (hermesFrame) openInBrowser();
+                else window.open(fullUrl(), '_blank', 'noopener');
               }}
               onSelectEvent={onSelectEvent}
             />
@@ -1741,7 +1810,13 @@ export default function App() {
     if (index >= 0) chooseView(VIEW_TABS[index][0]);
     else if (event.key === '[') onPrevError();
     else if (event.key === ']') onNextError();
-    else if (event.key === 'b' && !accountView && selectedRoot) prefs.toggle('briefing');
+    else if (event.key === 'b' && !accountView && selectedRoot) {
+      // The Briefing lives in the status card: a minimized card opens to show it.
+      if (statusCollapsed) {
+        setStatusCollapsed(false);
+        if (!prefs.visible('briefing')) prefs.toggle('briefing');
+      } else prefs.toggle('briefing');
+    }
     else if (event.key === 'p') openPanels();
     else if (event.key === '?') openHelp();
     else return;
@@ -1824,6 +1899,8 @@ export default function App() {
    */
   const headerActions = (
     <>
+      {/* Narrow windows: Detail moves into the Workspace sheet (CSS picks which copy shows). */}
+      <DetailSwitch preset={preset} onChange={choosePreset} placement="sheet" />
       {layout.quickControlsInline ? null : followNewestControl}
       {embedded ? (
         <a
@@ -1834,16 +1911,11 @@ export default function App() {
           rel="noopener noreferrer"
           title="Open this view in your web browser for more room."
           onClick={(event) => {
-            // Hermes desktop blocks new windows from embedded pages; ask the host page instead.
-            try {
-              window.parent.postMessage(
-                { type: 'omniscience:open-external', url: withoutHostMarker(window.location.href) },
-                '*',
-              );
-              event.preventDefault();
-            } catch {
-              /* fall back to the plain link */
-            }
+            // Hermes blocks new windows from its embedded pages; ask the Hermes page instead.
+            // Any other host gets the plain link.
+            if (!hermesFrame) return;
+            event.preventDefault();
+            openInBrowser();
           }}
         >
           Open in Browser ↗
@@ -1973,7 +2045,22 @@ export default function App() {
       {stopNote ? (
         <div className="privacy-note-toast" role="status">
           {stopNote}
-          <button type="button" className="pnt-x" onClick={() => setStopNote(null)} aria-label="Dismiss">
+          {lastFlag ? (
+            <button
+              type="button"
+              className="chip"
+              onClick={() => {
+                const file = lastFlag;
+                setLastFlag(null);
+                void unflagFile(file).then((ok) =>
+                  setStopNote(ok ? 'Unflagged. The saved file was moved aside, not deleted.' : 'The viewer could not unflag that.'),
+                );
+              }}
+            >
+              Unflag
+            </button>
+          ) : null}
+          <button type="button" className="pnt-x" onClick={() => { setStopNote(null); setLastFlag(null); }} aria-label="Dismiss">
             ✕
           </button>
         </div>
@@ -2025,7 +2112,7 @@ export default function App() {
               onToggle={toggleChats}
               buttonRef={chatsButtonRef}
             />
-            <ModeSwitch mode={mode} onChange={chooseMode} />
+            <ModeSwitch mode={mode} onChange={chooseMode} webOpensBrowser={hermesFrame && mode === 'hermes'} />
             {layout.quickControlsInline ? (
               <>
                 {followNewestControl}
@@ -2052,12 +2139,52 @@ export default function App() {
               data-tour={layout.panelsTourAnchor === 'workspace' ? 'panels' : undefined}
               aria-expanded={workspaceOpen}
               aria-controls="workspace-controls"
-              onClick={() => setWorkspaceOpen((open) => !open)}
+              onClick={() => {
+                // Below 900 px details are a drawer over the page; Workspace would open behind it.
+                if (!workspaceOpen && !rightCollapsed && window.matchMedia('(max-width: 900px)').matches) {
+                  setInspectorShown(false);
+                }
+                setWorkspaceOpen((open) => !open);
+              }}
               title="Workspace controls: follow newest, the mini panel, panels, reset, tour, map style, settings and help — all kept at full size."
             >
               <span aria-hidden="true">⌘</span> Workspace
             </button>
           ) : null}
+          {/* Privacy sits beside Workspace in the header, on every view: computer or browser use is
+              never something to find by scrolling a toolbar. */}
+          {(riskActive && privacy) || quiet.network + quiet.mcp > 0 ? (
+            <div className="topbar-alerts" role="group" aria-label="Privacy">
+              {quiet.network + quiet.mcp > 0 ? (
+                <span
+                  className="quiet-chip"
+                  title="In the last five minutes this chat called out to the network or a third-party server. Nothing was alerted, because these are ordinary working calls."
+                >
+                  {quiet.network ? `${quiet.network} network` : ''}
+                  {quiet.network && quiet.mcp ? ' · ' : ''}
+                  {quiet.mcp ? `${quiet.mcp} MCP` : ''}
+                </span>
+              ) : null}
+              {riskActive && privacy ? (
+                <PrivacyAlert
+                  hit={privacy.hit}
+                  toolName={privacy.tool}
+                  ageSeconds={privacy.age}
+                  ranMs={privacy.ranMs}
+                  chatLabel={
+                    shownSessions.find((candidate) => candidate.id === selectedRoot)?.label ??
+                    selectedRoot?.slice(0, 8) ??
+                    null
+                  }
+                  onFlag={() => void flagChat()}
+                  onIgnore={() => dismissPrivacy(privacy.id)}
+                  onOpenSettings={openSettings}
+                  onDismiss={() => dismissPrivacy(privacy.id)}
+                />
+              ) : null}
+            </div>
+          ) : null}
+          <DetailSwitch preset={preset} onChange={choosePreset} placement="bar" />
         </div>
         {compactHeader ? (
           workspaceOpen ? (
@@ -2092,6 +2219,12 @@ export default function App() {
           </div>
         )}
       </header>
+      <BrowserLaunchNote
+        state={browserLaunch}
+        onRetry={openInBrowser}
+        onUseHere={() => applyMode('web')}
+        onDismiss={() => setBrowserLaunch(null)}
+      />
 
       <main
         className={`workspace ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''}`}
@@ -2215,33 +2348,6 @@ export default function App() {
                   ))}
                 </select>
               </div>
-              {quiet.network + quiet.mcp > 0 ? (
-                <span
-                  className="quiet-chip"
-                  title="In the last five minutes this chat called out to the network or a third-party server. Nothing was alerted, because these are ordinary working calls."
-                >
-                  {quiet.network ? `${quiet.network} network` : ''}
-                  {quiet.network && quiet.mcp ? ' · ' : ''}
-                  {quiet.mcp ? `${quiet.mcp} MCP` : ''}
-                </span>
-              ) : null}
-              {riskActive && privacy ? (
-                <PrivacyAlert
-                  hit={privacy.hit}
-                  toolName={privacy.tool}
-                  ageSeconds={privacy.age}
-                  ranMs={privacy.ranMs}
-                  chatLabel={
-                    shownSessions.find((candidate) => candidate.id === selectedRoot)?.label ??
-                    selectedRoot?.slice(0, 8) ??
-                    null
-                  }
-                  onFlag={() => void flagChat()}
-                  onIgnore={() => dismissPrivacy(privacy.id)}
-                  onOpenSettings={openSettings}
-                  onDismiss={() => dismissPrivacy(privacy.id)}
-                />
-              ) : null}
 
               <span className="toolbar-spacer" aria-hidden="true" />
               <MenuButton
@@ -2312,31 +2418,59 @@ export default function App() {
             </div>
           ) : null}
           {!accountView && selectedRoot && !notRecorded && prefs.visible('status') ? (
-            <div className={`status-band${briefingOpen ? ' is-open' : ''}`} data-tour="status" data-panel="status">
-              <VerdictHeader
-                verdict={verdict}
-                onJump={onSelectEvent}
-                onSummary={() => {
-                  if (!briefingOpen) prefs.toggle('briefing');
-                  setChatSummaryOpen(true);
-                }}
-              />
+            <div
+              className={`status-band${briefingOpen && !statusCollapsed ? ' is-open' : ''}${statusCollapsed ? ' is-collapsed' : ''}`}
+              data-tour="status"
+              data-panel="status"
+            >
+              {statusCollapsed ? null : (
+                <VerdictHeader
+                  verdict={verdict}
+                  onJump={onSelectEvent}
+                  onSummary={() => {
+                    if (!briefingOpen) prefs.toggle('briefing');
+                    setChatSummaryOpen(true);
+                  }}
+                />
+              )}
               <div className="sb-row">
-                <button
-                  type="button"
-                  className="sb-briefing"
-                  aria-expanded={briefingOpen}
-                  onClick={() => prefs.toggle('briefing')}
-                  title="Briefing: the plain-English summary, each failure with why and what to do, the activity summary and the timeline."
-                >
-                  <span className="sb-caret" aria-hidden="true">{briefingOpen ? '▾' : '▸'}</span>
-                  <span className="sb-label">Summary</span>
-                  <span className="sb-digest mono">
-                    {summary.statusWord} · {summary.modelCalls} model calls · {summary.toolCalls} tools
-                    {summary.failedTools > 0 ? ` · ${summary.failedTools} failed` : ''}
-                  </span>
-                  <span className="sb-open">{briefingOpen ? 'Hide Briefing' : 'Open Briefing'}</span>
-                </button>
+                {statusCollapsed ? (
+                  <button
+                    ref={statusToggleRef}
+                    type="button"
+                    className="sb-restore"
+                    aria-expanded={false}
+                    onClick={() => setStatusCollapsed(false, true)}
+                    title="Show the full status card: the verdict, its reasons and the Summary."
+                  >
+                    <span className="sb-restore-cue">
+                      <span aria-hidden="true">▾</span> Show status
+                    </span>
+                    <span
+                      className="vh-pill"
+                      style={{ backgroundColor: levelColors[verdict.level], color: 'var(--panel)' }}
+                    >
+                      {levelLabels[verdict.level]}
+                    </span>
+                    <span className="sb-restore-headline">{verdict.headline}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="sb-briefing"
+                    aria-expanded={briefingOpen}
+                    onClick={() => prefs.toggle('briefing')}
+                    title="Briefing: the plain-English summary, each failure with why and what to do, the activity summary and the timeline."
+                  >
+                    <span className="sb-caret" aria-hidden="true">{briefingOpen ? '▾' : '▸'}</span>
+                    <span className="sb-label">Summary</span>
+                    <span className="sb-digest mono">
+                      {summary.statusWord} · {summary.modelCalls} model calls · {summary.toolCalls} tools
+                      {summary.failedTools > 0 ? ` · ${summary.failedTools} failed` : ''}
+                    </span>
+                    <span className="sb-open">{briefingOpen ? 'Hide Briefing' : 'Open Briefing'}</span>
+                  </button>
+                )}
                 {failureEventIds.length > 0 ? (
                   <span className="sb-stepper" role="group" aria-label="Step through failures">
                     <button type="button" onClick={onPrevError} aria-label="Previous failure" title="Previous failure">‹</button>
@@ -2352,8 +2486,20 @@ export default function App() {
                     ⚠ {lost} lost {lost === 1 ? 'record' : 'records'}
                   </span>
                 ) : null}
+                {statusCollapsed ? null : (
+                  <button
+                    ref={statusToggleRef}
+                    type="button"
+                    className="sb-minimize"
+                    aria-expanded={true}
+                    onClick={() => setStatusCollapsed(true, true)}
+                    title="Minimize the status card to one line. Failures and lost records stay on that line."
+                  >
+                    <span aria-hidden="true">▴</span> Minimize
+                  </button>
+                )}
               </div>
-              {briefingOpen ? (
+              {briefingOpen && !statusCollapsed ? (
                 <div className="briefing">
                   <ChatSummaryPanel
                     events={visibleEvents}
@@ -2586,6 +2732,17 @@ export default function App() {
             </button>
           ) : null}
           <div className="rail-content">
+            {/* Below 900 px this drawer covers the status card, so a selected failure carries its
+                own way to the next one. */}
+            {selectedEventId && failureEventIds.includes(selectedEventId) ? (
+              <span className="sb-stepper rail-fail-stepper" role="group" aria-label="Step through failures in details">
+                <button type="button" onClick={onPrevError} aria-label="Previous failure" title="Previous failure">‹</button>
+                <span className="sb-fails mono">
+                  Failure {failureEventIds.indexOf(selectedEventId) + 1} of {failureEventIds.length}
+                </span>
+                <button type="button" onClick={onNextError} aria-label="Next failure" title="Next failure">›</button>
+              </span>
+            ) : null}
             <button type="button" className="area-focus-button" aria-pressed={focusedArea === 'details'}
               onClick={() => setFocusedArea(focusedArea === 'details' ? null : 'details')}>
               {focusedArea === 'details' ? 'Restore details' : 'Expand details'}

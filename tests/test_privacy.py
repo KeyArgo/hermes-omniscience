@@ -180,3 +180,34 @@ def test_chat_name_falls_back_to_display_name_then_absent(tmp_path, monkeypatch)
     assert chat_titles(str(state), {"s-9"}) == {}
     # A missing database is not an error: the page still renders, using short ids.
     assert chat_titles(str(tmp_path / "nope.db"), {"s-1"}) == {}
+
+
+def test_unflag_takes_a_flag_off_the_list_and_keeps_the_dossier(tmp_path):
+    db = build(tmp_path)
+    result = privacy.write_flag(db, str(tmp_path), "s1", "e2")
+    assert len(privacy.list_flags(str(tmp_path))) == 1
+    assert privacy.remove_flag(str(tmp_path), result["flag"]) == {"ok": True, "unflagged": result["flag"]}
+    assert privacy.list_flags(str(tmp_path)) == []
+    # Kept aside, never deleted: an unflag is recoverable by hand.
+    assert (tmp_path / "privacy-flags" / "unflagged" / result["flag"]).is_file()
+    with pytest.raises(FileNotFoundError):
+        privacy.remove_flag(str(tmp_path), result["flag"])
+
+
+@pytest.mark.parametrize("name", ["../events.db", "unflagged", "x.json", "/etc/passwd", None, "20261115-120000-a/../../b.json"])
+def test_unflag_accepts_only_flag_names_it_wrote(tmp_path, name):
+    with pytest.raises(ValueError):
+        privacy.remove_flag(str(tmp_path), name)
+
+
+def test_unflag_route(tmp_path):
+    from fastapi.testclient import TestClient
+    from omniscience_viewer.app import create_app
+
+    db = build(tmp_path)
+    client = TestClient(create_app(db), base_url="http://127.0.0.1")
+    flag = client.post("/api/v1/privacy/flag", json={"session_id": "s1", "event_id": "e2"}).json()["flag"]
+    assert client.post("/api/v1/privacy/unflag", json={"file": flag}).json()["ok"] is True
+    assert client.get("/api/v1/privacy/flags").json()["flags"] == []
+    assert client.post("/api/v1/privacy/unflag", json={"file": flag}).status_code == 404
+    assert client.post("/api/v1/privacy/unflag", json={"file": "../events.db"}).status_code == 400

@@ -70,6 +70,15 @@
   animation: mb-in 160ms cubic-bezier(.2,.8,.2,1);
 }
 
+.mb-pop-floating {
+  /* Drawn in a layer on <body>: toolbars and sheets that scroll sideways cannot clip it. */
+  position: fixed;
+  top: auto;
+  z-index: 1000;
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+
 .mb-pop-start {
   left: 0;
 }
@@ -137,9 +146,15 @@
 }
 
 .mb-check {
-  flex-direction: row;
+  /* Box | name, with the explanation on its own line under the name, never squeezed beside it. */
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
+}
+
+.mb-check .mb-hint {
+  grid-column: 2;
 }
 
 .mb-check-box {

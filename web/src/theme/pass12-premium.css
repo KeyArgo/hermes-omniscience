@@ -787,6 +787,7 @@ select.chip {
   box-shadow: var(--shadow-seam), 0 18px 50px rgb(0 0 0 / 0.24);
 }
 
+
 :root[data-theme="paper"] .status-band {
   background: linear-gradient(155deg, #fff, #f7f3ea);
 }
@@ -843,6 +844,75 @@ select.chip {
 .sb-fails,
 .sb-lost {
   font-size: 15px;
+}
+
+/* Minimize: the last control in the card's own row, so it costs no extra height. */
+.sb-minimize {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.sb-minimize:hover {
+  background: var(--panel-2);
+}
+
+/* The minimized card: one row that says how to get it back and still carries every warning. */
+.status-band.is-collapsed .sb-row {
+  padding: 8px 14px;
+}
+.sb-restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 320px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 14px 6px 6px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.sb-restore:hover {
+  background: var(--panel-2);
+  border-color: var(--line-2);
+}
+.sb-restore-cue {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 9px;
+}
+.sb-restore .vh-pill {
+  flex: none;
+}
+.sb-restore-headline {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sb-minimize:focus-visible,
+.sb-restore:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
 }
 
 .briefing {
@@ -2849,3 +2919,113 @@ button.ctx-strip-cost:hover {
 :root[data-accent="red"] { --accent-rgb: 255 119 136; --accent: #ff7788; --cyan: #ff7788; --accent-glow: rgb(255 119 136 / 0.28); --line-strong: rgb(255 151 164 / 0.48); }
 :root[data-theme="paper"][data-accent="red"] { --accent-rgb: 153 31 48; --accent: #991f30; --cyan: #991f30; --accent-glow: rgb(153 31 48 / 0.2); --line-strong: rgb(153 31 48 / 0.4); }
 :root[data-accent="red"] .chip.is-active, :root[data-accent="red"] .chip.is-on, :root[data-accent="red"] .mode-option[aria-pressed="true"] { background: linear-gradient(135deg, #ffd5db, #ff8b9a); border-color: #ffc3cc; color: #351019; }
+
+/* What happened when Web / Open in Browser was pressed inside Hermes. It floats under the header
+   so the page grid keeps its rows; empty, it takes no room at all. */
+.browser-launch:empty {
+  display: none;
+}
+.browser-launch {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 950;
+  width: min(760px, calc(100vw - 24px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  box-shadow: var(--shadow-float);
+}
+.browser-launch.is-failed,
+.browser-launch.is-no-answer {
+  border-left: 4px solid var(--amber, #f2b84b);
+}
+.browser-launch.is-opened {
+  border-left: 4px solid var(--cyan);
+}
+.browser-launch-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.browser-launch .chip,
+.browser-launch .icon-button {
+  min-height: 44px;
+}
+
+/* Detail (Simple / Standard / Everything): in the header's status row, pushed to the right, where
+   there is room; in the Workspace sheet on narrow windows. Only one copy is ever displayed. */
+.topbar-status .detail-in-bar {
+  margin-left: auto;
+  /* As tall as the Workspace button beside it, so Detail never makes the header row taller. */
+  min-height: 52px;
+  padding: 4px;
+  gap: 3px;
+  border-radius: 15px;
+}
+.topbar-status .detail-in-bar .mode-option {
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 11px;
+  font-size: 17px;
+}
+.topbar:not(.is-compact-header) .detail-in-bar {
+  /* The wide header has an inline action row: Detail sits there instead. */
+  display: none;
+}
+@media (max-width: 1099px) {
+  .topbar-status .detail-in-bar {
+    display: none;
+  }
+}
+@media (min-width: 1100px) {
+  .workspace-actions .detail-in-sheet {
+    display: none;
+  }
+}
+.topbar-alerts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.topbar-alerts .privacy-alert {
+  font-size: 14px;
+  min-height: 40px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+/* In the header the chat name is already beside it and the raw tool name is in the label's
+   tooltip; Ignore and ✕ do the same thing, so the words stay and the cross goes. */
+.topbar-alerts .pa-tool,
+.topbar-alerts .pa-chat,
+.topbar-alerts .pa-x {
+  display: none;
+}
+@media (max-width: 899px) {
+  .topbar-alerts .pa-quiet {
+    display: none;
+  }
+}
+
+/* The drawer's own failure stepper: only where the drawer covers the status card. */
+.rail-fail-stepper {
+  display: none;
+}
+@media (max-width: 900px) {
+  .app:not(.app-mini) .rail-right .rail-fail-stepper {
+    display: inline-flex;
+    align-self: flex-start;
+    margin: 8px 56px 4px 12px;
+  }
+}

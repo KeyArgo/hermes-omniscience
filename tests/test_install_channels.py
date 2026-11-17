@@ -44,6 +44,7 @@ def test_install_pins_and_checks_resolved_commit(monkeypatch):
     monkeypatch.setattr(installer.subprocess, "run", run)
     assert installer.main() == 0
     assert calls[1][calls[1].index("--ref") + 1] == sha
+    assert "--enable" in calls[1]
     assert calls[2][1] == "-C"
 
 

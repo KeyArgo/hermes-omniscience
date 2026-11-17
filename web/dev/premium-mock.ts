@@ -471,16 +471,46 @@ export function installShowcaseViewer(): ShowcaseHarness {
     events: SHOWCASE_EVENTS,
     sessions: SHOWCASE_SESSIONS,
   };
+  // ?risk=1: a computer-use step lands as the newest step, so the privacy alert shows.
+  if (new URLSearchParams(window.location.search).get('risk') === '1') {
+    const rows = harness.events[ROOT];
+    const newest = rows[rows.length - 1];
+    // The synthetic chat ends ~11 min ago, past the alert's live window, so stamp the step now.
+    const step = event(newest.rowid + 1, 'tool.end', {
+      ts: Math.max(newest.ts, NOW - 5),
+      status: 'ok',
+      attrs: { tool_name: 'computer_use', duration_ms: 1200 },
+    });
+    harness.events = { ...harness.events, [ROOT]: [...rows, step] };
+  }
   const busyCount = Number(new URLSearchParams(window.location.search).get('busy') ?? '0');
   if (Number.isFinite(busyCount) && busyCount > 0) {
     const busy = Array.from({ length: busyCount }, (_, index) => busyTurn(index + 1)).flat();
     harness.events = {
-      ...SHOWCASE_EVENTS,
-      [ROOT]: [...SHOWCASE_EVENTS[ROOT], ...busy],
+      ...harness.events,
+      [ROOT]: [...harness.events[ROOT], ...busy],
     };
   }
 
-  const fakeFetch = async (input: RequestInfo | URL): Promise<Response> => {
+  // ?risk=1 also gives Privacy one run and a working flag list, so Flag and Unflag can be pressed.
+  const risky = new URLSearchParams(window.location.search).get('risk') === '1';
+  const riskStep = harness.events[ROOT][harness.events[ROOT].length - 1];
+  const flags: Record<string, unknown>[] = [];
+  let flagSeq = 0;
+  const addFlag = (sessionId: string | null, eventId: string | null) => {
+    flagSeq += 1;
+    const file = `20261115-120000-flag${flagSeq}.json`;
+    flags.unshift({
+      file, flagged_at: NOW, flagged_at_local: 'just now', session_id: sessionId,
+      event_id: eventId, tool: 'computer_use', note: '',
+    });
+    return file;
+  };
+  const bodyOf = (init?: RequestInit) => {
+    try { return JSON.parse(String(init?.body ?? '{}')) as Record<string, string | null>; } catch { return {}; }
+  };
+
+  const fakeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     calls.push(url);
     const parsed = new URL(url, window.location.origin);
@@ -498,6 +528,13 @@ export function installShowcaseViewer(): ShowcaseHarness {
       // Every row is loaded in one page here: the checks are about the interface, not pagination.
       return respond(200, { events: before === null ? rows : [] });
     }
+    if (path.includes('/export/') && path.endsWith('.csv')) {
+      const table = path.split('/').pop()?.replace('.csv', '') ?? 'steps';
+      return new Response('session_id,kind,ts\nsynthetic,llm.end,0\n', {
+        status: 200,
+        headers: { 'content-type': 'text/csv', 'content-disposition': `attachment; filename="omniscience-${table}.csv"` },
+      });
+    }
     if (path.endsWith('/warnings')) return respond(200, { warnings: [] });
     if (path.endsWith('/failures')) {
       const root = parsed.searchParams.get('root') ?? '';
@@ -505,8 +542,27 @@ export function installShowcaseViewer(): ShowcaseHarness {
     }
     if (path.endsWith('/diagnose')) return respond(200, { status: 'no_failure' });
     if (path.endsWith('/concerns')) return respond(200, { days: 1, counts: { privacy: 1, failures: 0 }, items: [] });
-    if (path.endsWith('/privacy/flags')) return respond(200, { flags: [] });
-    if (path.endsWith('/privacy')) return respond(200, { runs: [] });
+    if (path.endsWith('/privacy/flags')) return respond(200, { flags: [...flags] });
+    if (path.endsWith('/privacy/flag') && risky) {
+      const body = bodyOf(init);
+      return respond(200, { ok: true, flag: addFlag(body.session_id ?? null, body.event_id ?? null) });
+    }
+    if (path.endsWith('/privacy/unflag') && risky) {
+      const index = flags.findIndex((entry) => entry.file === bodyOf(init).file);
+      if (index < 0) return respond(404, { detail: 'no such flag' });
+      flags.splice(index, 1);
+      return respond(200, { ok: true });
+    }
+    if (path.endsWith('/privacy')) {
+      if (!risky) return respond(200, { runs: [] });
+      return respond(200, {
+        runs: [{
+          event_id: riskStep.event_id, ts: riskStep.ts, tool: 'computer_use', cls: 'computer',
+          label: 'Computer use', tone: 'high', session_id: ROOT, chat_title: 'Research assistant',
+          turn_id: null, status: 'ok', duration_ms: 1200,
+        }],
+      });
+    }
     if (path.endsWith('/insight')) return respond(200, { state: 'none' });
     if (path.endsWith('/ping')) return respond(200, { build: 'synthetic' });
     if (path.endsWith('/version')) {

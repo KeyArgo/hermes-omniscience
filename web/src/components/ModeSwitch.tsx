@@ -23,28 +23,41 @@ const OPTIONS: { id: InterfaceMode; label: string; title: string }[] = [
 export function ModeSwitch({
   mode,
   onChange,
+  webOpensBrowser = false,
 }: {
   mode: InterfaceMode;
   onChange: (mode: InterfaceMode) => void;
+  /** Inside the Hermes page, Web opens the web browser rather than changing this frame. */
+  webOpensBrowser?: boolean;
 }) {
   return (
     <div className="mode-select" role="group" aria-label="Interface mode">
       <span className="mode-select-label" aria-hidden="true">
         Mode
       </span>
-      {OPTIONS.map((option) => (
+      {OPTIONS.map((option) => {
+        const opensBrowser = webOpensBrowser && option.id === 'web';
+        return (
         <button
           key={option.id}
           type="button"
           className={`mode-option${mode === option.id ? ' is-active' : ''}`}
           aria-pressed={mode === option.id}
           data-mode-option={option.id}
+          data-opens-browser={opensBrowser ? 'true' : undefined}
+          aria-label={opensBrowser ? 'Web (opens your web browser)' : undefined}
           onClick={() => onChange(option.id)}
-          title={option.title}
+          title={
+            opensBrowser
+              ? 'Web: opens the full workspace in your web browser. This Hermes page keeps its layout.'
+              : option.title
+          }
         >
           {option.label}
+          {opensBrowser ? <span aria-hidden="true"> ↗</span> : null}
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

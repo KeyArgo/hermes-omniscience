@@ -34,7 +34,9 @@ export function PrivacyAlert({
   return (
     <div className="privacy-alert" role="alert" aria-live="assertive">
       <span className="pa-dot" aria-hidden="true" />
-      <span className="pa-label">{hit.label}</span>
+      <span className="pa-label" title={`${hit.label}: ${toolName}${chatLabel ? ` in ${chatLabel}` : ''}`}>
+        {hit.label}
+      </span>
       <span className="pa-tool" title="The recorded tool name">
         {toolName}
       </span>

@@ -558,6 +558,17 @@ def create_app(db_path: str, static_dir: str | None = None,
         except (sqlite3.Error, ValueError) as exc:
             raise HTTPException(status_code=503, detail=f"cannot read the recording: {exc}") from exc
 
+    @app.post("/api/v1/privacy/unflag")
+    def privacy_unflag(payload: dict = Body(...)) -> dict:
+        """Take one flag off the list. The dossier is kept aside, not deleted."""
+        name = payload.get("file") if isinstance(payload, dict) else None
+        try:
+            return privacy_mod.remove_flag(os.path.dirname(db_path), name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="not a flag file name") from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="that flag is not on the list") from exc
+
     @app.post("/api/v1/run/stop")
     def run_stop(payload: dict = Body(...)) -> dict:
         """Stop the chat, if the host's run API has been switched on for this viewer.

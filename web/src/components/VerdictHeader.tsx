@@ -2,7 +2,7 @@ import type { Verdict } from '../graph/verdict';
 import { formatDuration } from '../graph/format';
 import './VerdictHeader.css';
 
-const levelColors: Record<Verdict['level'], string> = {
+export const levelColors: Record<Verdict['level'], string> = {
   ok: 'var(--green)',
   slow: 'var(--amber)',
   failing: 'var(--red)',
@@ -10,7 +10,7 @@ const levelColors: Record<Verdict['level'], string> = {
   empty: 'var(--muted)',
 };
 
-const levelLabels: Record<Verdict['level'], string> = {
+export const levelLabels: Record<Verdict['level'], string> = {
   ok: 'OK',
   slow: 'Delays',
   failing: 'Failing',

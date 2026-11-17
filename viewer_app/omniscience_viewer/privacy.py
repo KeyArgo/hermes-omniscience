@@ -273,6 +273,27 @@ def write_flag(
     }
 
 
+FLAG_NAME = re.compile(r"^[0-9]{8}-[0-9]{6}-[A-Za-z0-9_.-]{1,40}\.json$")
+
+
+def remove_flag(state_dir: str, name: str) -> dict[str, Any]:
+    """Unflag: move one dossier out of the flagged list into ``privacy-flags/unflagged``.
+
+    Nothing is deleted, so an unflag is recoverable by hand. Only a name this module itself writes
+    is accepted, and only a file directly inside the flags folder is moved.
+    """
+    if not isinstance(name, str) or not FLAG_NAME.match(name):
+        raise ValueError("not a flag file name")
+    directory = _flags_dir(state_dir)
+    source = os.path.join(directory, name)
+    if os.path.dirname(os.path.realpath(source)) != os.path.realpath(directory) or not os.path.isfile(source):
+        raise FileNotFoundError(name)
+    archive = os.path.join(directory, "unflagged")
+    os.makedirs(archive, exist_ok=True)
+    os.replace(source, os.path.join(archive, name))
+    return {"ok": True, "unflagged": name}
+
+
 def list_flags(state_dir: str) -> list[dict[str, Any]]:
     directory = _flags_dir(state_dir)
     out: list[dict[str, Any]] = []

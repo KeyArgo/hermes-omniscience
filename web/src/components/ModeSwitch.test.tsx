@@ -27,4 +27,11 @@ describe('ModeSwitch', () => {
     expect(html).toContain('Starts Simple');
     expect(html).toContain('full workspace');
   });
+
+  it('in the Hermes page, Web says it opens the browser and is not pressed', () => {
+    const html = renderToStaticMarkup(<ModeSwitch mode="hermes" onChange={() => {}} webOpensBrowser />);
+    expect(html).toMatch(/aria-pressed="false"[^>]*data-mode-option="web"[^>]*data-opens-browser="true"/);
+    expect(html).toContain('aria-label="Web (opens your web browser)"');
+    expect(html).toContain('keeps its layout');
+  });
 });

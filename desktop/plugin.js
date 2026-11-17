@@ -26,31 +26,62 @@ function focusedChat() {
 }
 
 // The embedded viewer asks us to open itself in the user's browser (its own window.open is blocked).
-// Only links back to the viewer itself are honoured.
 //
 // Origins: the page is embedded in the SDK's SandboxedFrame, so its origin is OPAQUE and arrives
 // as the string "null" — the viewer URL is what a browser tab reports, and both are the page we
 // embedded. Everything else is ignored, and the payload is validated below regardless.
+//
+// The viewer key never travels in a message: the page names only the chat and the view, and this
+// page builds the link from its own copy of the key. A reply says whether Hermes opened it, and
+// carries nothing secret (it has to be sent to "*" because the frame's origin is opaque).
 const VIEWER_ORIGINS = new Set([VIEWER_URL, 'null'])
+const SESSION_RE = /^[A-Za-z0-9_.:-]{1,200}$/
+const VIEW_RE = /^[a-z]{1,24}$/
+let viewerToken = null
 let externalListener = null
+
+export function browserLinkFor(data, token) {
+  if (!token) return null
+  const session = typeof data?.session === 'string' && SESSION_RE.test(data.session) ? data.session : null
+  const view = typeof data?.view === 'string' && VIEW_RE.test(data.view) ? data.view : null
+  return viewerSrc(session, token, view ? { host: 'web', view } : { host: 'web' })
+}
+
+export function handleViewerMessage(event) {
+  const data = event.data
+  if (!VIEWER_ORIGINS.has(event.origin) || !data || typeof data !== 'object') return
+  if (data.type === 'omniscience:open-full') {
+    const session = typeof data.session === 'string' ? data.session : null
+    host.navigate(session ? `/omniscience?session=${encodeURIComponent(session)}` : '/omniscience')
+    return
+  }
+  if (data.type === 'omniscience:toggle-pane') {
+    setPane(!paneWanted())
+    return
+  }
+  if (data.type !== 'omniscience:open-web') return
+  const requestId = typeof data.requestId === 'string' ? data.requestId.slice(0, 64) : ''
+  const reply = ok => {
+    try {
+      event.source?.postMessage?.({ type: 'omniscience:open-web-result', requestId, ok }, '*')
+    } catch {
+      /* the frame went away */
+    }
+  }
+  const url = browserLinkFor(data, viewerToken)
+  const open = CTX?.os?.openExternal
+  if (!url || typeof open !== 'function') {
+    reply(false)
+    return
+  }
+  Promise.resolve()
+    .then(() => CTX.os.openExternal(url))
+    .then(ok => reply(ok !== false), () => reply(false))
+}
+
 function listenForOpenExternal() {
   if (externalListener) return
-  externalListener = event => {
-    const data = event.data
-    if (!VIEWER_ORIGINS.has(event.origin) || !data) return
-    if (data.type === 'omniscience:open-full') {
-      const session = typeof data.session === 'string' ? data.session : null
-      host.navigate(session ? `/omniscience?session=${encodeURIComponent(session)}` : '/omniscience')
-      return
-    }
-    if (data.type === 'omniscience:toggle-pane') {
-      setPane(!paneWanted())
-      return
-    }
-    if (data.type !== 'omniscience:open-external') return
-    if (typeof data.url !== 'string' || !data.url.startsWith(VIEWER_URL + '/')) return
-    CTX?.os?.openExternal?.(data.url)
-  }
+  externalListener = handleViewerMessage
   window.addEventListener('message', externalListener)
 }
 
@@ -80,6 +111,7 @@ function useViewerKey() {
       if (up && CTX?.rest) {
         token = await Promise.resolve(CTX.rest('/viewer')).then(r => (r && r.token) || null).catch(() => null)
       }
+      if (token) viewerToken = token
       if (alive) setState(prev => ({ ...prev, ready: true, token, up }))
     })()
     return () => {

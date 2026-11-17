@@ -54,13 +54,7 @@
     flex: 1 0 100%;
   }
 
-  .workspace-actions .mb-pop {
-    left: 0;
-    right: auto;
-    width: min(100%, 440px);
-    min-width: 0;
-    max-width: 100%;
-  }
+  /* Menus float above the sheet (MenuButton places them inside the window), so no rule here. */
 }
 
 /* --------------------------------------------------------------------------

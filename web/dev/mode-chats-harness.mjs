@@ -153,7 +153,7 @@ async function settleAfterReload(page) {
 }
 
 async function pressedMode(page) {
-  return (await page.locator('.mode-option[aria-pressed="true"]').innerText()).trim();
+  return (await page.locator('[data-mode-option][aria-pressed="true"]').innerText()).trim();
 }
 
 async function expanded(page) {
@@ -457,7 +457,7 @@ try {
     const frame = await handle.contentFrame();
     check(frame !== null, 'the harness iframe did not load');
     await frame.waitForSelector('.chats-toggle', { timeout: 15000 });
-    const framedMode = (await frame.locator('.mode-option[aria-pressed="true"]').innerText()).trim();
+    const framedMode = (await frame.locator('[data-mode-option][aria-pressed="true"]').innerText()).trim();
     check(framedMode === 'Web', 'an unmarked iframe was treated as Hermes');
     console.log('PASS explicit marker only: unmarked iframe stays web, marked frame is Simple Hermes');
     await context.close();
@@ -533,7 +533,7 @@ try {
             view,
           };
         };
-        return { chats: read('.chats-toggle'), mode: read('.mode-select'), bar: read('.topbar') };
+        return { chats: read('.chats-toggle'), mode: read('.mode-select:not(.detail-select)'), bar: read('.topbar') };
       });
       check(
         boxes.bar && boxes.bar.scrollWidth <= boxes.bar.clientWidth + 1,
@@ -570,7 +570,7 @@ try {
 
     const chats = await page.locator('.chats-toggle').boundingBox();
     check(chats && chats.height >= 44, `Paper: Chats is ${chats?.height}px tall`);
-    const mode = await page.locator('.mode-select').boundingBox();
+    const mode = await page.locator('.mode-select:not(.detail-select)').boundingBox();
     check(mode && mode.height >= 44, `Paper: mode switch is ${mode?.height}px tall`);
     check(
       mode && chats && mode.x >= 0 && mode.x + mode.width <= 600,

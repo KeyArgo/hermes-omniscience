@@ -1,7 +1,10 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit fcf4812
-> **Revised:** 2026-11-15 · **Body hash:** 8ecb2944
+> **Applies to:** Omniscience 1.0.0 · written at commit 5468cf5
+> **Revised:** 2026-11-16 · **Body hash:** 09f1b861
+
+
+
 
 
 
@@ -28,6 +31,13 @@ current as fixes land; report tests and unresolved issues against the exact comm
 - The Omniscience live sidebar appears across other Hermes pages and is difficult to dismiss. It
   should be predictable and easy to hide without disabling the plugin.
 - Investigate live-feed database load and repeated connections. Do not stop other sessions' work.
+- Make Omniscience enabled by default on a fresh install. The test-channel helper and documented
+  command already pass `--enable`; Hermes itself controls activation for other install paths and
+  currently defaults its enable prompt to no. Checked 2026-11-15 in
+  `hermes_cli/plugins_cmd_install.py`: `enable=None` asks "Enable now? [y/N]", `--enable` skips the
+  prompt, and no manifest field changes the default. So the supported answer is to keep
+  `--enable` in every install command we publish; anything more needs a host install policy.
+  Preserve an explicit later disable and do not bypass host dependency or capability consent.
 - Always finish owner-facing responses with a plain-language TL;DR. Use lower-cost models through
   their appropriate harnesses where useful; verify their work.
 
@@ -74,6 +84,51 @@ current as fixes land; report tests and unresolved issues against the exact comm
   Verify this tradeoff and the graph behavior against real data in Hermes.
   Remaining earlier issues: exact 2x button sizing,
   real Windows/macOS testing, owner visual acceptance, final independent review.
+- 2026-11-15 (Claude): the Filters menu was clipped to a 48 px strip in both modes because the
+  stage toolbar scrolls sideways (`overflow-x: auto` makes the other axis clip too). Menus now draw
+  in a fixed layer on `<body>`, placed inside the window, flipping up and scrolling when needed;
+  check with `node dev/filters-menu-check.mjs` (five sizes, both modes, keyboard and Escape).
+- In the Hermes page, **Web** now asks Hermes to open the full workspace in the browser
+  (`ctx.os.openExternal`) and the frame stays in Hermes mode. The frame sends only the chat and
+  view; the Hermes page builds the link with its own copy of the viewer key, so the key is never
+  posted to `*`. Opened / failed / no answer are said in a note with Try again and "Use Web layout
+  here". Open in Browser uses the same path. A browser tab still switches layout in place.
+  Check: `node dev/web-launch-check.mjs` (shipped bundle in an opaque-origin frame, real
+  `desktop/plugin.js` handler, success, false, throw and no listener).
+- The status card minimizes to one row that keeps the verdict, the failure stepper and lost
+  records; the minimized state is remembered per mode (session-only inside the Hermes frame),
+  Reset View restores it, and `b` opens it with the Briefing. Check:
+  `node dev/status-minimize-check.mjs`. New warnings do not auto-expand the card; the count on
+  the bar changes instead (owner to judge).
+- Detail (Simple / Standard / Everything, the same presets as Panels) replaces the old toolbar
+  menu: in the header's status row on the compact header (1100–1750 px), in the action row above
+  1750 px, and in the Workspace sheet below 1100 px. Each mode remembers its own choice (memory
+  only inside the Hermes frame). The Web view still starts on Simple (owner to decide). Check:
+  `node dev/detail-switch-check.mjs` (four widths, both modes, reload).
+- The privacy alert (computer or browser use) and the network/MCP tally sit in the header right
+  of Workspace. In the header the alert drops the raw tool name and chat (both in the label's
+  tooltip) and the duplicate ✕; under 900 px its Alerts link goes too (still in Settings). An
+  active alert adds a header row on narrow and very wide windows. Check:
+  `node dev/header-alert-check.mjs` (`?risk=1` in the harness adds a fresh computer-use step).
+- Flags can be taken off: `POST /api/v1/privacy/unflag {file}` moves the saved file to
+  `privacy-flags/unflagged/` (never deletes; only flag-shaped names inside the flags folder).
+  Unflag is offered on a flagged Privacy row, on each Flagged list entry and in the note after
+  flagging from the title bar. Check: `node dev/unflag-check.mjs`; Python tests in
+  `tests/test_privacy.py`.
+- Below 900 px the details drawer covers the status card, so a selected failure now carries its
+  own ‹ Failure n of N › stepper in the drawer, and opening Workspace closes the drawer first
+  (it used to open behind it). Found by the 800 px parity walk; the original build had the same
+  gap.
+- Feature parity walk: `node dev/feature-parity-walk.mjs <label> <web-root> <out.json> [w h]` runs
+  the same presses against two builds over the synthetic recording, CSV download included. On
+  2026-11-16 the redesign verified 25/25 at 1366×768 and 800×600; the original 2f13567 verified
+  20/25 and 17/25 (no minimize or mode switch, Maximize is browser fullscreen, failure stepping
+  moves the camera without selecting, and at 800 px the stepper, tour, token chart and Links are
+  out of reach). The original's CSV row ran against an older harness copy without the CSV
+  endpoint, so it is untested there, not broken.
+- The header Detail switch is as tall as the Workspace button (52 px) so it never adds height:
+  at 1366 px the header is 145 px; at 1440×900 it is 205 px, which leaves the map 320 px tall
+  under the status card. Minimizing the card or Expand view gives more room (owner to judge).
 
 ## Verification and release
 
