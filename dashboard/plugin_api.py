@@ -2,7 +2,8 @@
 
 Read-only health endpoint over the plugin's event database (see docs/DECISIONS.md D4:
 ``<HERMES_HOME>/plugin-data/omniscience/events.db``). No write endpoints — the plugin
-itself is the sole writer (D2).
+itself is the sole writer (D2). Asking for the viewer link also restarts the viewer when it is
+down (see ``_ensure_viewer``); that starts a process but writes nothing to the recording.
 
 Per the Hermes dashboard doc ("Don't block the event loop"): every handler is async and
 all blocking SQLite work runs off the loop via ``asyncio.to_thread``.
@@ -10,6 +11,8 @@ all blocking SQLite work runs off the loop via ``asyncio.to_thread``.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
+import logging
 import os
 import sqlite3
 from pathlib import Path
@@ -24,6 +27,7 @@ except Exception:  # pragma: no cover - fallback for non-Hermes import contexts
         return Path(env).expanduser() if env else Path("~/.hermes").expanduser()
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 PLUGIN_NAME = "omniscience"
 DEFAULT_VIEWER_URL = "http://127.0.0.1:8797"
@@ -81,15 +85,59 @@ async def health() -> dict:
     return await asyncio.to_thread(_health_locked)
 
 
+_LAUNCHER = None
+
+
+def _launcher():
+    """The plugin's viewer_launcher.py, beside this folder. Hermes loads this file by path, so a
+    package-relative import is not available here."""
+    global _LAUNCHER
+    if _LAUNCHER is None:
+        path = Path(__file__).resolve().parents[1] / "viewer_launcher.py"
+        spec = importlib.util.spec_from_file_location("omniscience_dashboard_viewer_launcher", path)
+        if not spec or not spec.loader:
+            raise ImportError(f"cannot load {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _LAUNCHER = module
+    return _LAUNCHER
+
+
+def _ensure_viewer() -> dict:
+    """Start the viewer if it is down, owned by this long-lived dashboard process.
+
+    The viewer stops when the Hermes process that started it exits. When that was a short-lived
+    one (a one-shot chat, a CLI command), the page later found nothing listening and nothing
+    restarted it. Opening the page now restarts it. The launcher still honours
+    OMNISCIENCE_VIEWER_AUTOSTART=0, Pause, local-only URLs and its one-minute retry pause.
+    """
+    db = _db_path()
+    if not db.is_file():
+        return {"running": False, "reason": "event database not found"}
+    real = os.path.realpath(db)
+    try:
+        result = _launcher().ensure_viewer(
+            real,
+            log_dir=os.path.dirname(real),
+            autostart=True,
+            state_db=str(get_hermes_home() / "state.db"),
+        )
+    except Exception as exc:  # never let a launch problem break the link answer
+        log.debug("omniscience: viewer restart from the dashboard failed", exc_info=True)
+        return {"running": False, "reason": f"could not start the viewer: {exc}"}
+    return {"running": bool(result.get("running")), "reason": str(result.get("reason", ""))}
+
+
 def _viewer_link_locked() -> dict:
     """Viewer URL plus its per-launch key, for the desktop page. Behind Hermes dashboard auth."""
+    viewer = _ensure_viewer()
     # The profile folder may hold only a link to the shared DB; the key sits next to the real file.
     token_file = _db_path().resolve().parent / "viewer-token"
     try:
         token = token_file.read_text(encoding="utf-8").strip() or None
     except OSError:
         token = None
-    return {"viewer_url": _viewer_url(), "token": token}
+    return {"viewer_url": _viewer_url(), "token": token, "viewer": viewer}
 
 
 @router.get("/viewer")

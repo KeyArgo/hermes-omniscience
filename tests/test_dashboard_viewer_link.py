@@ -149,3 +149,62 @@ def test_reading_health_never_creates_the_database(api, tmp_path):
     target = tmp_path / "home" / "plugin-data" / "omniscience" / "events.db"
     _client(api).get("/api/plugins/omniscience/health")
     assert not target.exists()
+
+
+class _FakeLauncher:
+    def __init__(self, result=None, error=None):
+        self.calls = []
+        self.result = result or {"running": True, "started": True, "reason": "started successfully"}
+        self.error = error
+
+    def ensure_viewer(self, db_path, *, log_dir, autostart, state_db=None):
+        self.calls.append({"db": db_path, "log_dir": log_dir, "autostart": autostart, "state_db": state_db})
+        if self.error:
+            raise self.error
+        return self.result
+
+
+def test_viewer_link_restarts_a_stopped_viewer_before_handing_over_the_key(api, tmp_path, monkeypatch):
+    """The viewer stops with the Hermes process that started it. When that was a short-lived one,
+    the page found nothing listening and nothing restarted it: opening the page now does."""
+    db = _db(tmp_path / "home" / "plugin-data" / "omniscience" / "events.db")
+    (db.parent / "viewer-token").write_text("tok-abc\n", encoding="utf-8")
+    fake = _FakeLauncher()
+    monkeypatch.setattr(api, "_launcher", lambda: fake)
+
+    body = _client(api).get("/api/plugins/omniscience/viewer").json()
+    assert body["token"] == "tok-abc", body
+    assert body["viewer"] == {"running": True, "reason": "started successfully"}, body
+    assert len(fake.calls) == 1
+    call = fake.calls[0]
+    assert call["db"] == os.path.realpath(db)
+    assert call["log_dir"] == os.path.dirname(os.path.realpath(db))
+    assert call["autostart"] is True
+    assert call["state_db"] == str(tmp_path / "home" / "state.db")
+
+
+def test_viewer_link_does_not_start_a_viewer_without_a_recording(api, monkeypatch):
+    fake = _FakeLauncher()
+    monkeypatch.setattr(api, "_launcher", lambda: fake)
+    body = _client(api).get("/api/plugins/omniscience/viewer").json()
+    assert fake.calls == []
+    assert body["viewer"]["running"] is False
+    assert "not found" in body["viewer"]["reason"]
+
+
+def test_viewer_link_still_answers_when_the_restart_fails(api, tmp_path, monkeypatch):
+    db = _db(tmp_path / "home" / "plugin-data" / "omniscience" / "events.db")
+    (db.parent / "viewer-token").write_text("tok-abc\n", encoding="utf-8")
+    monkeypatch.setattr(api, "_launcher", lambda: _FakeLauncher(error=RuntimeError("boom")))
+    body = _client(api).get("/api/plugins/omniscience/viewer").json()
+    assert body["token"] == "tok-abc", body
+    assert body["viewer"]["running"] is False
+    assert "boom" in body["viewer"]["reason"]
+
+
+def test_viewer_link_uses_the_real_launcher_and_honours_autostart_off(api, tmp_path, monkeypatch):
+    """Loads viewer_launcher.py by path the way Hermes loads this file, and keeps the opt-out."""
+    _db(tmp_path / "home" / "plugin-data" / "omniscience" / "events.db")
+    monkeypatch.setenv("OMNISCIENCE_VIEWER_AUTOSTART", "0")
+    body = _client(api).get("/api/plugins/omniscience/viewer").json()
+    assert body["viewer"] == {"running": False, "reason": "autostart off"}, body
