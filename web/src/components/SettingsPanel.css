@@ -66,6 +66,30 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Interface size: the same three-way choice the header uses for Detail and Mode, at the dialog's
+   scale. It sits in a row like every other setting, with the group pushed to the right edge. */
+.sp-size-row {
+  align-items: center;
+}
+
+.sp-size {
+  min-height: 0;
+  margin-left: auto;
+  padding: 2px 3px;
+  border-radius: 9px;
+  background: var(--panel-2);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.sp-size .mode-option {
+  min-width: 54px;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
 .sp-commands {
   margin: 0;
   padding-left: 18px;

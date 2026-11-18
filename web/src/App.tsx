@@ -8,10 +8,12 @@ import { groupMembers } from './graph/collapse';
 import { type Graph, type GNode } from './graph/reduce';
 import GraphWorker from './graph/graph.worker?worker&inline';
 import {
-  CONNECTION_TEXT,
+  QUIET_STEP_WINDOW_S,
   activityAge,
   connectionState,
+  connectionDetails,
   pickNewestSession,
+  type ConnectionState,
 } from './graph/format';
 import {
   computeRunSummary,
@@ -95,6 +97,12 @@ import {
   writeScopedPref,
 } from './shell/modePrefs';
 import { PrefScopeProvider } from './shell/prefScope';
+import {
+  applyInterfaceSize,
+  readInterfaceSize,
+  writeInterfaceSize,
+  type InterfaceSize,
+} from './shell/interfaceSize';
 import { useMediaQuery } from './shell/useMediaQuery';
 import { TipLayer } from './help/TipLayer';
 import guide from './help/guide.json';
@@ -464,6 +472,35 @@ export function WriteupChip({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+/**
+ * The live connection badge.
+ * Displays whether the open chat is working now, was active recently, or shows the last step time.
+ */
+export function LiveBadge({
+  connection,
+  label,
+  ageText,
+  tooltip,
+}: {
+  connection: ConnectionState;
+  label: string;
+  ageText?: string;
+  tooltip: string;
+}) {
+  return (
+    <span className={`live-badge is-${connection}`} title={tooltip}>
+      <span className="live-dot" />
+      {label}
+      {ageText ? (
+        <>
+          {' '}
+          <span className="live-age">· {ageText}</span>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
 export default function App() {
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -543,9 +580,23 @@ export default function App() {
     lastEventAt: freshest > 0 ? freshest : null,
     now: nowSec,
   });
-  const connectionText = CONNECTION_TEXT[connection];
-  const ageText = freshest > 0 ? activityAge(nowSec - freshest) : '';
+  const connectionText = connectionDetails(
+    connection,
+    freshest > 0 ? freshest : null,
+    nowSec,
+  );
+  const isStaleStep =
+    connection === 'recorded' &&
+    freshest > 0 &&
+    nowSec - freshest >= QUIET_STEP_WINDOW_S;
+  const ageText =
+    freshest > 0 && connection !== 'disconnected'
+      ? activityAge(nowSec - freshest)
+      : '';
   const isLive = connection === 'live';
+  const badgeTooltip = isStaleStep
+    ? connectionText.tooltip
+    : `${connectionText.tooltip}${ageText ? ` Last event ${ageText}.` : ''}`;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowSec(Date.now() / 1000), 5000);
@@ -687,6 +738,7 @@ export default function App() {
     setCompact(readModeCompact(next, embedded));
     setTheme(readScopedPref('theme', next) === 'paper' ? 'paper' : 'console');
     setAccent(readScopedPref('accent', next) === 'red' ? 'red' : 'teal');
+    setInterfaceSize(readInterfaceSize(next));
     const savedView = readScopedPref('view', next);
     const savedDefault = readScopedPref('defaultView', next);
     setDefaultView(isView(savedDefault) ? savedDefault : 'graph');
@@ -985,6 +1037,15 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.accent = accent;
   }, [accent]);
+  /**
+   * How large the whole viewer draws itself (Settings → Interface size). A display preference, so
+   * Reset View deliberately leaves it alone. Layout effect: the size has to be on the document
+   * before the first paint, or the page flashes at 100% and then shrinks.
+   */
+  const [interfaceSize, setInterfaceSize] = useState<InterfaceSize>(() => readInterfaceSize(mode));
+  useLayoutEffect(() => {
+    applyInterfaceSize(interfaceSize);
+  }, [interfaceSize]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Side-pane view (List / Context / Tools / Tokens / Time), remembered per mode.
   const [miniView, setMiniView] = useState<MiniView>(() => {
@@ -1608,6 +1669,8 @@ export default function App() {
     const resetPreset = defaultPreset(mode);
     const empty: Overrides = { hidden: [], shown: [] };
     prefs.reset();
+    // Interface size is not in that allow list on purpose: it is how large the page draws, not
+    // what you are looking at, so Reset View leaves the reader's chosen size alone.
     try {
       const keys: string[] = [];
       for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -1656,7 +1719,16 @@ export default function App() {
     resetView();
   };
 
-  const viewerSettings: ViewerSettings = { defaultView, compact, followNewest, showTitles, theme, accent, showContext };
+  const viewerSettings: ViewerSettings = {
+    defaultView,
+    compact,
+    followNewest,
+    showTitles,
+    theme,
+    accent,
+    showContext,
+    interfaceSize,
+  };
   const applySettings = (next: ViewerSettings) => {
     setDefaultView(next.defaultView);
     setCompact(next.compact);
@@ -1665,6 +1737,7 @@ export default function App() {
     setTheme(next.theme);
     setAccent(next.accent);
     setShowContext(next.showContext);
+    setInterfaceSize(next.interfaceSize);
     // Every viewer setting is remembered for the mode on screen only.
     writeModeCompact(mode, next.compact);
     writeScopedBool('followNewest', mode, next.followNewest);
@@ -1673,6 +1746,7 @@ export default function App() {
     writeScopedPref('theme', mode, next.theme);
     writeScopedPref('accent', mode, next.accent);
     writeScopedPref('defaultView', mode, next.defaultView);
+    writeInterfaceSize(mode, next.interfaceSize);
   };
   const toggleFullscreen = () => {
     try {
@@ -2122,14 +2196,12 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-status">
-          <span
-            className={`live-badge is-${connection}`}
-            title={`${connectionText.tooltip}${ageText ? ` Last event ${ageText}.` : ''}`}
-          >
-            <span className="live-dot" />
-            {connectionText.label}
-            {ageText ? <span className="live-age">· {ageText}</span> : null}
-          </span>
+          <LiveBadge
+            connection={connection}
+            label={connectionText.label}
+            ageText={ageText}
+            tooltip={badgeTooltip}
+          />
           {compactHeader ? null : telemetryStrip}
           {compactHeader ? (
             <button

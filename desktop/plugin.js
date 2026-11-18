@@ -4,7 +4,7 @@
  */
 import { host, SandboxedFrame } from '@hermes/plugin-sdk'
 import { jsx } from 'react/jsx-runtime'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const VIEWER_URL = 'http://127.0.0.1:8797'
 
@@ -86,6 +86,133 @@ function listenForOpenExternal() {
 }
 
 let CTX = null
+const ROOM_KEY = 'makeRoomAutomatically'
+let roomCleanup = null
+let roomClosing = false
+let roomAfterClosing = null
+
+function roomWanted(ctx) {
+  try {
+    if (ctx?.storage) return ctx.storage.get(ROOM_KEY, true) !== false
+    return window.localStorage.getItem('omniscience.' + ROOM_KEY) !== '0'
+  } catch {
+    return false
+  }
+}
+
+function setRoomWanted(ctx, on) {
+  try {
+    if (ctx?.storage) ctx.storage.set(ROOM_KEY, on)
+    else window.localStorage.setItem('omniscience.' + ROOM_KEY, on ? '1' : '0')
+  } catch { /* storage unavailable */ }
+}
+
+function RoomSettings() {
+  const [on, setOn] = useState(roomWanted(CTX))
+  return jsx('label', { style: { display: 'flex', gap: 8, padding: 16 }, children: [
+    jsx('input', { key: 'input', type: 'checkbox', checked: on, onChange: event => {
+      const next = event.target.checked
+      setRoomWanted(CTX, next)
+      setOn(next)
+    } }),
+    'Make room automatically',
+  ] })
+}
+
+// The shell unmounts the status bar when disabled. A missing shell is unknown,
+// not evidence that the bar is hidden (for example, during disposal).
+function statusbarVisible() {
+  const shell = document.querySelector('[data-contrib-shell]')
+  return shell ? Boolean(shell.querySelector('[data-slot="statusbar"]')) : null
+}
+
+function sidebarLabel(side) {
+  // The host emits no tool id. The right tool has a tour marker; the left tool
+  // is the sidebar glyph in the fixed left cluster.
+  const selector = side === 'left'
+    ? '[data-titlebar-cluster="left"] button:has(.codicon-layout-sidebar-left)'
+    : 'button[data-tour="right-pane-toggle"]'
+  return document.querySelector(selector)?.getAttribute('aria-label') || null
+}
+
+function afterHostCommit() {
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+}
+
+// Wait for the host to commit, then until the page width holds still for a frame (at most half a
+// second), so a slow machine or an animated pane is not mistaken for "nothing moved".
+async function settled(element) {
+  await afterHostCommit()
+  const end = Date.now() + 500
+  let last = element?.getBoundingClientRect().width
+  while (Date.now() < end) {
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    const width = element?.getBoundingClientRect().width
+    if (width === last) return
+    last = width
+  }
+}
+
+function makeRoom(ctx, page) {
+  if (!roomWanted(ctx) || typeof ctx?.runAction !== 'function') return () => {}
+  if (roomCleanup) {
+    if (!roomClosing) return () => {}
+    let cancelled = false
+    let nextCleanup = null
+    roomAfterClosing = () => { if (!cancelled) nextCleanup = makeRoom(ctx, page) }
+    return () => { cancelled = true; nextCleanup?.() }
+  }
+  const hidden = statusbarVisible() === true && ctx.runAction('view.toggleStatusbar')?.ok === true
+  const sides = []
+  let active = true
+  let pending = true
+  // Put back what this page hid even if the preference was switched off meanwhile; the preference
+  // only decides whether to make room on the way in.
+  const restoreSides = () => {
+    for (const { side, action, label } of sides.splice(0)) {
+      if (sidebarLabel(side) === label) ctx.runAction(action)
+    }
+  }
+  const cleanup = () => {
+    if (!active) return
+    active = false
+    roomClosing = pending
+    if (hidden && statusbarVisible() === false) ctx.runAction('view.toggleStatusbar')
+    restoreSides()
+    if (!pending) roomCleanup = null
+  }
+  roomCleanup = cleanup
+  ;(async () => {
+    for (const [side, action] of [['left', 'view.toggleSidebar'], ['right', 'view.toggleRightSidebar']]) {
+      if (!active || !roomWanted(ctx)) break
+      const element = page.current
+      const beforeLabel = sidebarLabel(side)
+      const before = element?.getBoundingClientRect().width
+      if (!beforeLabel || !Number.isFinite(before) || before <= 0) continue
+      if (ctx.runAction(action)?.ok !== true) continue
+      await settled(element)
+      const after = element.getBoundingClientRect().width
+      const label = sidebarLabel(side)
+      if (Number.isFinite(after) && after - before >= 40 && label && label !== beforeLabel) {
+        sides.push({ side, action, label })
+      } else {
+        // Revert a probe that opened a side or could not be identified safely.
+        ctx.runAction(action)
+        await afterHostCommit()
+      }
+      if (!active) restoreSides()
+    }
+    pending = false
+    if (!active) {
+      roomCleanup = null
+      roomClosing = false
+      const restart = roomAfterClosing
+      roomAfterClosing = null
+      restart?.()
+    }
+  })()
+  return cleanup
+}
 
 // The viewer answers only with its per-launch key, and Hermes hands it to us behind its own
 // login: the plugin's own backend reads it (GET /api/plugins/omniscience/viewer) and ctx.rest is
@@ -106,11 +233,13 @@ function useViewerKey() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const up = await viewerReachable()
+      // Ask for the link first: the backend restarts a stopped viewer before it answers, so a viewer
+      // that went down with a short-lived Hermes process comes back when this page opens or retries.
       let token = null
-      if (up && CTX?.rest) {
+      if (CTX?.rest) {
         token = await Promise.resolve(CTX.rest('/viewer')).then(r => (r && r.token) || null).catch(() => null)
       }
+      const up = await viewerReachable()
       if (token) viewerToken = token
       if (alive) setState(prev => ({ ...prev, ready: true, token, up }))
     })()
@@ -125,7 +254,7 @@ function useViewerKey() {
 function ViewerProblem({ up, retry }) {
   const text = up
     ? 'Omniscience could not get the viewer key. Restart the viewer, then retry.'
-    : 'The Omniscience viewer is not running. Start it (python -m omniscience_viewer), then retry.'
+    : 'The Omniscience viewer is not running and could not be started. Retry; if it stays down, see viewer.log in the Omniscience data folder.'
   return jsx('div', {
     style: { padding: 24, maxWidth: 560, lineHeight: 1.5 },
     children: [
@@ -150,18 +279,21 @@ function viewerSrc(session, token, extra) {
 
 function OmnisciencePage() {
   listenForOpenExternal()
+  const page = useRef(null)
+  useEffect(() => makeRoom(CTX, page), [])
   const key = useViewerKey()
   // Default to the chat the user was in when they opened Omniscience.
   const session = linkedSession() || focusedChat()
-  if (!key.ready) return jsx('div', { style: { padding: 16, opacity: 0.6 }, children: 'Opening Omniscience…' })
-  if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry: key.retry })
-  const src = viewerSrc(session, key.token, HOST_MARKER)
+  const src = key.ready && key.up && key.token ? viewerSrc(session, key.token, HOST_MARKER) : null
   return jsx('div', {
+    ref: page,
     style: { width: '100%', height: '100%', display: 'flex' },
     // SandboxedFrame, not a raw <iframe>: the viewer is web content, so it gets the app's guest
     // posture (an opaque origin, no bridge, no access to the app's storage). The page is built
     // for that — it authenticates every call with its own key and asks for nothing else.
-    children: jsx(SandboxedFrame, {
+    children: !key.ready ? jsx('div', { style: { padding: 16, opacity: 0.6 }, children: 'Opening Omniscience…' })
+      : !src ? jsx(ViewerProblem, { up: key.up, retry: key.retry })
+      : jsx(SandboxedFrame, {
       src,
       title: 'Omniscience viewer',
       style: { flex: 1, border: 'none', display: 'block' },
@@ -274,10 +406,22 @@ export default {
   register(ctx) {
     CTX = ctx
     ctx.onDispose?.(() => {
+      roomAfterClosing = null
+      roomCleanup?.()
       const dispose = paneDisposer
       paneDisposer = null
       if (dispose) dispose()
       CTX = null
+    })
+    ctx.registerSettingsPage?.({ id: 'preferences', title: 'Omniscience', render: () => jsx(RoomSettings, {}) })
+    if (!ctx.registerSettingsPage) ctx.register({
+      id: 'make-room-setting',
+      area: 'palette',
+      data: {
+        id: 'omniscience.toggleMakeRoom',
+        label: 'Omniscience: Turn automatic room on or off',
+        run: () => setRoomWanted(ctx, !roomWanted(ctx)),
+      },
     })
     ctx.register({
       id: 'page',

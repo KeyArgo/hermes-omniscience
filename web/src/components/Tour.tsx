@@ -10,6 +10,7 @@ import {
 import './Tour.css';
 import { tokenHeaders } from '../token';
 import { API_BASE } from '../api';
+import { currentInterfaceScale } from '../shell/interfaceSize';
 
 type Mode = 'hidden' | 'offer' | 'run';
 
@@ -36,11 +37,25 @@ function writeSeen() {
   void fetch(`${API_BASE}/tour-seen`, { method: 'POST', headers: tokenHeaders() }).catch(() => {});
 }
 
+/**
+ * Where a target is, in the app root's own pixels.
+ *
+ * The ring and the card are `position: fixed` inside the root, so they are laid out in the root's
+ * pixels — and with Interface size under 100% (styles.css puts a `zoom` on the root) the root's
+ * pixels are smaller than the window's. `getBoundingClientRect` answers in window pixels, so at 80%
+ * a ring drawn from raw numbers sits a fifth of the screen away from the control it points at.
+ */
 function targetRect(sel: string): Rect | null {
   const el = document.querySelector(sel);
   if (!el) return null;
   const r = el.getBoundingClientRect();
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
+  const scale = currentInterfaceScale();
+  return {
+    top: r.top / scale,
+    left: r.left / scale,
+    width: r.width / scale,
+    height: r.height / scale,
+  };
 }
 
 export function Tour({
@@ -73,8 +88,14 @@ export function Tour({
     const card = cardRef.current;
     const cw = card ? card.offsetWidth : 340;
     const ch = card ? card.offsetHeight : 160;
+    // The card is laid out in the root's pixels too, so the box it is placed in is the window
+    // divided by the same scale the target was measured in.
+    const scale = currentInterfaceScale();
     setPos(
-      placeCard(rect, { width: cw, height: ch }, { width: window.innerWidth, height: window.innerHeight }),
+      placeCard(rect, { width: cw, height: ch }, {
+        width: window.innerWidth / scale,
+        height: window.innerHeight / scale,
+      }),
     );
   }, []);
 

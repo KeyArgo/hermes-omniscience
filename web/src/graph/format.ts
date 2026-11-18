@@ -78,6 +78,7 @@ export function formatLocalTime(ts: number | null | undefined): string {
   );
 }
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function sameLocalDay(a: Date, b: Date): boolean {
@@ -202,6 +203,49 @@ export const CONNECTION_TEXT: Record<
     tooltip: "Disconnected — can't reach the viewer",
   },
 };
+
+/** Epoch seconds -> "Sun 15 Nov, 14:18" in the viewer's local time. */
+export function formatStepDateTime(ts: number | null | undefined): string {
+  if (typeof ts !== 'number' || !Number.isFinite(ts) || ts <= 0) return 'not reported';
+  const d = new Date(ts * 1000);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Past this, the chat has not taken a step for hours: say "Last step ..." rather than "Chat quiet". */
+export const QUIET_STEP_WINDOW_S = 2 * 3600;
+
+/** Tooltip for a chat whose last step was hours or days ago: exact local time + reassurance. */
+export function formatStepTooltip(ts: number | null | undefined): string {
+  if (typeof ts !== 'number' || !Number.isFinite(ts) || ts <= 0) return CONNECTION_TEXT.recorded.tooltip;
+  const dt = formatStepDateTime(ts);
+  return `Last recorded step: ${dt}. No step has been recorded in this chat since then.`;
+}
+
+export interface ConnectionDetails {
+  label: string;
+  tooltip: string;
+}
+
+/**
+ * Label and tooltip for the live badge. Hours after the last step it says "Last step" and gives
+ * the exact time: "Chat quiet · 2d ago" read like a stalled recorder, not a chat at rest.
+ */
+export function connectionDetails(
+  state: ConnectionState,
+  lastEventAt?: number | null,
+  now?: number,
+): ConnectionDetails {
+  const resting =
+    state === 'recorded' &&
+    typeof lastEventAt === 'number' &&
+    Number.isFinite(lastEventAt) &&
+    lastEventAt > 0 &&
+    typeof now === 'number' &&
+    now - lastEventAt >= QUIET_STEP_WINDOW_S;
+  if (resting) return { label: 'Last step', tooltip: formatStepTooltip(lastEventAt) };
+  return { label: CONNECTION_TEXT[state].label, tooltip: CONNECTION_TEXT[state].tooltip };
+}
 
 /** "12s ago", "4m ago", "2h ago" — the age that backs the badge, in words. */
 export function activityAge(seconds: number | null | undefined): string {

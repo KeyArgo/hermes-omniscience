@@ -1,7 +1,8 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 5468cf5
-> **Revised:** 2026-11-16 · **Body hash:** 09f1b861
+> **Applies to:** Omniscience 1.0.0 · written at commit 4de50ec
+> **Revised:** 2026-11-18 · **Body hash:** d1a333e9
+
 
 
 
@@ -129,6 +130,23 @@ current as fixes land; report tests and unresolved issues against the exact comm
 - The header Detail switch is as tall as the Workspace button (52 px) so it never adds height:
   at 1366 px the header is 145 px; at 1440×900 it is 205 px, which leaves the map 320 px tall
   under the status card. Minimizing the card or Expand view gives more room (owner to judge).
+
+- 2026-11-17/18 (owner: "as much viewing area as possible", "chat quiet 2d like its not updating"):
+  - Make room: on the full Omniscience page, Hermes 2026-11-16+ lets plugins run view actions
+    (`ctx.runAction`). The page hides the status bar and any open sidebar, keeping a hide only when
+    its own width grew (else it undoes the toggle), and on leave restores only what it hid and the
+    user has not changed since (button label unchanged). On by default; "Make room automatically" in
+    the plugin's settings page. Older Hermes without `runAction`: nothing happens. Not yet seen in
+    the real Desktop window (needs a Desktop reload); `dev/desktop-plugin-harness.test.mjs` covers it.
+  - Interface size: Settings → 100 / 90 / 80 %, default 90 %, CSS `zoom` on the app root with the
+    shell height compensated; Tour ring and hover tips divide by the scale. Menus portalled to
+    `<body>` keep their normal text size. At 90 % the 42 px controls draw at 37.8 px, under the 40 px
+    floor; `interface-slice` grades the floor in the app's own pixels (owner may prefer 100 %
+    default). Check: `node dev/interface-size-check.mjs`.
+  - The badge says "Last step · 2d ago" with the exact local time once a chat has been quiet for
+    two hours, instead of "Chat quiet", which read like a stalled recorder.
+  - The viewer restarts when the page opens: the page now asks the backend for the link before it
+    pings the viewer, and the backend starts a stopped viewer (`dashboard/plugin_api.py`).
 
 ## Verification and release
 

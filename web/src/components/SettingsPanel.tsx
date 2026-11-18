@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getPrefs, setPrefs } from '../api';
 import type { ChatPrefs } from '../types';
+import { INTERFACE_SIZES, type InterfaceSize } from '../shell/interfaceSize';
 import './SettingsPanel.css';
 
 export type ViewMode =
@@ -18,6 +19,8 @@ export interface ViewerSettings {
   showContext: boolean;
   theme: ThemeName;
   accent: AccentName;
+  /** How large the whole page draws: 100%, 90% or 80%. */
+  interfaceSize: InterfaceSize;
 }
 
 interface Props {
@@ -45,6 +48,13 @@ const VIEW_LABELS: Record<ViewMode, string> = {
   latency: 'Latency (how long models really take)',
   coverage: 'Coverage (how complete the recording is)',
   lens: 'Lens (recorded moments as one ring)',
+};
+
+/** Spelled out on hover: what each size is for, in the reader's words rather than a zoom level. */
+const SIZE_TITLES: Record<InterfaceSize, string> = {
+  100: '100%: the size the viewer has always drawn at.',
+  90: '90%: a tenth smaller, so more fits on the same screen. The default.',
+  80: '80%: the smallest, for a small window or a tall page.',
 };
 
 /** Every Omniscience setting in one place. Viewer settings apply at once; recording settings are chat commands. */
@@ -154,6 +164,28 @@ export function SettingsPanel({ open, settings, onChange, onOpenPrivacy, onReset
 
         <section>
           <h3>What you see</h3>
+          <div className="sp-row sp-size-row">
+            <span>Interface size</span>
+            <div className="mode-select sp-size" role="group" aria-label="Interface size">
+              {INTERFACE_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  className={`mode-option${settings.interfaceSize === size ? ' is-active' : ''}`}
+                  aria-pressed={settings.interfaceSize === size}
+                  data-interface-size={size}
+                  onClick={() => set({ interfaceSize: size })}
+                  title={SIZE_TITLES[size]}
+                >
+                  {size}%
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="sp-note">
+            Draws the whole page smaller, so more fits on screen. 90% is the default; Reset View
+            leaves it alone.
+          </p>
           <label className="sp-row">
             <span>Context chart under each chat</span>
             <input

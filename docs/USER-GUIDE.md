@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3ee0d28
-> **Revised:** 2026-11-13 · **Body hash:** c3f6e847
+> **Applies to:** Omniscience 1.0.0 · written at commit 4de50ec
+> **Revised:** 2026-11-17 · **Body hash:** b2c006c5
+
 
 
 
@@ -360,6 +361,15 @@ Settings → **Look** switches the whole viewer between **Console** (deep space,
 faint technical grid; the default) and **Paper** (warm graphite and brass). Same data, same layout,
 nothing hidden — it is only a change of face, and Reset view puts it back.
 
+### Interface size
+
+Settings → **Interface size** draws the whole page at **100%**, **90%** (the default) or **80%**:
+text, buttons, the map and the panels all get smaller together, so about a fifth more fits on a
+small screen without changing what is shown. Nothing is hidden or re-arranged — it is the same
+layout, drawn smaller. The choice is remembered for the mode you made it in (the browser and the
+docked Hermes pane each keep their own), and **Reset view** leaves it alone: how large the page
+draws is not part of the view Reset view restores.
+
 ### The turn summary in your chat
 
 Omniscience posts a short summary at the end of each turn, so you never have to open the viewer to
@@ -400,7 +410,8 @@ the next call has to process that whole context fresh.
 
 Panels with a **⤢** button open front and centre for close reading, which is what you want on a
 laptop; **Esc** closes. **↺ reset view** in the header (and in Settings) puts the panels, zoom,
-filters and view back to how they started — it never touches the recording.
+filters and view back to how they started — it never touches the recording, and it leaves your
+chosen **Interface size** alone.
 
 ### Follow frame
 

@@ -206,7 +206,9 @@ export function writeScopedBool(
  * Does this key hold a resettable view preference for `mode`? Reset View uses this as an allow
  * list: only a key that answers yes is removed. Everything else — the API token's session state,
  * privacy choices and dismissals, chat-list sort/group/collapse, the follow list, usage windows,
- * problem acknowledgements, the remembered mode, and the other mode's keys — is left alone.
+ * problem acknowledgements, the remembered mode, and the other mode's keys — is left alone. So is
+ * the interface size (`interfaceSize.ts`): how large the page draws is not part of the view Reset
+ * View is restoring, so it must not appear in `MODE_VIEW_KEYS` either.
  *
  * `omni.hermes.*` is never a web key even though the string also starts with `omni.`.
  */

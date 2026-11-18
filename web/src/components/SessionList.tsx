@@ -3,7 +3,10 @@ import type { SessionMeta } from '../types';
 import {
   ACTIVE_WINDOW_S,
   RECENT_WINDOW_S,
+  QUIET_STEP_WINDOW_S,
   formatNumber,
+  formatStepDateTime,
+  formatStepTooltip,
   relativeTime,
   sessionOutcome,
   sessionStartLabel,
@@ -274,6 +277,7 @@ export function SessionList({
               : 'not reported';
           const working = session.id === workingId;
           const ageS = typeof session.last_ts === 'number' ? now - session.last_ts : null;
+          const isStaleStep = ageS !== null && ageS >= QUIET_STEP_WINDOW_S;
           const activeNow = ageS !== null && ageS >= 0 && ageS <= ACTIVE_WINDOW_S;
           const recent = ageS !== null && ageS >= 0 && ageS <= RECENT_WINDOW_S;
           const contextNow = session.prompt_now && session.prompt_now > 0 ? session.prompt_now : session.prompt_max;
@@ -292,7 +296,9 @@ export function SessionList({
                   working ? `${session.label || session.id} — working now` : session.label || session.id,
                   `${outcome} · started ${start}`,
                   typeof session.last_ts === 'number'
-                    ? `last activity ${relativeTime(session.last_ts, now)} (${new Date(session.last_ts * 1000).toLocaleString()})`
+                    ? (isStaleStep
+                        ? `last step ${relativeTime(session.last_ts, now)} (${formatStepDateTime(session.last_ts)})`
+                        : `last activity ${relativeTime(session.last_ts, now)} (${new Date(session.last_ts * 1000).toLocaleString()})`)
                     : 'no recorded time',
                   `model ${session.model ?? model}`,
                   `${session.events ?? 0} steps recorded`,
@@ -321,7 +327,11 @@ export function SessionList({
                         <span className="session-sep">·</span>
                         <span
                           className="session-age"
-                          title={`Last recorded activity: ${new Date(session.last_ts * 1000).toLocaleString()} (system clock)`}
+                          title={
+                            isStaleStep
+                              ? formatStepTooltip(session.last_ts)
+                              : `Last recorded activity: ${new Date(session.last_ts * 1000).toLocaleString()} (system clock)`
+                          }
                         >
                           {relativeTime(session.last_ts, now)}
                         </span>

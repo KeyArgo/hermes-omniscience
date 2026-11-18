@@ -37,7 +37,7 @@ const files = {
     : pluginSource,
   '/sdk.js': "export const host = { navigate() {}, state: {} }; export const SandboxedFrame = 'SandboxedFrame';",
   '/jsx.js': 'export const jsx = (t, p) => ({ t, p });',
-  '/react.js': 'export const useState = (v) => [v, () => {}]; export const useEffect = (fn) => { fn(); }; export const useMemo = (fn) => fn();',
+  '/react.js': 'export const useState = (v) => [v, () => {}]; export const useEffect = (fn) => { fn(); }; export const useMemo = (fn) => fn(); export const useRef = (v) => ({ current: v });',
 };
 const parentHtml = (frameSrc, withHost) => `<!doctype html><meta charset="utf-8">
 <script type="importmap">{"imports":{"@hermes/plugin-sdk":"/sdk.js","react/jsx-runtime":"/jsx.js","react":"/react.js"}}</script>

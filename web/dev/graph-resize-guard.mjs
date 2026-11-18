@@ -52,18 +52,21 @@ try {
     const shell = document.querySelector('.graph-shell');
     const viewport = document.querySelector('.react-flow__viewport');
     if (!shell || !viewport) return null;
-    const rect = shell.getBoundingClientRect();
     const match = viewport.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([-\d.]+)\)/);
     if (!match) return null;
     const x = Number(match[1]);
     const y = Number(match[2]);
     const zoom = Number(match[3]);
     return {
-      width: rect.width,
-      height: rect.height,
+      // clientWidth/Height are the pane's own layout pixels — the space the viewport transform
+      // lives in. getBoundingClientRect would answer in window pixels, which are smaller than the
+      // pane's own when the page is drawn at an Interface size under 100% (CSS zoom on .app), and
+      // mixing the two made the world centre look as if it drifted by a tenth of the pane.
+      width: shell.clientWidth,
+      height: shell.clientHeight,
       zoom,
-      worldX: (rect.width / 2 - x) / zoom,
-      worldY: (rect.height / 2 - y) / zoom,
+      worldX: (shell.clientWidth / 2 - x) / zoom,
+      worldY: (shell.clientHeight / 2 - y) / zoom,
     };
   });
 
@@ -183,7 +186,12 @@ try {
       if (candidate.classList.contains('selected')) return false;
       if (candidate.classList.contains('react-flow__node-group') || candidate.classList.contains('react-flow__node-turn')) return false;
       const rect = candidate.getBoundingClientRect();
-      return rect.right > shell.left && rect.left < shell.right && rect.bottom > shell.top && rect.top < shell.bottom;
+      if (!(rect.right > shell.left && rect.left < shell.right && rect.bottom > shell.top && rect.top < shell.bottom)) return false;
+      // Somewhere a real click would land on this node: the status card and the details rail
+      // float over the pane, and at an Interface size under 100% the graph is short enough for a
+      // node near its top to sit behind one of them.
+      const hit = document.elementFromPoint((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2);
+      return Boolean(hit) && (hit === candidate || candidate.contains(hit));
     });
     return node?.getAttribute('data-id') ?? null;
   });

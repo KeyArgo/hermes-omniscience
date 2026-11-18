@@ -191,6 +191,14 @@ async function measure(page) {
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, 48);
+    // How far the app draws itself from its own layout pixels (Interface size, Settings). 1 when
+    // the root has no zoom; 0.9 at the default. Targets are graded in these pixels, not the
+    // window's.
+    const appScale = (() => {
+      const root = document.querySelector('.app');
+      const value = root ? parseFloat(getComputedStyle(root).zoom) : 1;
+      return Number.isFinite(value) && value > 0 ? value : 1;
+    })();
     // A control inside a horizontally scrollable row is reachable by wheel, trackpad, touch and
     // keyboard focus; it is not clipped. Only overflow with no scroll mechanism counts.
     const scrollHost = (el) => {
@@ -298,8 +306,13 @@ async function measure(page) {
       },
       controls,
       clipped: controls.filter((c) => c.clipped),
+      // The floor is a design target, so measure it in the app's own pixels: Interface size (see
+      // src/shell/interfaceSize.ts) draws the page at 90% by default, which makes a 42 px design
+      // target 37.8 window pixels without moving it a pixel in the layout the design is graded on.
       tiny: controls.filter(
-        (c) => !(c.tag === 'INPUT' && c.type === 'checkbox') && (c.height < 40 || c.font < 12),
+        (c) =>
+          !(c.tag === 'INPUT' && c.type === 'checkbox') &&
+          (c.height / appScale < 40 || c.font < 12),
       ),
       checkbox: controls.filter((c) => c.tag === 'INPUT' && c.type === 'checkbox'),
     };

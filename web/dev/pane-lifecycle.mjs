@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const source = (await readFile(new URL('../../desktop/plugin.js', import.meta.url), 'utf8'))
   .replace("import { host, SandboxedFrame } from '@hermes/plugin-sdk'", 'const { host, SandboxedFrame } = globalThis.__omniTest')
   .replace("import { jsx } from 'react/jsx-runtime'", 'const { jsx } = globalThis.__omniTest')
-  .replace("import { useEffect, useState } from 'react'", 'const { useEffect, useState } = globalThis.__omniTest');
+  .replace("import { useEffect, useRef, useState } from 'react'", 'const { useEffect, useRef, useState } = globalThis.__omniTest');
 const values = new Map([['omniscience.livePane', '1']]);
 globalThis.window = { localStorage: { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) } };
 const registered = new Map();
@@ -16,7 +16,7 @@ globalThis.__omniTest = {
     opens++;
     return () => { closes++; options.onClose(); };
   } },
-  SandboxedFrame: () => null, jsx: () => null, useEffect: () => {}, useState: () => {},
+  SandboxedFrame: () => null, jsx: () => null, useEffect: () => {}, useRef: (value) => ({ current: value }), useState: () => {},
 };
 const plugin = (await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)).default;
 plugin.register({ register: (item) => { registered.set(item.id, item); return () => {}; }, onDispose: (fn) => { disposePlugin = fn; } });

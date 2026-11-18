@@ -9,7 +9,7 @@
 // plugin-data of any profile, which is exactly what the catalog review refused.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-async function loadPlugin() {
+async function loadPlugin(effects = []) {
   vi.resetModules();
   const host = {
     state: {
@@ -22,8 +22,9 @@ async function loadPlugin() {
   vi.doMock("@hermes/plugin-sdk", () => ({ host, SandboxedFrame: "SandboxedFrame" }));
   vi.doMock("react/jsx-runtime", () => ({ jsx: (t, p) => ({ t, p }) }));
   vi.doMock("react", () => ({
-    useEffect: () => {},
+    useEffect: fn => { effects.push(fn); },
     useMemo: fn => fn(),
+    useRef: () => ({ current: globalThis.testPage || null }),
     useState: v => [v, () => {}],
   }));
   // No hermesDesktop on purpose: touching it is the failure this harness is looking for.
@@ -59,7 +60,7 @@ describe("desktop plugin wiring", () => {
     const areas = registered.map(c => c.area);
     expect(areas).toContain("routes");
     expect(areas).toContain("sidebar.nav");
-    expect(areas.filter(a => a === "palette").length).toBe(2);
+    expect(areas.filter(a => a === "palette").length).toBe(3);
     expect(registered.find(c => c.area === "routes").data.path).toBe("/omniscience");
   });
 
@@ -100,5 +101,167 @@ describe("desktop plugin wiring", () => {
     // No ctx registered and no key yet: an honest "no".
     mod.handleViewerMessage({ origin: "null", source, data: { type: "omniscience:open-web", requestId: "r1" } });
     expect(replies).toEqual([{ type: "omniscience:open-web-result", requestId: "r1", ok: false }]);
+  });
+});
+
+describe("viewer restart on open", () => {
+  it("asks the backend for the link before checking the viewer, so a stopped viewer is restarted", async () => {
+    const effects = [];
+    const mod = await loadPlugin(effects);
+    const { ctx, registered, rest } = fakeCtx();
+    const order = [];
+    rest.mockImplementation(async path => { order.push(`rest ${path}`); return { token: "k" }; });
+    globalThis.fetch = vi.fn(async () => { order.push("ping"); throw new Error("connection refused"); });
+    globalThis.document = { querySelector: () => null };
+    mod.default.register(ctx);
+    registered.find(c => c.area === "routes").render().t();
+    // Every effect the page registered; the key hook is one of them.
+    effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(order[0]).toBe("rest /viewer");
+    expect(order).toContain("ping");
+  });
+});
+
+describe("automatic room", () => {
+  async function setup({ visible = true, allowed = true, enabled = true, action = true, shell = true } = {}) {
+    const effects = [];
+    const mod = await loadPlugin(effects);
+    const { ctx, registered } = fakeCtx();
+    let shown = visible;
+    globalThis.testPage = null;
+    globalThis.document = { querySelector: selector => selector === '[data-contrib-shell]' && shell ? {
+      querySelector: () => shown ? {} : null,
+    } : null };
+    ctx.storage = { get: () => enabled, set: vi.fn() };
+    ctx.onDispose = fn => { ctx.dispose = fn; };
+    if (action) ctx.runAction = vi.fn(() => {
+      if (!allowed) return { ok: false };
+      shown = !shown;
+      return { ok: true };
+    });
+    mod.default.register(ctx);
+    const page = registered.find(c => c.area === "routes").render();
+    const mount = () => {
+      effects.length = 0;
+      page.t();
+      return effects[0]();
+    };
+    return { ctx, mount, show: () => { shown = true; }, shown: () => shown };
+  }
+
+  it("hides the status bar on mount and restores it on leave or disposal", async () => {
+    const s = await setup();
+    const cleanup = s.mount();
+    expect(s.shown()).toBe(false);
+    cleanup();
+    expect(s.shown()).toBe(true);
+    s.mount();
+    s.ctx.dispose();
+    expect(s.shown()).toBe(true);
+    expect(s.ctx.runAction).toHaveBeenCalledTimes(4);
+  });
+
+  it("leaves a bar the user reopened alone and avoids double toggles", async () => {
+    const s = await setup();
+    const cleanup = s.mount();
+    const duplicateCleanup = s.mount();
+    expect(s.ctx.runAction).toHaveBeenCalledTimes(1);
+    s.show();
+    duplicateCleanup();
+    cleanup();
+    expect(s.ctx.runAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing when disabled, unavailable, denied, hidden, or unknown", async () => {
+    for (const options of [{ enabled: false }, { action: false }, { allowed: false }, { visible: false }, { shell: false }]) {
+      const s = await setup(options);
+      s.mount()();
+      if (s.ctx.runAction) expect(s.ctx.runAction).toHaveBeenCalledTimes(options.allowed === false ? 1 : 0);
+    }
+  });
+});
+
+
+describe("sidebar room probes", () => {
+  async function setup({ left = true, right = true, enabled = true, action = true, missing = [] } = {}) {
+    const effects = [];
+    const mod = await loadPlugin(effects);
+    const { ctx, registered } = fakeCtx();
+    const open = { left, right };
+    const absent = new Set(missing);
+    let frames = [];
+    globalThis.requestAnimationFrame = fn => { frames.push(fn); };
+    globalThis.testPage = { getBoundingClientRect: () => ({ width: 1000 - (open.left ? 200 : 0) - (open.right ? 200 : 0) }) };
+    globalThis.document = { querySelector: selector => {
+      if (selector === '[data-contrib-shell]') return { querySelector: () => null };
+      const side = selector.includes('codicon-layout-sidebar-left') ? 'left' : 'right';
+      return absent.has(side) ? null : { getAttribute: () => open[side] ? `hide-${side}` : `show-${side}` };
+    } };
+    ctx.storage = { get: () => enabled, set: vi.fn() };
+    ctx.onDispose = fn => { ctx.dispose = fn; };
+    if (action) ctx.runAction = vi.fn(id => {
+      const side = id === 'view.toggleSidebar' ? 'left' : 'right';
+      open[side] = !open[side];
+      return { ok: true };
+    });
+    mod.default.register(ctx);
+    const page = registered.find(c => c.area === 'routes').render();
+    const mount = () => { effects.length = 0; page.t(); return effects[0](); };
+    const flush = async () => {
+      for (let i = 0; i < 12; i++) {
+        const next = frames; frames = [];
+        next.forEach(fn => fn());
+        await Promise.resolve();
+      }
+    };
+    return { ctx, open, absent, mount, flush };
+  }
+
+  it("hides open sides sequentially and restores on leave", async () => {
+    const s = await setup();
+    const cleanup = s.mount();
+    expect(s.ctx.runAction.mock.calls.map(c => c[0])).toEqual(['view.toggleSidebar']);
+    await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    expect(s.ctx.runAction.mock.calls.map(c => c[0])).toEqual(['view.toggleSidebar', 'view.toggleRightSidebar']);
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
+  });
+
+  it("undoes probes that opened closed sides", async () => {
+    const s = await setup({ left: false, right: false });
+    const cleanup = s.mount(); await s.flush(); cleanup();
+    expect(s.open).toEqual({ left: false, right: false });
+    expect(s.ctx.runAction.mock.calls.map(c => c[0])).toEqual(['view.toggleSidebar', 'view.toggleSidebar', 'view.toggleRightSidebar', 'view.toggleRightSidebar']);
+  });
+
+  it("does not restore a side the user reopened or whose button disappeared", async () => {
+    const s = await setup(); const cleanup = s.mount(); await s.flush();
+    s.open.left = true; s.absent.add('right'); cleanup();
+    expect(s.open).toEqual({ left: true, right: false });
+    expect(s.ctx.runAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips missing buttons, opt-out, and missing actions", async () => {
+    for (const options of [{ missing: ['left', 'right'] }, { enabled: false }, { action: false }]) {
+      const s = await setup(options); s.mount()(); await s.flush();
+      if (s.ctx.runAction) expect(s.ctx.runAction).not.toHaveBeenCalled();
+    }
+  });
+
+  it("still restores what it hid when the preference is switched off while the page is open", async () => {
+    const s = await setup(); const cleanup = s.mount(); await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    s.ctx.storage.get = () => false;
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
+  });
+
+  it("does not double-toggle on duplicate mounts or cleanup during a probe", async () => {
+    const s = await setup(); const cleanup = s.mount(); const duplicate = s.mount();
+    duplicate(); cleanup(); s.mount(); await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    expect(s.ctx.runAction.mock.calls.map(c => c[0])).toEqual(['view.toggleSidebar', 'view.toggleSidebar', 'view.toggleSidebar', 'view.toggleRightSidebar']);
   });
 });

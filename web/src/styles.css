@@ -60,8 +60,14 @@ input {
 .app {
   display: grid;
   grid-template-rows: 54px minmax(0, 1fr) 58px;
-  height: 100vh;
-  height: 100dvh;
+  /* Interface size (Settings): the whole shell draws smaller so more fits on a small screen. The
+     zoom sits on the app root rather than on <body> so the menus that portal to <body> keep
+     measuring their trigger in window pixels (MenuButton's placeMenu) and stay under it.
+     Zoom scales the height the shell computes too, so a plain 100dvh left the bottom of the window
+     empty; dividing by the same scale keeps the shell exactly one screen tall at every size. */
+  zoom: var(--ui-scale, 1);
+  height: calc(100vh / var(--ui-scale, 1));
+  height: calc(100dvh / var(--ui-scale, 1));
   overflow: hidden;
 }
 
@@ -2380,6 +2386,8 @@ table.kv.friendly td {
 /* ---------- mini live pane ---------- */
 .app.app-mini {
   display: block;
+  /* A percentage height already resolves inside the zoomed root, unlike the viewport units .app
+     uses, so this needs no compensation for Interface size. */
   height: 100%;
   overflow: hidden;
 }

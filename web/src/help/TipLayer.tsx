@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeTip, SHOW_DELAY_FOCUS, SHOW_DELAY_HOVER, tipTextFor } from './tipPlacement';
+import { currentInterfaceScale } from '../shell/interfaceSize';
 import './TipLayer.css';
 
 type Shown = {
@@ -153,12 +154,21 @@ export function TipLayer({ extra = NONE }: { extra?: Record<string, string> }) {
 
   useLayoutEffect(() => {
     if (!shown || !bubbleRef.current) return;
+    // The bubble is `position: fixed` inside the zoomed app root, so it is placed in the root's
+    // pixels: measure the target and the window in the same ones (Interface size, styles.css).
+    const scale = currentInterfaceScale();
     const rect = shown.target.getBoundingClientRect();
-    const bubbleRect = bubbleRef.current.getBoundingClientRect();
+    const bubble = bubbleRef.current;
+    // offsetWidth/Height are already the root's pixels; the rect's are the window's.
     const next = placeTip(
-      { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-      { width: bubbleRect.width, height: bubbleRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
+      {
+        top: rect.top / scale,
+        left: rect.left / scale,
+        width: rect.width / scale,
+        height: rect.height / scale,
+      },
+      { width: bubble.offsetWidth, height: bubble.offsetHeight },
+      { width: window.innerWidth / scale, height: window.innerHeight / scale },
     );
     setPos(next);
   }, [shown]);

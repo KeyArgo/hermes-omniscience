@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONNECTION_TEXT,
+  QUIET_STEP_WINDOW_S,
+  connectionDetails,
   connectionState,
   formatDuration,
   formatDurationMs,
   formatLocalTime,
   formatNumber,
+  formatStepDateTime,
+  formatStepTooltip,
   formatTokens,
   pickNewestSession,
   relativeTime,
@@ -231,6 +235,81 @@ describe('connection state', () => {
       tooltip: "Disconnected — can't reach the viewer",
     });
   });
+});
+
+describe('step timing and dormant chat labels', () => {
+  it('uses a two-hour threshold', () => {
+    expect(QUIET_STEP_WINDOW_S).toBe(7200);
+  });
+
+  it('formats step local date and time: Sun 15 Nov, 14:18 style', () => {
+    // 2026-11-15 14:18:00 local time
+    const ts = new Date(2026, 10, 15, 14, 18, 0).getTime() / 1000;
+    expect(formatStepDateTime(ts)).toBe('Sun 15 Nov, 14:18');
+  });
+
+  it('pads single-digit hours and minutes in step timestamps', () => {
+    // 2026-03-09 08:05:00 local time (Monday)
+    const ts = new Date(2026, 2, 9, 8, 5, 0).getTime() / 1000;
+    expect(formatStepDateTime(ts)).toBe('Mon 9 Mar, 08:05');
+  });
+
+  it('handles invalid step timestamps cleanly', () => {
+    expect(formatStepDateTime(null)).toBe('not reported');
+    expect(formatStepDateTime(undefined)).toBe('not reported');
+    expect(formatStepDateTime(NaN)).toBe('not reported');
+    expect(formatStepDateTime(0)).toBe('not reported');
+    expect(formatStepDateTime(-100)).toBe('not reported');
+  });
+
+  it('builds the exact tooltip with local time and recording reassurance', () => {
+    const ts = new Date(2026, 10, 15, 14, 18, 0).getTime() / 1000;
+    expect(formatStepTooltip(ts)).toBe(
+      'Last recorded step: Sun 15 Nov, 14:18. No step has been recorded in this chat since then.',
+    );
+  });
+
+  it('switches to "Last step" label only when older than a few hours', () => {
+    const now = 1762500000;
+    // Under 5 minutes: live or recent
+    expect(connectionDetails('live', now - 30, now).label).toBe('Active now');
+    expect(connectionDetails('recent', now - 180, now).label).toBe('Recent activity');
+
+    // Past 5 minutes, but under a few hours (e.g. 10m, 1h) -> stays "Chat quiet"
+    expect(connectionDetails('recorded', now - 600, now).label).toBe('Chat quiet');
+    expect(connectionDetails('recorded', now - 3600, now).label).toBe('Chat quiet');
+    expect(connectionDetails('recorded', now - 7199, now).label).toBe('Chat quiet');
+
+    // At or over a few hours (2h+) -> "Last step"
+    expect(connectionDetails('recorded', now - 7200, now).label).toBe('Last step');
+    expect(connectionDetails('recorded', now - 4 * 3600, now).label).toBe('Last step');
+    expect(connectionDetails('recorded', now - 2 * 86400, now).label).toBe('Last step');
+
+    // Missing or invalid timestamp stays "Chat quiet"
+    expect(connectionDetails('recorded', null, now).label).toBe('Chat quiet');
+    expect(connectionDetails('recorded', undefined, now).label).toBe('Chat quiet');
+  });
+
+  it('keeps "Disconnected" distinct even when the last step was days ago', () => {
+    const now = 1762500000;
+    expect(connectionDetails('disconnected', now - 2 * 86400, now).label).toBe('Disconnected');
+    expect(connectionDetails('disconnected', now - 2 * 86400, now).tooltip).toBe(
+      "Disconnected — can't reach the viewer",
+    );
+  });
+
+  it('provides exact tooltip and reassurance when chat is dormant', () => {
+    const stepDate = new Date(2026, 10, 15, 14, 18, 0);
+    const stepTs = stepDate.getTime() / 1000;
+    const now = stepTs + 2 * 86400; // 2 days later
+
+    const details = connectionDetails('recorded', stepTs, now);
+    expect(details.label).toBe('Last step');
+    expect(details.tooltip).toBe(
+      'Last recorded step: Sun 15 Nov, 14:18. No step has been recorded in this chat since then.',
+    );
+  });
+
 });
 
 describe('newest session', () => {
