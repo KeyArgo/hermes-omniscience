@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4386e6d
-> **Revised:** 2026-11-18 · **Body hash:** 641ade94
+> **Applies to:** Omniscience 1.0.0 · written at commit 126bf74
+> **Revised:** 2026-11-18 · **Body hash:** d6de2dad
+
 
 
 
@@ -126,7 +127,7 @@ share of the ceiling, and — where a compaction has happened — the size it pe
 
 | Region | What is there |
 |---|---|
-| **1 — toolbar** (top strip) | view switch (list / graph / time / tokens), `More views`, `⬒ mini panel`, `⚙ settings`, and the version chip |
+| **1 — toolbar** (top strip) | the product name with its version chip beside it (at every width), view switch (list / graph / time / tokens), `More views`, `⬒ mini panel`, `⚙ settings` |
 | **2 — sessions rail** (left column) | every chat, grouped by day, with its age, outcome and size |
 | **3 — the map** (centre) | whichever view you chose, plus the chart, the cursor and the step list |
 | **4 — mini panel** (right column) | the context strip for the open chat at its top, then whatever you asked it to watch |

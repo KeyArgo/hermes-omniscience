@@ -372,18 +372,87 @@ export function versionChipText(build: BuildInfo): string {
   return parts.join(' · ');
 }
 
-/** The tooltip: the runtime metadata, and a note when the installed copy has local changes. */
+/** The tooltip, in the order the suite's chips use: version, commit, commit date, install date,
+ *  channel, and what a click does. Same shape as Aura's chip so the two read alike. */
 export function versionChipTitle(build: BuildInfo): string {
-  return `${build.version}${build.channel === 'dev' ? ' — pre-release build of ' + (build.release ?? '') : ''}${
-    build.dirty ? ' (uncommitted changes in the installed copy)' : ''
-  }\nCommit ${build.commit.slice(0, 12)} · ${(build.commit_date || '').slice(0, 10)}\nBuilt ${
-    build.built_at || 'unknown'
-  }\nClick to copy this line for a bug report.`;
+  return [
+    `Omniscience ${build.version}`,
+    build.commit ? `commit ${build.commit}` : 'no commit (installed copy)',
+    build.commit_date ? `committed ${build.commit_date}` : '',
+    build.built_at ? `installed ${build.built_at}` : '',
+    build.channel ? `channel ${build.channel}` : '',
+    'click to copy this line',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
-/** The build chip. Shown in every full-viewer layout, whatever the telemetry preference: it is the
- *  only place the running version appears, and the line a bug report asks for. Nothing is shown
- *  until the viewer answers with its build, and no value is compiled in. */
+/** What the chip says after a click: nothing until one, then the truth for 1.4 s. */
+export type ChipCopyState = '' | 'copied' | 'failed';
+
+export function chipLabel(line: string, copyState: ChipCopyState): string {
+  if (copyState === 'copied') return 'copied ✓';
+  if (copyState === 'failed') return 'copy failed';
+  return line;
+}
+
+/** The chip's classes: the pill, amber for a dirty tree, and the copy feedback colours. */
+export function chipClasses(build: BuildInfo, copyState: ChipCopyState): string {
+  return [
+    'version-chip',
+    'mono',
+    build.dirty ? 'is-dirty' : '',
+    copyState === 'copied' ? 'is-copied' : '',
+    copyState === 'failed' ? 'is-copy-failed' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** Copy text with a fallback for browsers without the async clipboard. True only if something
+ *  really copied — a badge that lies is worse than no badge. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through to the textarea */
+  }
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/** A chip click: copy "Omniscience <line>" (the whole line a bug report asks for), then let the
+ *  chip itself report the truth for 1.4 s. `onCopied` fires only on a real copy. Exported so the
+ *  behaviour is testable without a DOM. */
+export async function copyChipLine(
+  line: string,
+  setCopyState: (state: ChipCopyState) => void,
+  onCopied?: (line: string) => void,
+): Promise<void> {
+  const ok = await copyText(`Omniscience ${line}`);
+  setCopyState(ok ? 'copied' : 'failed');
+  if (ok && onCopied) onCopied(line);
+  setTimeout(() => setCopyState(''), 1400);
+}
+
+/** The build chip, styled and behaving like the other Hermes plugins' chips (Aura): a mono pill
+ *  beside the product name that copies its own line and reports the copy inside itself. Nothing
+ *  is shown until the viewer answers with its build, and no value is compiled in. */
 export function VersionChip({
   build,
   onCopy,
@@ -391,42 +460,72 @@ export function VersionChip({
   build: BuildInfo | null;
   onCopy: (line: string) => void;
 }) {
+  const [copyState, setCopyState] = useState<ChipCopyState>('');
   if (!build) return null;
   const line = versionChipText(build);
   return (
     <button
       type="button"
-      className={`version-chip mono${build.dirty ? ' is-dirty' : ''}`}
+      className={chipClasses(build, copyState)}
       title={versionChipTitle(build)}
-      onClick={() => onCopy(line)}
+      onClick={() => {
+        void copyChipLine(line, setCopyState, onCopy);
+      }}
     >
-      {line}
+      {chipLabel(line, copyState)}
     </button>
   );
 }
 
-/** The header's version chip and the optional telemetry counts that share its row. The chip is not
- *  behind the telemetry toggle; Events/Lost (and the replay badge) still are. */
-export function TelemetryStrip({
+/** The header's brand: seal, product name, tagline, mode, and the version chip. The chip sits
+ *  beside the product name at EVERY width — the compact header hides the tagline, never the
+ *  build. This is the one obvious place the running version appears. */
+export function HeaderBrand({
   build,
+  followNewest,
+  modeLabel,
+  modeBlurb,
+  onCopyVersion,
+}: {
+  build: BuildInfo | null;
+  followNewest: boolean;
+  modeLabel: string;
+  modeBlurb: string;
+  onCopyVersion: (line: string) => void;
+}) {
+  return (
+    <div className="brand">
+      <span className="brand-mark">
+        <Seal size={52} />
+      </span>
+      <span className="brand-name">OMNISCIENCE</span>
+      <span className="brand-sub">Every run, made legible</span>
+      <span className={`brand-status${followNewest ? ' is-following' : ''}`} title={modeBlurb}>
+        · {modeLabel}
+      </span>
+      <VersionChip build={build} onCopy={onCopyVersion} />
+    </div>
+  );
+}
+
+/** The header's optional telemetry counts. The version chip is not here: it belongs beside the
+ *  product name in HeaderBrand, where no width hides it. Events/Lost (and the replay badge) keep
+ *  sitting behind the telemetry toggle. */
+export function TelemetryStrip({
   telemetryVisible,
   events,
   lost,
   replayIndex,
   visibleCount,
-  onCopyVersion,
 }: {
-  build: BuildInfo | null;
   telemetryVisible: boolean;
   events: number;
   lost: number;
   replayIndex: number | null;
   visibleCount: number;
-  onCopyVersion: (line: string) => void;
 }) {
   return (
     <>
-      <VersionChip build={build} onCopy={onCopyVersion} />
       {telemetryVisible ? (
         <div className="telemetry" data-panel="telemetry">
           <span
@@ -1995,19 +2094,14 @@ export default function App() {
   const briefingOpen = prefs.visible('briefing');
   const warningGroups = useMemo(() => groupWarnings(warnings).length, [warnings]);
 
-  /** The build chip and the optional counts. One element, rendered in the header or the sheet. */
+  /** The optional counts, kept in the full header and the workspace sheet behind the toggle. */
   const telemetryStrip = (
     <TelemetryStrip
-      build={build}
       telemetryVisible={prefs.visible('telemetry')}
       events={events.length}
       lost={lost}
       replayIndex={replayIndex}
       visibleCount={visibleCount}
-      onCopyVersion={(line) => {
-        void navigator.clipboard?.writeText(line);
-        setExportNote('Version copied');
-      }}
     />
   );
 
@@ -2259,16 +2353,13 @@ export default function App() {
 
       <header className={`topbar${compactHeader ? ' is-compact-header' : ''}`}>
         <div className="topbar-main">
-          <div className="brand">
-            <span className="brand-mark">
-              <Seal size={52} />
-            </span>
-            <span className="brand-name">OMNISCIENCE</span>
-            <span className="brand-sub">Every run, made legible</span>
-            <span className={`brand-status${followNewest ? ' is-following' : ''}`} title={modeBlurb}>
-              · {modeLabel}
-            </span>
-          </div>
+          <HeaderBrand
+            build={build}
+            followNewest={followNewest}
+            modeLabel={modeLabel}
+            modeBlurb={modeBlurb}
+            onCopyVersion={() => setExportNote('Version copied')}
+          />
           <div className="topbar-primary" role="group" aria-label="Primary controls">
             <ChatsButton
               open={chatsOpen}

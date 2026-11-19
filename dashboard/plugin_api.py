@@ -119,6 +119,42 @@ def _prefs():
     return _PREFS
 
 
+_VERSION_STAMP = None
+
+
+def _version_stamp():
+    """The viewer's version_stamp.py, loaded by path like _launcher() does. The chip's values must
+    come from the same place whether the viewer answers or the dashboard answers for it."""
+    global _VERSION_STAMP
+    if _VERSION_STAMP is None:
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "viewer"
+            / "omniscience_viewer"
+            / "version_stamp.py"
+        )
+        spec = importlib.util.spec_from_file_location("omniscience_dashboard_version_stamp", path)
+        if not spec or not spec.loader:
+            raise ImportError(f"cannot load {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _VERSION_STAMP = module
+    return _VERSION_STAMP
+
+
+def _version_locked() -> dict:
+    stamp = _version_stamp()
+    info = stamp.as_dict()
+    return {**info, "chip_line": stamp.chip_line(info)}
+
+
+@router.get("/version")
+async def version() -> dict:
+    """Which build this plugin is, in the same fields as the viewer's /api/v1/version, so the
+    desktop settings chip shows the real version even while the viewer is off."""
+    return await asyncio.to_thread(_version_locked)
+
+
 def _viewer_enabled() -> bool:
     """The owner's switch. An unreadable settings file reads as the default (on)."""
     try:

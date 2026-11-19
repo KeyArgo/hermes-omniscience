@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TelemetryStrip, VersionChip, versionChipText } from './App';
+import {
+  HeaderBrand,
+  TelemetryStrip,
+  VersionChip,
+  chipClasses,
+  chipLabel,
+  copyChipLine,
+  versionChipText,
+  type ChipCopyState,
+} from './App';
 import type { BuildInfo } from './api';
 
 /** A full BuildInfo, so each test overrides only the field it is about. */
@@ -68,24 +77,115 @@ describe('VersionChip', () => {
       />,
     );
     expect(textOf(markup)).toBe('v1.0.0-dev.728 · 0746f579 · 2026-11-10 · modified');
+    expect(markup).toContain('is-dirty');
+  });
+
+  it('is a pill that keeps the suite order: version · commit · date', () => {
+    const markup = renderToStaticMarkup(<VersionChip build={build()} onCopy={() => {}} />);
+    expect(markup).toContain('version-chip');
+    // Not Aura's date-before-commit fallback: the chip line leads with the version.
+    expect(textOf(markup)).toMatch(/^v1\.0\.0-dev\.728 · 0746f579 · 2026-11-10$/);
+  });
+
+  it('says copied or failed only after a real copy, then reverts', async () => {
+    vi.useFakeTimers();
+    try {
+      const states: ChipCopyState[] = [];
+      const writeText = vi.fn(async () => {});
+      vi.stubGlobal('navigator', { clipboard: { writeText } });
+      const copied: string[] = [];
+      await copyChipLine('v1.0.0-dev.728 · 0746f579 · 2026-11-10', (s) => states.push(s), (l) => copied.push(l));
+      expect(writeText).toHaveBeenCalledWith('Omniscience v1.0.0-dev.728 · 0746f579 · 2026-11-10');
+      expect(states).toEqual(['copied']);
+      expect(copied).toEqual(['v1.0.0-dev.728 · 0746f579 · 2026-11-10']);
+      vi.advanceTimersByTime(1399);
+      expect(states).toEqual(['copied']);
+      vi.advanceTimersByTime(1);
+      expect(states).toEqual(['copied', '']);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('says copy failed when the clipboard refuses', async () => {
+    vi.useFakeTimers();
+    try {
+      const states: ChipCopyState[] = [];
+      const writeText = vi.fn(async () => {
+        throw new Error('denied');
+      });
+      // No document either: the textarea fallback cannot save it, so the answer is the truth.
+      vi.stubGlobal('navigator', { clipboard: { writeText } });
+      vi.stubGlobal('document', undefined);
+      const copied: string[] = [];
+      await copyChipLine('v1 · a · b', (s) => states.push(s), (l) => copied.push(l));
+      expect(states).toEqual(['failed']);
+      expect(copied).toEqual([]);
+      vi.advanceTimersByTime(1400);
+      expect(states).toEqual(['failed', '']);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('labels itself by the copy state, in the accent or the red', () => {
+    expect(chipLabel('v1 · a · b', '')).toBe('v1 · a · b');
+    expect(chipLabel('v1 · a · b', 'copied')).toBe('copied ✓');
+    expect(chipLabel('v1 · a · b', 'failed')).toBe('copy failed');
+    expect(chipClasses(build(), 'copied')).toContain('is-copied');
+    expect(chipClasses(build(), 'failed')).toContain('is-copy-failed');
+    expect(chipClasses(build(), '')).toBe('version-chip mono');
+    expect(chipClasses(build({ dirty: true }), 'copied')).toBe('version-chip mono is-dirty is-copied');
+  });
+});
+
+describe('HeaderBrand', () => {
+  /** The compact header renders this same brand, so a chip in it is a chip at every width. */
+  it('shows the version chip beside the product name, whatever the width', () => {
+    const markup = renderToStaticMarkup(
+      <HeaderBrand
+        build={build()}
+        followNewest={false}
+        modeLabel="all chats"
+        modeBlurb="Every chat, newest first."
+        onCopyVersion={() => {}}
+      />,
+    );
+    expect(markup).toContain('class="brand"');
+    expect(markup).toContain('OMNISCIENCE');
+    expect(markup).toContain('version-chip');
+    expect(textOf(markup)).toContain('v1.0.0-dev.728 · 0746f579 · 2026-11-10');
+  });
+
+  it('still shows the chip when there is no answer yet, as nothing', () => {
+    const markup = renderToStaticMarkup(
+      <HeaderBrand
+        build={null}
+        followNewest
+        modeLabel="following newest"
+        modeBlurb="Following."
+        onCopyVersion={() => {}}
+      />,
+    );
+    expect(markup).toContain('OMNISCIENCE');
+    expect(markup).not.toContain('version-chip');
   });
 });
 
 describe('TelemetryStrip', () => {
-  it('keeps the version chip when telemetry is hidden, but not Events or Lost', () => {
-    const markup = renderToStaticMarkup(
-      <TelemetryStrip
-        build={build()}
-        telemetryVisible={false}
-        events={1234}
-        lost={7}
-        replayIndex={null}
-        visibleCount={0}
-        onCopyVersion={() => {}}
-      />,
+  it('shows the counts only when telemetry is visible, and never the chip', () => {
+    const hidden = renderToStaticMarkup(
+      <TelemetryStrip telemetryVisible={false} events={1234} lost={7} replayIndex={null} visibleCount={0} />,
     );
-    expect(markup).toContain('v1.0.0-dev.728 · 0746f579 · 2026-11-10');
-    expect(markup).not.toContain('Events');
-    expect(markup).not.toContain('Lost');
+    expect(hidden).not.toContain('Events');
+    expect(hidden).not.toContain('version-chip');
+    const shown = renderToStaticMarkup(
+      <TelemetryStrip telemetryVisible events={1234} lost={7} replayIndex={null} visibleCount={0} />,
+    );
+    expect(shown).toContain('Events');
+    expect(shown).toContain('Lost');
+    expect(shown).not.toContain('version-chip');
   });
 });

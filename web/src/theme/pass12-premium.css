@@ -256,21 +256,8 @@ body {
   text-shadow: 0 0 12px rgb(95 227 176 / 0.35);
 }
 
-.version-chip {
-  min-height: 44px;
-  padding: 6px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgb(255 255 255 / 0.03);
-  color: var(--muted);
-  font-size: 15px;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* The version chip keeps its suite-wide pill look here too (styles.css): the chip belongs beside
+   the product name, not at 44 px in a box. */
 
 .telemetry {
   display: flex;
@@ -673,10 +660,6 @@ select.chip {
 .workspace-actions > * {
   flex: 0 1 auto;
   min-width: 0;
-}
-
-.workspace-actions .version-chip {
-  width: 100%;
 }
 
 .workspace-sheet .telemetry {

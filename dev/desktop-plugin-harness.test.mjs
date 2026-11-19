@@ -9,7 +9,7 @@
 // plugin-data of any profile, which is exactly what the catalog review refused.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-async function loadPlugin(effects = []) {
+async function loadPlugin(effects = [], reactMock = null) {
   vi.resetModules();
   const host = {
     state: {
@@ -21,12 +21,12 @@ async function loadPlugin(effects = []) {
   };
   vi.doMock("@hermes/plugin-sdk", () => ({ host, SandboxedFrame: "SandboxedFrame" }));
   vi.doMock("react/jsx-runtime", () => ({ jsx: (t, p) => ({ t, p }) }));
-  vi.doMock("react", () => ({
+  vi.doMock("react", () => reactMock ?? {
     useEffect: fn => { effects.push(fn); },
     useMemo: fn => fn(),
     useRef: () => ({ current: globalThis.testPage || null }),
     useState: v => [v, () => {}],
-  }));
+  });
   // No hermesDesktop on purpose: touching it is the failure this harness is looking for.
   globalThis.window = {
     location: { search: "", hash: "" },
@@ -512,5 +512,137 @@ describe("waking the viewer when a pane is looked at again", () => {
 
     stop();
     expect(listeners.visibilitychange).toBeUndefined();
+  });
+});
+
+describe("the settings version chip", () => {
+  // Same walk as the viewer-switch block, but with a stateful useState so the value the chip's
+  // effect fetched is visible on the next render pass.
+  function render(node) {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.t === "function") return render(node.t(node.p || {}));
+    const children = node.p?.children;
+    if (!children) return node;
+    const list = Array.isArray(children) ? children : [children];
+    return { ...node, p: { ...node.p, children: list.map(render) } };
+  }
+
+  function find(node, match) {
+    if (!node || typeof node !== "object") return null;
+    if (match(node)) return node;
+    const children = node.p?.children;
+    const list = Array.isArray(children) ? children : [];
+    for (const child of list) {
+      const hit = find(child, match);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  function hookStore() {
+    const slots = [];
+    let i = 0;
+    return {
+      begin() { i = 0; },
+      useState: init => {
+        const idx = i++;
+        if (!(idx in slots)) slots[idx] = typeof init === "function" ? init() : init;
+        return [slots[idx], v => { slots[idx] = typeof v === "function" ? v(slots[idx]) : v; }];
+      },
+    };
+  }
+
+  const BUILD = {
+    version: "1.2.3-dev.9",
+    commit: "abc12345ffffffffffffffffffffffffffffffff",
+    commit_short: "abc12345",
+    commit_date: "2026-11-10T14:00:00Z",
+    built_at: "2026-11-10T15:00:00Z",
+    channel: "dev",
+    dirty: false,
+    chip_line: "v1.2.3-dev.9 · abc12345 · 2026-11-10",
+  };
+
+  function chipSetup(build = BUILD) {
+    const effects = [];
+    const hooks = hookStore();
+    const reactMock = {
+      useEffect: fn => { effects.push(fn); },
+      useMemo: fn => fn(),
+      useRef: () => ({ current: null }),
+      useState: hooks.useState,
+    };
+    return loadPlugin(effects, reactMock).then(mod => {
+      const pages = [];
+      const rest = vi.fn(async path => (path === "/version" ? { ...build } : { token: "k" }));
+      const ctx = {
+        register: () => () => {},
+        registerSettingsPage: page => { pages.push(page); return () => {}; },
+        rest,
+        storage: { get: () => true, set: vi.fn() },
+      };
+      mod.default.register(ctx);
+      const renderTree = () => { hooks.begin(); return render(pages[0].render()); };
+      const chip = tree => find(tree, n => n.t === "button" && typeof n.p?.title === "string" && n.p.title.includes("click to copy this line"));
+      // render() normalises a single child into an array, so the chip's text comes back wrapped.
+      const chipText = node => (Array.isArray(node.p.children) ? node.p.children.join("") : node.p.children);
+      renderTree();   // first pass: collects the components' effects (the chip is not there yet)
+      return { mod, ctx, rest, effects, renderTree, chip, chipText };
+    });
+  }
+
+  it("shows nothing before /version answers, then the backend's line", async () => {
+    const s = await chipSetup();
+    expect(s.chip(s.renderTree())).toBeNull();   // no value is compiled in
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(s.rest).toHaveBeenCalledWith("/version", { timeoutMs: 4000 });
+    const chip = s.chip(s.renderTree());
+    expect(s.chipText(chip)).toBe("v1.2.3-dev.9 · abc12345 · 2026-11-10");
+    expect(chip.p.title).toContain("Omniscience 1.2.3-dev.9");
+    expect(chip.p.title).toContain("committed 2026-11-10T14:00:00Z");
+    expect(chip.p.title).toContain("installed 2026-11-10T15:00:00Z");
+    expect(chip.p.title).toContain("channel dev");
+  });
+
+  it("copies 'Omniscience <line>' and says copied ✓ only when the copy worked", async () => {
+    const s = await chipSetup();
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const chip = s.chip(s.renderTree());
+    const writes = [];
+    vi.stubGlobal("navigator", { clipboard: { writeText: async text => { writes.push(text); } } });
+    try {
+      await chip.p.onClick();
+      expect(writes).toEqual(["Omniscience v1.2.3-dev.9 · abc12345 · 2026-11-10"]);
+      expect(s.chip(s.renderTree()) && s.chipText(s.chip(s.renderTree()))).toBe("copied ✓");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("says copy failed when the clipboard refuses", async () => {
+    const s = await chipSetup();
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const chip = s.chip(s.renderTree());
+    // Rejected clipboard and no document: the textarea fallback cannot save it either.
+    vi.stubGlobal("navigator", { clipboard: { writeText: async () => { throw new Error("denied"); } } });
+    vi.stubGlobal("document", undefined);
+    try {
+      await chip.p.onClick();
+      expect(s.chipText(s.chip(s.renderTree()))).toBe("copy failed");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("builds its own line in the suite order when the backend has no chip_line", async () => {
+    const s = await chipSetup({ ...BUILD, chip_line: undefined, dirty: true });
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const chip = s.chip(s.renderTree());
+    expect(s.chipText(chip)).toBe("v1.2.3-dev.9 · abc12345 · 2026-11-10 · modified");
+    expect(chip.p.style.color).toBe("#e8a33d");   // amber for a dirty tree, like Aura
   });
 });

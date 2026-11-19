@@ -1,7 +1,8 @@
 # Install & operate Hermes Omniscience
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
-> **Revised:** 2026-11-13 · **Body hash:** 3325f15e
+> **Applies to:** Omniscience 1.0.0 · written at commit 126bf74
+> **Revised:** 2026-11-18 · **Body hash:** a17fe2f2
+
 
 
 
@@ -186,9 +187,11 @@ hermes plugins install KeyArgo/hermes-omniscience --yes-deps --enable
 ```
 
 The recording is kept: `events.db`, `prefs.json` and `usage.db` live under
-`<HERMES_HOME>/plugin-data/omniscience/` and are not part of the plugin install. The version chip in
-the viewer header, `python -m omniscience_viewer --version`, and `GET /api/v1/version` report the
-build that is actually running. If the chip still shows the old build, reload the page; the page
+`<HERMES_HOME>/plugin-data/omniscience/` and are not part of the plugin install. The version chip
+beside the product name in the viewer header, `python -m omniscience_viewer --version`, and
+`GET /api/v1/version` report the build that is actually running; the desktop settings page reads
+the same facts from the plugin's `GET /version`, so it shows them even while the viewer is off. If
+the chip still shows the old build, reload the page; the page
 also notices a changed build and offers a reload.
 
 ## 7. Uninstall & data removal

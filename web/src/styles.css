@@ -2436,21 +2436,25 @@ table.kv.friendly td {
 .live-dot.is-faint { opacity: 0.55; }
 .session-item.is-recent .session-title { color: var(--text); }
 
-/* The build chip: version and commit, read from the running viewer. Always shown in the full
-   viewer, so it keeps its own line and width and lets the header scroll under it when narrow. */
+/* The build chip: version and commit, read from the running viewer. It sits beside the product
+   name in the brand at every width, and looks and acts like the other plugins' chips (Aura): a
+   mono pill that copies its own line and reports the copy inside itself. */
 .version-chip {
+  font-family: var(--mono);
   font-size: 10.5px;
   color: var(--dim);
-  background: none;
+  background: transparent;
   border: 1px solid var(--line-2);
-  border-radius: 4px;
-  padding: 1px 6px;
+  border-radius: 999px;
+  padding: 1px 7px;
   cursor: pointer;
   white-space: nowrap;
   flex: none;
 }
 .version-chip:hover { color: var(--text); border-color: var(--line-strong, var(--line-2)); }
 .version-chip.is-dirty { color: var(--amber); border-color: rgba(251, 191, 36, 0.4); }
+.version-chip.is-copied { color: var(--cyan); border-color: rgba(34, 211, 238, 0.45); }
+.version-chip.is-copy-failed { color: #e05a5a; border-color: rgba(224, 90, 90, 0.45); }
 
 /* When the chat last recorded anything, in the user's own clock. */
 .session-age { color: var(--dim); font-variant-numeric: tabular-nums; }

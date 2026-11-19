@@ -110,6 +110,8 @@ function setRoomWanted(ctx, on) {
 function RoomSettings() {
   const [on, setOn] = useState(roomWanted(CTX))
   return jsx('div', { style: { display: 'grid', gap: 16, padding: 16 }, children: [
+    // The build chip leads the page: the line a bug report asks for, where settings are read.
+    jsx(VersionChip, { key: 'version' }),
     jsx('label', { key: 'room', style: { display: 'flex', gap: 8 }, children: [
       jsx('input', { key: 'input', type: 'checkbox', checked: on, onChange: event => {
         const next = event.target.checked
@@ -120,6 +122,90 @@ function RoomSettings() {
     ] }),
     jsx(ViewerSwitch, { key: 'viewer' }),
   ] })
+}
+
+// The build chip, looking and acting like Aura's: a mono pill whose click copies
+// "Omniscience <line>" and which then says "copied ✓" or "copy failed" inside itself for 1.4 s.
+// Every value comes from the backend's /version — nothing compiled in, no chip before it answers.
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch { /* fall through to the textarea */ }
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.append(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    area.remove()
+    return ok
+  } catch { return false }
+}
+
+/** `v1.0.0-dev.57 · a4b7a67d · 2026-11-09` (+ ` · modified` from a dirty tree): the suite's
+ *  version · commit · date order, used only when the backend gives no chip_line. */
+function buildLine(build) {
+  if (build.chip_line) return build.chip_line
+  if (!build.version) return ''
+  const parts = ['v' + build.version]
+  const sha = build.commit_short || build.commit
+  if (sha) parts.push(String(sha).slice(0, 8))
+  if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
+  return parts.join(' · ') + (build.dirty ? ' · modified' : '')
+}
+
+function buildTitle(build) {
+  return [
+    'Omniscience ' + build.version,
+    build.commit ? 'commit ' + build.commit : 'no commit (installed copy)',
+    build.commit_date ? 'committed ' + build.commit_date : '',
+    build.built_at ? 'installed ' + build.built_at : '',
+    build.channel ? 'channel ' + build.channel : '',
+    'click to copy this line',
+  ].filter(Boolean).join('\n')
+}
+
+function VersionChip() {
+  const [build, setBuild] = useState(null)
+  const [copyState, setCopyState] = useState('')   // '' | 'copied' | 'failed'
+  useEffect(() => {
+    if (!CTX?.rest) return undefined
+    let alive = true
+    Promise.resolve(CTX.rest('/version', { timeoutMs: 4000 }))
+      .then(info => { if (alive && info && info.version) setBuild(info) })
+      .catch(() => {})            // no guess beats a wrong number
+    return () => { alive = false }
+  }, [])
+  const line = build ? buildLine(build) : ''
+  if (!line) return null
+  return jsx('button', {
+    type: 'button',
+    title: buildTitle(build),
+    onClick: async () => {
+      // Say "copied" only when something was copied: a badge that lies is worse than no badge.
+      const ok = await copyText('Omniscience ' + line)
+      setCopyState(ok ? 'copied' : 'failed')
+      setTimeout(() => setCopyState(''), 1400)
+    },
+    style: {
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      fontSize: 10.5,
+      padding: '1px 7px',
+      borderRadius: 999,
+      border: '1px solid var(--ui-stroke-secondary)', background: 'transparent',
+      cursor: 'pointer', whiteSpace: 'nowrap', justifySelf: 'start',
+      color: copyState === 'failed' ? '#e05a5a'
+        : copyState === 'copied' ? 'var(--ui-accent)'
+        : build.dirty ? '#e8a33d' : 'var(--ui-text-tertiary)',
+    },
+    children: copyState === 'copied' ? 'copied ✓' : copyState === 'failed' ? 'copy failed' : line,
+  })
 }
 
 // The owner's on/off switch. It lives in prefs.json, which the recorder and the viewer also read:
