@@ -1,7 +1,8 @@
 # Premium interface slice — what changed, what was measured
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 2f13567
-> **Revised:** 2026-11-14 · **Body hash:** ffa48e75
+> **Applies to:** Omniscience 1.0.0 · written at commit 0182d1d
+> **Revised:** 2026-11-19 · **Body hash:** cafcc5e0
+
 
 
 
@@ -176,4 +177,4 @@ fixtures generated in the page.
 
 No commit, push, deploy, gateway restart or subagent was performed. The working tree also contains
 the earlier mode/Run Lens work and review fixes from the shared branch; this slice is additive.
-Stop here for Claude review.
+Stop here for review.

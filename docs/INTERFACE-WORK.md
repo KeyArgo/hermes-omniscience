@@ -1,7 +1,8 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 0f0dddd
-> **Revised:** 2026-11-18 · **Body hash:** 7ee58f1c
+> **Applies to:** Omniscience 1.0.0 · written at commit 0182d1d
+> **Revised:** 2026-11-19 · **Body hash:** dde8c5dc
+
 
 
 
@@ -87,7 +88,7 @@ current as fixes land; report tests and unresolved issues against the exact comm
   Verify this tradeoff and the graph behavior against real data in Hermes.
   Remaining earlier issues: exact 2x button sizing,
   real Windows/macOS testing, owner visual acceptance, final independent review.
-- 2026-11-15 (Claude): the Filters menu was clipped to a 48 px strip in both modes because the
+- 2026-11-15: the Filters menu was clipped to a 48 px strip in both modes because the
   stage toolbar scrolls sideways (`overflow-x: auto` makes the other axis clip too). Menus now draw
   in a fixed layer on `<body>`, placed inside the window, flipping up and scrolling when needed;
   check with `node dev/filters-menu-check.mjs` (five sizes, both modes, keyboard and Escape).
