@@ -1,13 +1,40 @@
 # Roadmap
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 2f13567
-> **Revised:** 2026-11-13 · **Body hash:** 4f9bc918
+> **Applies to:** Omniscience 1.0.0 · written at commit 94e9773
+> **Revised:** 2026-11-19 · **Body hash:** 15311bde
+
 
 
 
 
 What is built, what is next, and what is parked. The recovered backlog below also includes ideas
 from earlier design and testing sessions; a checkbox there is not a claim that a feature is absent.
+
+## Next update (after the catalog listing)
+
+Found in the pre-submission review. None of these blocks listing; each is planned for the first update.
+Work in progress lives on the `lane/fixes` and `lane/notices` branches.
+
+- [ ] **Quieter failure pop-up.** "terminal failed 3 times in a row" currently repeats every turn and carries a long
+  link. Plan: at most one pop-up per tool per chat every 30 minutes, an on/off switch in Settings, no link.
+- [ ] **Quiet mode on busy recordings.** An open page still checks idle chats about once a second when the recording
+  holds many chats (about 1% CPU). Compare against the chat's own cursor instead of the newest row overall.
+- [ ] **macOS memory in the health log.** Peak memory is reported in the wrong unit and current memory is missing.
+- [ ] **Version fallback.** The dashboard's `/version` should fall back to `viewer_app/` when `viewer/` is absent.
+- [ ] **`OMNISCIENCE_VIEWER_RSS_WARN_MB` reaches the viewer.** The launcher's environment allow-list drops it today.
+- [ ] **Off while starting.** Turning the viewer Off during a start can leave it running, and a failed stop is not
+  shown. Coordinate the two and report the failure.
+- [ ] **Leftover viewer on a start mismatch.** Stop the spawned process when its fingerprint does not match.
+- [ ] **Usage cache bound.** Each distinct date range adds a cache entry until restart; cap it.
+- [ ] **More in `viewer.log`.** Start, stop and refusal reasons; live-query errors with tracebacks; recorder and
+  writeup failures at WARNING (never payloads or keys).
+- [ ] **Viewer key out of the address.** Hand the key to the frame after load instead of `?t=` (today it is local
+  only and stripped on load).
+- [ ] **Docs polish.** README viewer-lifecycle wording, `OMNISCIENCE_VIEWER_RSS_WARN_MB` and
+  `OMNISCIENCE_VIEWER_IDLE_EXIT_S` in CONFIGURATION, TROUBLESHOOTING log examples matching real lines, current test
+  counts in README and SECURITY, what `?` means in a health line.
+- [ ] **Charts visible by default in the Hermes pane.** The pane opens in the Simple preset, which hides the
+  Tokens-per-call chart. Consider Standard, or inheriting the browser's preset.
 
 ## Phase 1 — vertical slice (done)
 
