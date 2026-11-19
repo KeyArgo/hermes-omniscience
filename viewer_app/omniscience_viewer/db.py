@@ -1210,6 +1210,19 @@ def latest_rowid(path: str, ttl: float = LATEST_TTL_S) -> tuple[int, tuple] | No
     return value
 
 
+def cached_session_count(path: str) -> int:
+    """How many chats the cached chat-list fold holds for this recording (0 when uncached).
+
+    A health-line read, not a query: one dict lookup under the fold's own lock, no SQL.
+    """
+    realpath = os.path.realpath(path)
+    with _SESSIONS_STATE_LOCK:
+        entry = _SESSIONS_STATE.get(realpath)
+    if entry is None:
+        return 0
+    return len(entry[0].get("sessions", {}))
+
+
 def clear_caches() -> None:
     """Forget every read cache. For tests, and for a recording replaced under the viewer."""
     with _SESSIONS_LOCK:

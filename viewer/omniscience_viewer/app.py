@@ -34,6 +34,7 @@ from . import warnings as warnings_mod
 from . import brake as brake_mod
 from . import concerns as concerns_mod
 from . import bundle as bundle_mod
+from . import health as health_mod
 from . import privacy as privacy_mod
 from .live_queries import LiveQueryCoalescer
 from .auth import TokenMiddleware
@@ -60,6 +61,10 @@ HEARTBEAT_INTERVAL_S = 10.0
 # 0 disables the exit; the check itself runs at most every IDLE_CHECK_INTERVAL_S.
 IDLE_EXIT_DEFAULT_S = 600.0
 IDLE_CHECK_INTERVAL_S = 30.0
+
+# An HTTP request slower than this earns one WARNING naming its path (never its query string,
+# which can carry the token), so a stuck request is findable in viewer.log afterwards.
+SLOW_REQUEST_MS = 1000.0
 
 
 def idle_exit_seconds(environ: dict | None = None) -> float:
@@ -137,16 +142,38 @@ async def idle_watch(
 
 
 class ActivityMiddleware:
-    """Marks every HTTP request as activity for the idle exit: one attribute write, no work."""
+    """Marks every HTTP request as activity for the idle exit, and names the slow or broken ones.
+
+    The happy path costs one attribute write and two clock reads. A request over
+    ``SLOW_REQUEST_MS`` earns one WARNING; an exception that escapes the routes earns one ERROR
+    with its traceback before it is re-raised. Only the path is logged — the query string can
+    hold the token and never reaches the log.
+    """
 
     def __init__(self, app: Any, activity: ViewerActivity) -> None:
         self.app = app
         self.activity = activity
 
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
-        if scope.get("type") == "http":
-            self.activity.touch()
-        await self.app(scope, receive, send)
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        self.activity.touch()
+        start = time.monotonic()
+        try:
+            await self.app(scope, receive, send)
+        except Exception:
+            log.error(
+                "omniscience: unhandled request error path=%s", scope.get("path", ""),
+                exc_info=True,
+            )
+            raise
+        finally:
+            ms = (time.monotonic() - start) * 1000.0
+            if ms > SLOW_REQUEST_MS:
+                log.warning(
+                    "omniscience: slow request path=%s ms=%.0f", scope.get("path", ""), ms
+                )
 
 
 class SandboxedFrameCors:
@@ -514,6 +541,18 @@ def create_app(db_path: str, static_dir: str | None = None,
             app.state.idle_task = asyncio.create_task(
                 idle_watch(activity, idle_s, lambda: app.state.request_exit())
             )
+
+    # One health line a minute while the viewer runs (silent when idle and unchanged, a forced
+    # check-in every ten minutes), plus rate-limited memory warnings. See health.py.
+    health_monitor = health_mod.HealthMonitor(
+        db_path, activity, cache_sessions=lambda: db_mod.cached_session_count(db_path)
+    )
+    app.state.health_monitor = health_monitor
+    app.state.health_task = None
+
+    @app.on_event("startup")
+    async def _start_health_watch() -> None:
+        app.state.health_task = asyncio.create_task(health_mod.health_watch(health_monitor))
 
     def _build_id() -> str:
         """A cheap marker for the page that is installed right now.
@@ -1062,7 +1101,9 @@ def create_app(db_path: str, static_dir: str | None = None,
         except WebSocketDisconnect:
             return
         except Exception:
-            log.debug("omniscience: live feed closed by an unexpected error", exc_info=True)
+            # An unexpected error here is a defect, not a disconnect: leave the traceback in
+            # viewer.log so the cause is findable afterwards.
+            log.error("omniscience: live feed closed by an unexpected error", exc_info=True)
             return
         finally:
             activity.socket_closed()

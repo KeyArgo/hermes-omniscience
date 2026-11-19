@@ -27,6 +27,40 @@ log = logging.getLogger("omniscience")
 # Default port for the viewer
 DEFAULT_PORT = 8797
 
+# viewer.log is capped so a long-lived viewer cannot fill the disk. Rotation happens at viewer
+# start only: on Windows an open file cannot be renamed, and the spawned viewer holds the log
+# open for its whole life. At start the old viewer has exited and the new one has not opened
+# the file yet, so the rename is safe on every platform.
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUPS = 2
+
+
+def rotate_viewer_log(log_dir: str, *, max_bytes: int = LOG_MAX_BYTES, backups: int = LOG_BACKUPS) -> bool:
+    """Roll an oversized ``viewer.log`` to ``viewer.log.1`` … ``.N``, dropping the oldest.
+
+    Returns True when a rotation happened. Never raises: a log that cannot be rotated (locked
+    file, missing directory) is kept as-is rather than blocking the viewer's start.
+    """
+    path = os.path.join(log_dir, "viewer.log")
+    try:
+        if os.path.getsize(path) <= max_bytes:
+            return False
+    except OSError:
+        return False
+    try:
+        oldest = f"{path}.{backups}"
+        if os.path.exists(oldest):
+            os.unlink(oldest)
+        for index in range(backups - 1, 0, -1):
+            source = f"{path}.{index}"
+            if os.path.exists(source):
+                os.replace(source, f"{path}.{index + 1}")
+        os.replace(path, f"{path}.1")
+        return True
+    except OSError:
+        log.debug("omniscience: could not rotate viewer.log", exc_info=True)
+        return False
+
 
 def viewer_url() -> str:
     """Return the configured viewer URL."""
@@ -439,6 +473,10 @@ def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool, state_db: str 
             if existing_pythonpath:
                 parts.append(existing_pythonpath)
             env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(parts))
+
+            # Roll an oversized viewer.log before the new viewer opens it — the one moment
+            # that is safe on Windows (see rotate_viewer_log).
+            rotate_viewer_log(log_dir)
 
             # Log file — create with restrictive permissions (0600)
             log_file = os.path.join(log_dir, "viewer.log")

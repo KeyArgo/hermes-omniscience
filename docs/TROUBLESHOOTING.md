@@ -1,7 +1,8 @@
 # Troubleshooting
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4386e6d
-> **Revised:** 2026-11-18 · **Body hash:** 6d6fbe40
+> **Applies to:** Omniscience 1.0.0 · written at commit 21c07b0
+> **Revised:** 2026-11-19 · **Body hash:** a7bbf9b6
+
 
 
 
@@ -9,6 +10,35 @@
 
 Real failure modes this code produces or handles, and the shortest way to check each one. Start with
 `GET /api/v1/health` and the viewer log; both answer most questions.
+
+## Reading viewer.log
+
+`<HERMES_HOME>/plugin-data/omniscience/viewer.log` is the viewer's own trail, with timestamps.
+When the viewer misbehaves — memory growth, CPU spikes, errors, stuck requests — the cause is
+usually findable here afterwards.
+
+- **Health line, once a minute while the viewer runs:**
+
+  ```
+  2026-11-19 00:42:38,851 INFO omniscience: health rss_mb=57.8 peak_mb=57.8 cpu_pct=0.3 threads=2 sockets=0 db_mb=0.2 cache_sessions=4
+  ```
+
+  `rss_mb` is the viewer's current memory, `peak_mb` the highest it has been, `cpu_pct` its share
+  of one core over the last minute, `threads` and `sockets` its thread and open live-connection
+  counts, `db_mb` the recording's size and `cache_sessions` the chats held in the chat-list cache.
+  A value the platform cannot provide reads as `?`, never an error. An idle viewer whose numbers
+  have not changed stays silent, but checks in at least every ten minutes — a long gap means the
+  viewer was not running, not that it was quiet.
+- **Memory warnings:** `memory high rss_mb=…` when memory passes
+  `OMNISCIENCE_VIEWER_RSS_WARN_MB` (default 400), and `memory growing rss_mb=… rose_mb=…` when it
+  rose more than 100 MB in the last 30 minutes. Each repeats at most once per ten minutes.
+- **Slow requests:** `slow request path=… ms=…` for any HTTP request over one second. Only the
+  path is logged; the query string can carry the viewer key and never reaches the log.
+- **Errors:** an unhandled error in a request or the live feed is logged at ERROR with its
+  traceback, so a crash leaves its cause behind.
+- **The log cannot grow forever:** at 5 MB it rolls to `viewer.log.1` and `viewer.log.2` (the
+  oldest is dropped). Rotation happens at viewer start, which is the one moment it is also safe
+  on Windows, where an open file cannot be renamed.
 
 ## The viewer page says "No page bundle is installed"
 
