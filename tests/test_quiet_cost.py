@@ -28,7 +28,6 @@ sys.path.insert(0, str(ROOT / "analysis"))
 
 from omniscience_viewer import db as db_mod  # noqa: E402
 from omniscience_viewer import warnings as warnings_mod  # noqa: E402
-from test_warnings_api import warnings_db  # noqa: E402,F401  (the fixture)
 
 COLUMNS = (
     "rowid INTEGER PRIMARY KEY, event_id TEXT, schema TEXT, boot_id TEXT, seq INTEGER, ts REAL, "
@@ -565,10 +564,29 @@ def test_a_row_written_during_a_full_build_is_not_lost(tmp_path, monkeypatch):
     writer.close()
 
 
-def test_a_locked_read_is_not_remembered_as_no_warnings(warnings_db, monkeypatch):
+def _repeated_failure_db(tmp_path: Path) -> str:
+    """Three bash failures in one chat: the repeated-tool-failure warning (as in test_warnings_api)."""
+    path = _make_db(tmp_path)
+    con = sqlite3.connect(path)
+    con.executemany(
+        "INSERT INTO events (event_id, schema, boot_id, seq, ts, kind, session_id, status, attrs) "
+        "VALUES (?, 'omni.v1', 'b1', ?, ?, ?, 'root', ?, ?)",
+        [
+            ("f-ss", 1, 1.0, "session.start", None, "{}"),
+            ("f-t1", 2, 1.5, "tool.end", "error", json.dumps({"tool_name": "bash"})),
+            ("f-t2", 3, 2.0, "tool.end", "error", json.dumps({"tool_name": "bash"})),
+            ("f-t3", 4, 2.5, "tool.end", "error", json.dumps({"tool_name": "bash"})),
+            ("f-se", 5, 3.0, "session.end", "completed", "{}"),
+        ],
+    )
+    con.commit()
+    con.close()
+    return path
+
+
+def test_a_locked_read_is_not_remembered_as_no_warnings(tmp_path, monkeypatch):
     # A lock during the read used to be cached as "no warnings" until the next row was written.
-    path, root, _clean = warnings_db
-    path = str(path)
+    path, root = _repeated_failure_db(tmp_path), "root"
     db_mod.clear_caches()
     warnings_mod._WARNING_CACHE.clear()
     expected = _uncached_warnings(path, root)
