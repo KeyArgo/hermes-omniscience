@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -74,3 +75,26 @@ def test_the_server_can_be_asked_to_exit(monkeypatch):
     monkeypatch.setattr(uvicorn, "Server", FakeServer)
 
     assert main(["--demo"]) == 0
+
+
+def test_a_real_viewer_writes_its_idle_exit_to_its_log(tmp_path):
+    # The viewer's own INFO lines (who connected, why it closed) had no handler, so viewer.log
+    # never showed them while the in-process tests, which capture logging, passed.
+    import socket
+    import sqlite3
+    import subprocess
+
+    db = tmp_path / "events.db"
+    sqlite3.connect(db).execute("CREATE TABLE events (rowid INTEGER PRIMARY KEY, kind TEXT)").connection.close()
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    env = dict(os.environ, PYTHONPATH=str(ROOT_DIR / "viewer"), OMNISCIENCE_VIEWER_IDLE_EXIT_S="1")
+    proc = subprocess.run(
+        [sys.executable, "-m", "omniscience_viewer", "--db", str(db), "--port", str(port), "--no-token"],
+        env=env, capture_output=True, text=True, timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    line = next((l for l in proc.stderr.splitlines() if "closing the viewer" in l), None)
+    assert line is not None, proc.stderr[-2000:]
+    assert re.match(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", line), line

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 import tempfile
@@ -133,11 +134,28 @@ def main(argv: list[str] | None = None) -> int:
     # The viewer closes itself after a quiet spell (OMNISCIENCE_VIEWER_IDLE_EXIT_S), and the next
     # pane open starts it again. uvicorn's own server object is the only thing that can stop it
     # cleanly, so hand the app a way to ask for that.
+    _log_to_viewer_log()
     config = uvicorn.Config(app, host=args.host, port=args.port, access_log=False)
     server = uvicorn.Server(config)
     app.state.request_exit = lambda: setattr(server, "should_exit", True)
     server.run()
     return 0
+
+
+def _log_to_viewer_log() -> None:
+    """Print the viewer's own INFO lines (socket open/close, idle exit, parent gone) with a time.
+
+    Without a handler Python drops them, so viewer.log could not say who connected or why the
+    viewer closed. stderr is what the launcher writes to viewer.log.
+    """
+    logger = logging.getLogger("omniscience")
+    if logger.handlers:
+        return
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 if __name__ == "__main__":
