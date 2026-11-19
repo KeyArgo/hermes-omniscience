@@ -109,13 +109,50 @@ function setRoomWanted(ctx, on) {
 
 function RoomSettings() {
   const [on, setOn] = useState(roomWanted(CTX))
-  return jsx('label', { style: { display: 'flex', gap: 8, padding: 16 }, children: [
-    jsx('input', { key: 'input', type: 'checkbox', checked: on, onChange: event => {
-      const next = event.target.checked
-      setRoomWanted(CTX, next)
-      setOn(next)
-    } }),
-    'Make room automatically',
+  return jsx('div', { style: { display: 'grid', gap: 16, padding: 16 }, children: [
+    jsx('label', { key: 'room', style: { display: 'flex', gap: 8 }, children: [
+      jsx('input', { key: 'input', type: 'checkbox', checked: on, onChange: event => {
+        const next = event.target.checked
+        setRoomWanted(CTX, next)
+        setOn(next)
+      } }),
+      'Make room automatically',
+    ] }),
+    jsx(ViewerSwitch, { key: 'viewer' }),
+  ] })
+}
+
+// The owner's on/off switch. It lives in prefs.json, which the recorder and the viewer also read:
+// off means no viewer process at all, while recording carries on exactly as before.
+function ViewerSwitch() {
+  const [enabled, setEnabled] = useState(true)
+  useEffect(() => {
+    let alive = true
+    if (!CTX?.rest) return () => { alive = false }
+    Promise.resolve(CTX.rest('/viewer/mode'))
+      .then(answer => {
+        if (alive && answer && typeof answer.enabled === 'boolean') setEnabled(answer.enabled)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const change = event => {
+    const next = event.target.checked
+    setEnabled(next)
+    Promise.resolve(CTX?.rest?.('/viewer/mode', { method: 'POST', body: { enabled: next } }))
+      .then(answer => {
+        // The backend answers from what is on disk; a save that did not land must not look saved.
+        if (answer && typeof answer.enabled === 'boolean') setEnabled(answer.enabled)
+      })
+      .catch(() => setEnabled(!next))
+  }
+  return jsx('div', { style: { display: 'grid', gap: 4 }, children: [
+    jsx('label', { key: 'label', style: { display: 'flex', gap: 8 }, children: [
+      jsx('input', { key: 'input', type: 'checkbox', checked: enabled, onChange: change }),
+      'Run the Omniscience viewer',
+    ] }),
+    jsx('p', { key: 'hint', style: { margin: 0, opacity: 0.7, fontSize: 12 },
+      children: 'Off: recording continues; the viewer does not run.' }),
   ] })
 }
 
@@ -277,6 +314,34 @@ async function viewerReachable() {
   }
 }
 
+// A hidden pane closes its live connection, so after ten quiet minutes the viewer exits by itself.
+// When the pane is looked at again, ask the backend for the link once more: it starts the viewer
+// if it is down (and starts nothing while the owner's switch is off), and the page's own
+// reconnect then finds it. Throttled so a flickering layout cannot start a storm of requests.
+const WAKE_MIN_GAP_MS = 30_000
+export function wakeViewerOnReturn(target, doc = globalThis.document, now = () => Date.now()) {
+  let shown = true
+  let last = 0
+  const update = visible => {
+    if (visible && !shown && now() - last >= WAKE_MIN_GAP_MS) {
+      last = now()
+      Promise.resolve(CTX?.rest?.('/viewer')).catch(() => {})
+    }
+    shown = visible
+  }
+  const onVisibility = () => update(doc?.visibilityState !== 'hidden')
+  doc?.addEventListener?.('visibilitychange', onVisibility)
+  let observer = null
+  if (target && typeof IntersectionObserver === 'function') {
+    observer = new IntersectionObserver(entries => update(entries.some(entry => entry.isIntersecting)))
+    observer.observe(target)
+  }
+  return () => {
+    doc?.removeEventListener?.('visibilitychange', onVisibility)
+    observer?.disconnect()
+  }
+}
+
 function useViewerKey() {
   const [state, setState] = useState({ ready: false, token: null, up: true, attempt: 0 })
   useEffect(() => {
@@ -292,7 +357,9 @@ function useViewerKey() {
         // Why the backend could not start it ("port in use by another Omniscience viewer", …).
         if (answer?.viewer && answer.viewer.running === false) reason = answer.viewer.reason || null
       }
-      const up = await viewerReachable()
+      // Off is a decision, not a failure. A viewer still answering on the port belongs to an
+      // earlier build: showing it would contradict the switch the owner just set.
+      const up = reason === 'off' ? false : await viewerReachable()
       if (token) viewerToken = token
       if (alive) setState(prev => ({ ...prev, ready: true, token, up, reason }))
     })()
@@ -304,16 +371,34 @@ function useViewerKey() {
   return { ...state, retry }
 }
 
-function ViewerProblem({ up, retry, reason }) {
-  const text = up
-    ? 'Omniscience could not get the viewer key. Restart the viewer, then retry.'
-    : 'The Omniscience viewer is not running and could not be started. Retry; if it stays down, see viewer.log in the Omniscience data folder.'
-  const why = reason ? ` (${reason})` : ''
+// Turn the owner's switch back on, then let the caller ask for the link again (which starts it).
+function turnOnViewer() {
+  return Promise.resolve()
+    .then(() => CTX?.rest?.('/viewer/mode', { method: 'POST', body: { enabled: true } }))
+    .catch(() => null)
+}
+
+export function ViewerProblem({ up, retry, reason }) {
+  const off = reason === 'off'
+  const text = off
+    ? 'The Omniscience viewer is off.'
+    : up
+      ? 'Omniscience could not get the viewer key. Restart the viewer, then retry.'
+      : 'The Omniscience viewer is not running and could not be started. Retry; if it stays down, see viewer.log in the Omniscience data folder.'
+  const why = !off && reason ? ` (${reason})` : ''
+  const button = off
+    ? jsx('button', {
+      key: 'b',
+      onClick: () => turnOnViewer().then(retry),
+      style: { padding: '6px 14px', cursor: 'pointer' },
+      children: 'Turn on',
+    })
+    : jsx('button', { key: 'b', onClick: retry, style: { padding: '6px 14px', cursor: 'pointer' }, children: 'Retry' })
   return jsx('div', {
     style: { padding: 24, maxWidth: 560, lineHeight: 1.5 },
     children: [
       jsx('p', { key: 't', style: { marginBottom: 12 }, children: text + why }),
-      jsx('button', { key: 'b', onClick: retry, style: { padding: '6px 14px', cursor: 'pointer' }, children: 'Retry' }),
+      button,
     ],
   })
 }
@@ -335,6 +420,7 @@ function OmnisciencePage() {
   listenForOpenExternal()
   const page = useRef(null)
   useEffect(() => makeRoom(CTX, page), [])
+  useEffect(() => wakeViewerOnReturn(page.current), [])
   const key = useViewerKey()
   // Default to the chat the user was in when they opened Omniscience.
   const session = linkedSession() || focusedChat()
@@ -368,6 +454,8 @@ function useFocusedChat() {
 
 function LivePane() {
   listenForOpenExternal()
+  const pane = useRef(null)
+  useEffect(() => wakeViewerOnReturn(pane.current), [])
   const key = useViewerKey()
   const session = useFocusedChat()
   if (!key.ready) return jsx('div', { style: { padding: 12, opacity: 0.6 }, children: 'Opening…' })
@@ -379,6 +467,7 @@ function LivePane() {
   const fullView = () => host.navigate(session ? `/omniscience?session=${encodeURIComponent(session)}` : '/omniscience')
   const inBrowser = () => CTX?.os?.openExternal?.(viewerSrc(session, key.token))
   return jsx('div', {
+    ref: pane,
     style: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%' },
     children: [
       jsx(SandboxedFrame, {

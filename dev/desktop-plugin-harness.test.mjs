@@ -375,3 +375,142 @@ describe("sidebar room probes", () => {
     expect(s.open).toEqual({ left: true, right: true });
   });
 });
+
+describe("the owner's viewer switch", () => {
+  // The settings page is React, so the fake jsx tree is rendered by calling each component
+  // function. That is enough to reach the control's onChange and to see what it posts.
+  function render(node) {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.t === "function") return render(node.t(node.p || {}));
+    const children = node.p?.children;
+    if (!children) return node;
+    const list = Array.isArray(children) ? children : [children];
+    return { ...node, p: { ...node.p, children: list.map(render) } };
+  }
+
+  function find(node, match) {
+    if (!node || typeof node !== "object") return null;
+    if (match(node)) return node;
+    const children = node.p?.children;
+    const list = Array.isArray(children) ? children : [];
+    for (const child of list) {
+      const hit = find(child, match);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  function settingsCtx(mode = true) {
+    const pages = [];
+    const rest = vi.fn(async (path, options) => {
+      if (path !== "/viewer/mode") return { token: "k" };
+      return { enabled: options?.body ? options.body.enabled : mode };
+    });
+    const ctx = {
+      register: () => () => {},
+      registerSettingsPage: page => {
+        pages.push(page);
+        return () => {};
+      },
+      rest,
+    };
+    return { ctx, pages, rest };
+  }
+
+  it("reads the mode and posts the switch when the settings checkbox changes", async () => {
+    const mod = await loadPlugin();
+    const { ctx, pages, rest } = settingsCtx(true);
+    mod.default.register(ctx);
+
+    const tree = render(pages[0].render());
+    const label = find(tree, node => node.t === "label" && (node.p.children || []).includes("Run the Omniscience viewer"));
+    expect(label).toBeTruthy();
+    const input = label.p.children[0];
+    expect(input.t).toBe("input");
+    expect(input.p.checked).toBe(true);
+
+    input.p.onChange({ target: { checked: false } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(rest).toHaveBeenCalledWith("/viewer/mode", { method: "POST", body: { enabled: false } });
+  });
+
+  it("explains an off viewer and offers to turn it on, then retries", async () => {
+    const mod = await loadPlugin();
+    const { ctx, rest } = fakeCtx();
+    rest.mockImplementation(async path => (path === "/viewer/mode" ? { enabled: false } : { token: "k" }));
+    mod.default.register(ctx);
+    const retry = vi.fn();
+
+    const tree = mod.ViewerProblem({ up: false, retry, reason: "off" });
+    expect(tree.p.children[0].p.children).toBe("The Omniscience viewer is off.");
+    const button = tree.p.children[1];
+    expect(button.p.children).toBe("Turn on");
+
+    button.p.onClick();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(rest).toHaveBeenCalledWith("/viewer/mode", { method: "POST", body: { enabled: true } });
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the ordinary Retry button for every other reason", async () => {
+    const mod = await loadPlugin();
+    const { ctx } = fakeCtx();
+    mod.default.register(ctx);
+    const retry = vi.fn();
+    const tree = mod.ViewerProblem({ up: false, retry, reason: "event database not found" });
+    expect(tree.p.children[1].p.children).toBe("Retry");
+  });
+
+  it("does not show a viewer that still answers while the switch is off", async () => {
+    // A viewer started by an earlier build can still hold the port; the switch is the owner's
+    // decision, so the page must not embed it. Without this the off screen never appears.
+    const effects = [];
+    const mod = await loadPlugin(effects);
+    const { ctx, registered, rest } = fakeCtx();
+    rest.mockImplementation(async () => ({ token: "k", viewer: { running: false, reason: "off" } }));
+    const pinged = vi.fn(async () => {});
+    globalThis.fetch = pinged;
+    globalThis.document = { querySelector: () => null };
+    mod.default.register(ctx);
+    registered.find(c => c.area === "routes").render().t();
+    effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(pinged).not.toHaveBeenCalled();
+  });
+});
+
+describe("waking the viewer when a pane is looked at again", () => {
+  it("asks for the link once on return, never while hidden, and not twice in quick succession", async () => {
+    const mod = await loadPlugin();
+    const { ctx, rest } = fakeCtx();
+    mod.default.register(ctx);
+    rest.mockClear();
+    const listeners = {};
+    const doc = {
+      visibilityState: "visible",
+      addEventListener: (name, fn) => { listeners[name] = fn; },
+      removeEventListener: name => { delete listeners[name]; },
+    };
+    let clock = 1_000_000;
+    const stop = mod.wakeViewerOnReturn(null, doc, () => clock);
+
+    doc.visibilityState = "hidden"; listeners.visibilitychange();
+    expect(rest).not.toHaveBeenCalled();
+    doc.visibilityState = "visible"; listeners.visibilitychange();
+    expect(rest).toHaveBeenCalledWith("/viewer");
+    expect(rest).toHaveBeenCalledTimes(1);
+
+    clock += 5_000; // a flicker right after must not ask again
+    doc.visibilityState = "hidden"; listeners.visibilitychange();
+    doc.visibilityState = "visible"; listeners.visibilitychange();
+    expect(rest).toHaveBeenCalledTimes(1);
+
+    clock += 60_000;
+    doc.visibilityState = "hidden"; listeners.visibilitychange();
+    doc.visibilityState = "visible"; listeners.visibilitychange();
+    expect(rest).toHaveBeenCalledTimes(2);
+
+    stop();
+    expect(listeners.visibilitychange).toBeUndefined();
+  });
+});

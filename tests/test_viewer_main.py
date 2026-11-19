@@ -34,14 +34,19 @@ def test_resolve_db_path_hermes_home():
 def test_demo_serves_synthetic_db(monkeypatch):
     calls = []
 
-    def fake_run(app, **kwargs):
-        calls.append((app, kwargs))
+    class FakeServer:
+        def __init__(self, config):
+            self.config = config
+            calls.append(self)
 
-    monkeypatch.setattr(uvicorn, "run", fake_run)
+        def run(self):
+            pass
+
+    monkeypatch.setattr(uvicorn, "Server", FakeServer)
 
     assert main(["--demo"]) == 0
     assert len(calls) == 1
-    app = calls[0][0]
+    app = calls[0].config.app
 
     with TestClient(app, base_url="http://127.0.0.1") as client:
         body = client.get("/api/v1/health").json()
@@ -49,3 +54,23 @@ def test_demo_serves_synthetic_db(monkeypatch):
     db_path = body["db_path"]
     assert os.path.isfile(db_path)
     assert body["events"] > 0
+
+
+def test_the_server_can_be_asked_to_exit(monkeypatch):
+    """The idle watcher stops the server through its own should_exit, nothing harsher."""
+    calls = []
+
+    class FakeServer:
+        should_exit = False
+
+        def __init__(self, config):
+            self.config = config
+            calls.append(self)
+
+        def run(self):
+            assert self.config.app.state.request_exit() is None
+            assert self.should_exit is True
+
+    monkeypatch.setattr(uvicorn, "Server", FakeServer)
+
+    assert main(["--demo"]) == 0

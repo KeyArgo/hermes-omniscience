@@ -313,9 +313,30 @@ export async function fetchDiagnose(root: string): Promise<Diagnose | null> {
   }
 }
 
+/**
+ * Who opened this page, for the viewer's socket log.
+ *
+ * The desktop passes its markers in the URL (`host=hermes`, and `mini=1` for the docked pane);
+ * a plain browser tab carries neither. It is only a label — the log's `client=` field — never a
+ * permission decision.
+ */
+export function viewerClient(): "pane" | "mini" | "browser" {
+  try {
+    const search = typeof window === "undefined" ? "" : window.location.search || "";
+    const hash = typeof window === "undefined" ? "" : window.location.hash || "";
+    const at = hash.indexOf("?");
+    const params = new URLSearchParams(search || (at >= 0 ? hash.slice(at) : ""));
+    if (params.get("mini") === "1") return "mini";
+    if (params.get("host") === "hermes") return "pane";
+  } catch {
+    /* no location, or a malformed one: a browser tab is the safe answer */
+  }
+  return "browser";
+}
+
 export function liveUrl(root: string, after: number): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return withToken(`${protocol}//${window.location.host}${API_BASE}/live?root=${encodeURIComponent(root)}&after=${after}`);
+  return withToken(`${protocol}//${window.location.host}${API_BASE}/live?root=${encodeURIComponent(root)}&after=${after}&client=${viewerClient()}`);
 }
 
 /** The subprotocol string to pass as `new WebSocket(url, [subprotocol])`, or null. */

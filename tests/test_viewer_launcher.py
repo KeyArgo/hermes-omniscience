@@ -216,3 +216,65 @@ def test_spawn_passes_viewer_settings_but_not_provider_secrets(tmp_path, monkeyp
     assert env['OMNISCIENCE_TENSORFOLD_HOSTS'] == 'spark=http://127.0.0.1:1234'
     assert env['OMNISCIENCE_STATE_DB'] == state_db
     assert env['OMNISCIENCE_PARENT_PID'] == str(os.getpid())
+
+
+def test_stop_viewer_refuses_a_pid_that_is_not_the_viewer(tmp_path):
+    """A stale pid file must never cost somebody else their process.
+
+    The test process itself is the stranger: it is alive, it is not ``omniscience_viewer``, and
+    nothing may signal it.
+    """
+    from omniscience import viewer_launcher as launcher
+
+    with open(launcher.pid_path(str(tmp_path)), "w", encoding="utf-8") as fh:
+        fh.write(str(os.getpid()))
+
+    result = launcher.stop_viewer(str(tmp_path))
+    assert result["stopped"] is False
+    assert "not the viewer" in result["reason"]
+    # Still here, so the refusal was real rather than a kill that happened to fail.
+    os.kill(os.getpid(), 0)
+
+
+def test_stop_viewer_without_a_pid_file_says_so(tmp_path):
+    from omniscience import viewer_launcher as launcher
+
+    assert launcher.stop_viewer(str(tmp_path))["stopped"] is False
+    assert launcher.stop_viewer(str(tmp_path))["reason"] == "no viewer pid"
+
+
+def test_stop_viewer_signals_the_viewer_and_waits_for_it_to_go(tmp_path, monkeypatch):
+    """With a verified viewer cmdline the launcher sends SIGTERM once and records the exit."""
+    from omniscience import viewer_launcher as launcher
+
+    pid = 4242
+    with open(launcher.pid_path(str(tmp_path)), "w", encoding="utf-8") as fh:
+        fh.write(str(pid))
+    monkeypatch.setattr(launcher, "_pid_cmdline", lambda p: f"/usr/bin/python3 -m omniscience_viewer --db x")
+    signalled = []
+    monkeypatch.setattr(launcher.os, "kill", lambda p, sig: signalled.append((p, sig)))
+    # Alive when checked, then gone on the first wait: the viewer got the signal and exited.
+    checks = iter([True, False])
+    monkeypatch.setattr(launcher, "_pid_running", lambda p: next(checks, False))
+
+    result = launcher.stop_viewer(str(tmp_path))
+    assert signalled == [(pid, launcher.signal.SIGTERM)]
+    assert result == {"stopped": True, "reason": "stopped"}
+    assert not os.path.exists(launcher.pid_path(str(tmp_path)))
+
+
+def test_stop_viewer_clears_a_pid_the_viewer_left_behind(tmp_path, monkeypatch):
+    """The idle exit leaves viewer.pid; turning the switch off must not signal a recycled pid."""
+    from omniscience import viewer_launcher as launcher
+
+    pid = 4243
+    with open(launcher.pid_path(str(tmp_path)), "w", encoding="utf-8") as fh:
+        fh.write(str(pid))
+    signalled = []
+    monkeypatch.setattr(launcher.os, "kill", lambda p, sig: signalled.append((p, sig)))
+    monkeypatch.setattr(launcher, "_pid_running", lambda p: False)
+
+    result = launcher.stop_viewer(str(tmp_path))
+    assert signalled == []
+    assert result["stopped"] is False and result["reason"] == "not running"
+    assert not os.path.exists(launcher.pid_path(str(tmp_path)))

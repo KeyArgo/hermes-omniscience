@@ -100,9 +100,15 @@ def test_the_viewer_copy_behaves_identically(tmp_path):
         {"digest": {"enabled": True, "detail": "brief"}},
         {"digest": {"enabled": False, "detail": "nonsense"}},
         {"digest": "garbage"},
+        {"viewer": "off"},
+        {"viewer": "nonsense"},
+        {"viewer": False},
+        {"digest": {"enabled": False}, "viewer": "OFF"},
     ]
     for case in cases:
         assert prefs.normalize(case) == other.normalize(case)
+        assert prefs.viewer_enabled(case) == other.viewer_enabled(case)
+        assert prefs.set_viewer(case, False) == other.set_viewer(case, False)
 
     path_plugin = str(tmp_path / "a.json")
     path_viewer = str(tmp_path / "b.json")
@@ -120,3 +126,30 @@ def test_both_copies_derive_the_same_path():
 @pytest.mark.parametrize("detail", ["brief", "standard", "full"])
 def test_every_detail_level_is_accepted(detail):
     assert prefs.set_digest(prefs.defaults(), detail=detail)["digest"]["detail"] == detail
+
+
+def test_the_viewer_is_on_by_default():
+    assert prefs.viewer_enabled(prefs.defaults()) is True
+    assert prefs.defaults()["viewer"] == "on"
+
+
+def test_only_off_means_off():
+    """Unknown values read as on: a settings file the owner hand-edited must not hide the pane."""
+    assert prefs.viewer_enabled({"viewer": "off"}) is False
+    assert prefs.viewer_enabled({"viewer": " OFF "}) is False
+    assert prefs.viewer_enabled({"viewer": False}) is False
+    assert prefs.viewer_enabled({"viewer": "on"}) is True
+    assert prefs.viewer_enabled({"viewer": "maybe"}) is True
+    assert prefs.viewer_enabled({}) is True
+    assert prefs.viewer_enabled(None) is True
+
+
+def test_set_viewer_round_trips_and_never_mutates_its_input(tmp_path):
+    before = prefs.defaults()
+    off = prefs.set_viewer(before, False)
+    assert off["viewer"] == "off"
+    assert before["viewer"] == "on"
+    path = str(tmp_path / "prefs.json")
+    assert prefs.save(path, off) is True
+    assert prefs.viewer_enabled(prefs.load(path)) is False
+    assert prefs.digest_enabled(prefs.load(path)) is True  # the other setting is untouched

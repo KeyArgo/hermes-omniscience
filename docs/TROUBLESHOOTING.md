@@ -1,7 +1,8 @@
 # Troubleshooting
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
-> **Revised:** 2026-11-13 · **Body hash:** 4ac46ba2
+> **Applies to:** Omniscience 1.0.0 · written at commit 4386e6d
+> **Revised:** 2026-11-18 · **Body hash:** 6d6fbe40
+
 
 
 
@@ -34,14 +35,16 @@ profile has no database until Hermes records something.
 - To look at synthetic data instead, run with `--demo`.
 - To start an isolated demo home, run `scripts/demo-home.sh`.
 
-## The viewer does not start when Hermes loads the plugin
+## The viewer does not start when the Omniscience pane opens
 
-The launcher returns a reason and writes it to `<HERMES_HOME>/plugin-data/omniscience/viewer.log`.
-Common reasons from `viewer_launcher.py`:
+The viewer is not started at Hermes boot any more: it starts when the pane asks for it, and stops
+itself after ten quiet minutes. The launcher returns a reason and writes it to
+`<HERMES_HOME>/plugin-data/omniscience/viewer.log`. Common reasons from `viewer_launcher.py`:
 
 | Reason | Check |
 |---|---|
-| `autostart off` | `OMNISCIENCE_VIEWER_AUTOSTART` is set to `0`/`false`/`no`/`off`. |
+| `off` (from the dashboard) | **Settings → Omniscience → Run the Omniscience viewer** is off. Turn it on, or set `"viewer": "on"` in `prefs.json`. Recording is unaffected. |
+| `autostart off` | `OMNISCIENCE_VIEWER_AUTOSTART` is set to `0`/`false`/`no`/`off`, which refuses every start. |
 | `paused (recording continues)` | The `paused` marker exists. Run `scripts/omni.sh resume`. |
 | `non-local URL, refusing to auto-start` | `OMNISCIENCE_VIEWER_URL` points at a non-loopback host. Start the viewer yourself if that is intended. |
 | `port in use by another Omniscience viewer` | Another viewer answers on the port but with a different database fingerprint. Stop it or change `OMNISCIENCE_VIEWER_URL`. |

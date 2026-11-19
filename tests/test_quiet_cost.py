@@ -270,9 +270,10 @@ def test_the_chat_list_still_sees_a_purge_a_replaced_file_and_a_limit(tmp_path):
     _insert(con2, 1.0, "session.start", session="only-here", attrs={"model": "m"})
     con2.commit()
     con2.close()
+    # Windows cannot replace a file that is still open: the writer lets go first, as a restore would.
+    con.close()
     Path(other).replace(path)
     assert _roots(db_mod.list_sessions_checked(path)[0]) == ["only-here"]
-    con.close()
 
 
 # ---------------------------------------------------------------------------

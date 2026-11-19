@@ -8,6 +8,7 @@ Designed to be called from register(ctx) on a daemon thread.
 import hashlib
 import logging
 import os
+import signal
 import sys
 import time
 import urllib.request
@@ -106,6 +107,7 @@ def pythonpath_entries(bundle_dir: str, entries) -> list[str]:
 
 
 PAUSE_MARKER = "paused"
+PID_FILE_NAME = "viewer.pid"
 
 
 def pause_marker_path(state_dir: str) -> str:
@@ -114,6 +116,151 @@ def pause_marker_path(state_dir: str) -> str:
 
 def is_paused(state_dir: str) -> bool:
     return os.path.exists(pause_marker_path(state_dir))
+
+
+def pid_path(log_dir: str) -> str:
+    """Where the launcher records the viewer it started, next to ``viewer.lock``."""
+    return os.path.join(log_dir, PID_FILE_NAME)
+
+
+def _pid_cmdline(pid: int) -> str | None:
+    """The command line of *pid* as one string, or None when it cannot be read.
+
+    Read before signalling so a stale pid file can never make this module kill a stranger:
+    the number in ``viewer.pid`` may have belonged to the viewer once and to something else now.
+    """
+    if pid <= 0:
+        return None
+    if sys.platform == "win32":
+        # No /proc and no portable cmdline call. wmic answers where it exists; where it does not,
+        # None means "cannot check", which stop_viewer treats as a refusal, never as a kill.
+        try:
+            proc = subprocess.run(
+                ["wmic", "process", "where", f"processid={pid}", "get", "commandline"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+        return lines[1] if len(lines) > 1 else None
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        raw = b""
+    if raw:
+        return raw.replace(b"\0", b" ").decode("utf-8", "replace").strip()
+    try:
+        proc = subprocess.run(
+            ["ps", "-o", "command=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout.strip() or None
+
+
+def _pid_running(pid: int) -> bool:
+    """Is this process still running (not gone, not a zombie)? See app._pid_alive."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    if sys.platform == "win32":
+        return True
+    try:
+        state = Path(f"/proc/{pid}/stat").read_bytes().rsplit(b") ", 1)[1].split(b" ", 1)[0]
+    except (OSError, IndexError):
+        return True  # cannot read it, so do not claim it is gone
+    return state not in (b"Z", b"X")
+
+
+def stop_viewer(log_dir: str) -> dict:
+    """Stop the viewer this launcher started. Never raises, never signals anything else.
+
+    The pid comes from ``viewer.pid``; the process it names is signalled only when its command
+    line still contains ``omniscience_viewer``. On Windows stopping is refused unless the command
+    line can be read (``wmic``), because killing by pid without that check is how the wrong
+    process gets killed.
+
+    Returns ``{"stopped": bool, "reason": str}``.
+    """
+    result: dict = {"stopped": False, "reason": ""}
+    path = pid_path(log_dir)
+    try:
+        raw = Path(path).read_text(encoding="utf-8").strip()
+    except OSError:
+        result["reason"] = "no viewer pid"
+        return result
+    try:
+        pid = int(raw)
+    except ValueError:
+        result["reason"] = "viewer pid file holds no pid"
+        _remove_pid_file(path)
+        return result
+
+    if not _pid_running(pid):
+        # The viewer closed itself (the idle exit) and left its pid behind: nothing to signal.
+        _remove_pid_file(path)
+        result["reason"] = "not running"
+        return result
+
+    cmdline = _pid_cmdline(pid)
+    if cmdline is None:
+        result["reason"] = f"cannot check what process {pid} is"
+        return result
+    if "omniscience_viewer" not in cmdline:
+        result["reason"] = f"process {pid} is not the viewer"
+        _remove_pid_file(path)
+        return result
+
+    if sys.platform == "win32":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T"],
+                capture_output=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            result["reason"] = f"taskkill failed: {exc}"
+            return result
+    else:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            _remove_pid_file(path)
+            result["reason"] = "not running"
+            return result
+        except OSError as exc:
+            result["reason"] = f"could not signal the viewer: {exc}"
+            return result
+
+    deadline = time.time() + 3.0
+    while time.time() < deadline:
+        if not _pid_running(pid):
+            _remove_pid_file(path)
+            result["stopped"] = True
+            result["reason"] = "stopped"
+            return result
+        time.sleep(0.1)
+    result["reason"] = "still running after 3s"
+    return result
+
+
+def _remove_pid_file(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        log.debug("omniscience: could not remove the viewer pid file", exc_info=True)
 
 
 def viewer_command(db_path: str, *, state_db: str | None, static_dir: str, port: int) -> list[str]:
@@ -273,6 +420,7 @@ def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool, state_db: str 
                 "HERMES_HOME", "PYTHONPATH", "OMNISCIENCE_POLL_INTERVAL_S",
                 "OMNISCIENCE_IDLE_POLL_INTERVAL_S", "OMNISCIENCE_VIEWER_CONTENT_LABELS",
                 "OMNISCIENCE_TENSORFOLD_HOSTS", "OMNISCIENCE_DIGEST",
+                "OMNISCIENCE_VIEWER_IDLE_EXIT_S",
             )
             env = {name: os.environ[name] for name in allowed if name in os.environ}
             # The child resolves chat titles from this store; nothing else is implied.
@@ -313,6 +461,15 @@ def ensure_viewer(db_path: str, *, log_dir: str, autostart: bool, state_db: str 
                     close_fds=True,
                     env=env,
                 )
+
+            # The pid is recorded so the owner's switch can stop this exact process. A mocked or
+            # unusual Popen may not carry a real pid; then nothing is written rather than a lie.
+            if isinstance(getattr(proc, "pid", None), int) and proc.pid > 0:
+                try:
+                    with open(pid_path(log_dir), "w", encoding="utf-8") as pid_fh:
+                        pid_fh.write(str(proc.pid))
+                except OSError:
+                    log.debug("omniscience: could not write the viewer pid file", exc_info=True)
 
             # Wait up to 5 seconds for viewer to come up
             deadline = time.time() + 5.0
@@ -358,10 +515,13 @@ def stop_hint() -> str:
     """Return a plain-text hint for the user on how to stop/disable the viewer."""
     return (
         "To stop the Omniscience viewer:\n"
-        "  1. Find the process: ps aux | grep omniscience_viewer\n"
-        "  2. Kill it: kill <PID>\n"
-        "To disable auto-start:\n"
-        "  Set OMNISCIENCE_VIEWER_AUTOSTART=0 in your environment.\n"
+        "  1. Turn off 'Run the Omniscience viewer' in the Omniscience settings\n"
+        "     (or set \"viewer\": \"off\" in prefs.json beside events.db).\n"
+        "     Off: recording continues; the viewer does not run.\n"
+        "  2. Or find the process and kill it: ps aux | grep omniscience_viewer\n"
+        "The viewer runs only while someone is looking at it, and exits by itself when idle.\n"
+        "To keep it running from Hermes boot (the old behaviour):\n"
+        "  Set OMNISCIENCE_VIEWER_AUTOSTART=1 in your environment.\n"
         "To change the URL:\n"
         "  Set OMNISCIENCE_VIEWER_URL=http://host:port"
     )

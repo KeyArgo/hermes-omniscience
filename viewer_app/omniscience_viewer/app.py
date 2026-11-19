@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from typing import Any
 
 from urllib.parse import urlsplit
@@ -53,6 +54,99 @@ POLL_INTERVAL_S = float(os.environ.get("OMNISCIENCE_POLL_INTERVAL_S", "1.0"))
 IDLE_POLL_INTERVAL_S = float(os.environ.get("OMNISCIENCE_IDLE_POLL_INTERVAL_S", "4.0"))
 IDLE_AFTER = 3
 HEARTBEAT_INTERVAL_S = 10.0
+
+# Nobody looking means no requests and no open sockets. After this long with neither, the viewer
+# closes itself and the next pane open starts it again (dashboard/plugin_api.py GET /viewer).
+# 0 disables the exit; the check itself runs at most every IDLE_CHECK_INTERVAL_S.
+IDLE_EXIT_DEFAULT_S = 600.0
+IDLE_CHECK_INTERVAL_S = 30.0
+
+
+def idle_exit_seconds(environ: dict | None = None) -> float:
+    """``OMNISCIENCE_VIEWER_IDLE_EXIT_S``: seconds of total quiet before exiting; 0 disables.
+
+    Junk and negative values read as the default rather than as "never exit" or "exit at once".
+    """
+    raw = (environ or os.environ).get("OMNISCIENCE_VIEWER_IDLE_EXIT_S", "")
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return IDLE_EXIT_DEFAULT_S
+    return value if value >= 0 else IDLE_EXIT_DEFAULT_S
+
+
+def _iso_timestamp() -> str:
+    """Local time with its offset, so a log line says when as well as what."""
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+class ViewerActivity:
+    """When the viewer last saw a request or held an open socket, and how many are open now.
+
+    Only the event loop touches this (middleware, socket handlers and the idle task all run
+    there), so it needs no lock. A disconnect counts as activity too: the countdown to an idle
+    exit starts when the last reader left, not when they arrived.
+    """
+
+    def __init__(self) -> None:
+        self.last_activity = time.monotonic()
+        self.open_sockets = 0
+
+    def touch(self) -> None:
+        self.last_activity = time.monotonic()
+
+    def socket_open(self) -> None:
+        self.open_sockets += 1
+        self.touch()
+
+    def socket_closed(self) -> None:
+        self.open_sockets = max(0, self.open_sockets - 1)
+        self.touch()
+
+    def idle_for(self, now: float | None = None) -> float:
+        return (time.monotonic() if now is None else now) - self.last_activity
+
+    def idle(self, idle_s: float, now: float | None = None) -> bool:
+        """Idle means no socket is open and nothing has asked for anything for ``idle_s``."""
+        return idle_s > 0 and self.open_sockets == 0 and self.idle_for(now) >= idle_s
+
+
+async def idle_watch(
+    activity: ViewerActivity,
+    idle_s: float,
+    request_exit,
+    *,
+    interval: float | None = None,
+) -> None:
+    """One task: after ``idle_s`` of no requests and no sockets, ask the server to close.
+
+    It does nothing else — no timers beyond its own sleep, no database reads — and checks at most
+    every ``IDLE_CHECK_INTERVAL_S`` (sooner only when ``idle_s`` is shorter, as in tests).
+    """
+    if idle_s <= 0:
+        return
+    step = interval if interval is not None else min(IDLE_CHECK_INTERVAL_S, idle_s)
+    while True:
+        await asyncio.sleep(step)
+        if activity.idle(idle_s):
+            log.info(
+                "omniscience: no requests or open sockets for %ss, closing the viewer", f"{idle_s:g}"
+            )
+            request_exit()
+            return
+
+
+class ActivityMiddleware:
+    """Marks every HTTP request as activity for the idle exit: one attribute write, no work."""
+
+    def __init__(self, app: Any, activity: ViewerActivity) -> None:
+        self.app = app
+        self.activity = activity
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http":
+            self.activity.touch()
+        await self.app(scope, receive, send)
 
 
 class SandboxedFrameCors:
@@ -242,6 +336,16 @@ def _collect_backfill(db_path: str, seed, cursor: int):
     return [fetched[rowid] for rowid in sorted(fetched)], seen
 
 
+def _live_client(raw: str | None) -> str:
+    """The page's ``client`` marker, kept to a short safe token.
+
+    The value comes from a URL, so it is stripped of anything that could forge or twist a log
+    line. Unknown or absent reads as ``unknown``; the page sends pane, mini or browser.
+    """
+    text = _FILENAME_UNSAFE.sub("", (raw or "").strip())[:16]
+    return text or "unknown"
+
+
 def _presented_subprotocol(headers) -> str | None:
     """The `omni.<token>` the client proposed as a WebSocket subprotocol, or None.
 
@@ -381,6 +485,14 @@ def create_app(db_path: str, static_dir: str | None = None,
     _watch_parent()
     live_queries = LiveQueryCoalescer()
     app = FastAPI(title="Hermes Omniscience Viewer", docs_url=None, redoc_url=None)
+    # Nobody looking must cost nothing: one activity counter, one task, and the server closes
+    # itself after a quiet spell. __main__ points request_exit at uvicorn's server.should_exit.
+    activity = ViewerActivity()
+    idle_s = idle_exit_seconds()
+    app.state.activity = activity
+    app.state.idle_exit_s = idle_s
+    app.state.request_exit = lambda: None
+    app.state.idle_task = None
     # Blocks DNS-rebinding: a hostile page can't reach us under its own hostname.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or LOCAL_HOSTS)
     # A shared mutable holder: __main__ writes the per-launch token into this dict after the
@@ -393,6 +505,15 @@ def create_app(db_path: str, static_dir: str | None = None,
     # Outermost (added last): a sandboxed frame preflights every API call, and the preflight
     # carries no token, so it must be answered before TokenMiddleware sees it.
     app.add_middleware(SandboxedFrameCors)
+    # Outermost of all, beside the CORS one: every request, refused or not, is somebody looking.
+    app.add_middleware(ActivityMiddleware, activity=activity)
+
+    @app.on_event("startup")
+    async def _start_idle_watch() -> None:
+        if idle_s > 0:
+            app.state.idle_task = asyncio.create_task(
+                idle_watch(activity, idle_s, lambda: app.state.request_exit())
+            )
 
     def _build_id() -> str:
         """A cheap marker for the page that is installed right now.
@@ -788,7 +909,8 @@ def create_app(db_path: str, static_dir: str | None = None,
         return diagnose_mod.explain(db_path, root)
 
     @app.websocket("/api/v1/live")
-    async def live(websocket: WebSocket, root: str | None = None, after: int = 0) -> None:
+    async def live(websocket: WebSocket, root: str | None = None, after: int = 0,
+                   client: str | None = None) -> None:
         if not _origin_allowed(websocket.headers.get("origin"), websocket.headers.get("host")):
             await websocket.close(code=1008)
             return
@@ -798,6 +920,15 @@ def create_app(db_path: str, static_dir: str | None = None,
         # browser; rejecting the subprotocol here aborts the socket with a protocol error.
         websocket_sub = _presented_subprotocol(websocket.headers)
         await websocket.accept(subprotocol=websocket_sub)
+        # One line per live socket, both ends. Without them a viewer log could not say who
+        # opened six or seven sockets, or when — which is what a CPU question turns on.
+        client_label = _live_client(client)
+        root_label = (root or "-")[:8]
+        activity.socket_open()
+        log.info(
+            "omniscience: live socket open ts=%s root=%s client=%s",
+            _iso_timestamp(), root_label, client_label,
+        )
         cursor = after or 0
         last_heartbeat = time.monotonic()
         idle_polls = 0
@@ -933,6 +1064,12 @@ def create_app(db_path: str, static_dir: str | None = None,
         except Exception:
             log.debug("omniscience: live feed closed by an unexpected error", exc_info=True)
             return
+        finally:
+            activity.socket_closed()
+            log.info(
+                "omniscience: live socket close ts=%s root=%s client=%s",
+                _iso_timestamp(), root_label, client_label,
+            )
 
     index_path = os.path.join(static_dir, "index.html") if static_dir else None
 

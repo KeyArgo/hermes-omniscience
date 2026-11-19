@@ -2,7 +2,7 @@
 
 The viewer must not import the plugin package: it is installed and started
 separately. The two copies are held to the same behaviour by
-tests/test_prefs_parity.py.
+tests/test_prefs.py::test_the_viewer_copy_behaves_identically.
 
 
 Kept in a small JSON file next to the event database so that the chat command
@@ -13,10 +13,12 @@ File format (all keys optional; unknown keys are preserved but ignored):
 
     {
       "version": 1,
-      "digest": {"enabled": true, "detail": "standard"}
+      "digest": {"enabled": true, "detail": "standard"},
+      "viewer": "on"
     }
 
-``detail`` is one of ``brief``, ``standard`` or ``full``.
+``detail`` is one of ``brief``, ``standard`` or ``full``. ``viewer`` is ``on`` or ``off``: off
+means the viewer does not run at all; recording carries on.
 """
 
 from __future__ import annotations
@@ -40,16 +42,23 @@ __all__ = [
     "path_for",
     "save",
     "set_digest",
+    "set_viewer",
+    "viewer_enabled",
 ]
 
 PREF_FILE_NAME = "prefs.json"
 DETAIL_LEVELS = ("brief", "standard", "full")
 DEFAULT_DETAIL = "standard"
+VIEWER_MODES = ("on", "off")
 
 
 def defaults() -> dict:
-    """The shipped defaults: a turn summary in the chat, standard detail."""
-    return {"version": 1, "digest": {"enabled": True, "detail": DEFAULT_DETAIL}}
+    """The shipped defaults: a turn summary in the chat, standard detail, the viewer on."""
+    return {
+        "version": 1,
+        "digest": {"enabled": True, "detail": DEFAULT_DETAIL},
+        "viewer": "on",
+    }
 
 
 def path_for(db_path: str | None) -> str:
@@ -80,6 +89,12 @@ def normalize(raw: Any) -> dict:
     version = raw.get("version")
     if isinstance(version, int) and version > 0:
         out["version"] = version
+
+    viewer = raw.get("viewer")
+    if isinstance(viewer, bool):
+        out["viewer"] = "on" if viewer else "off"
+    elif isinstance(viewer, str) and viewer.strip().lower() in VIEWER_MODES:
+        out["viewer"] = viewer.strip().lower()
     return out
 
 
@@ -143,4 +158,21 @@ def set_digest(prefs: dict, *, enabled: bool | None = None, detail: str | None =
         out["digest"]["enabled"] = enabled
     if isinstance(detail, str) and detail in DETAIL_LEVELS:
         out["digest"]["detail"] = detail
+    return out
+
+
+def viewer_enabled(prefs: dict) -> bool:
+    """Whether the viewer may run. On by default; anything but ``off`` means on."""
+    viewer = prefs.get("viewer") if isinstance(prefs, dict) else None
+    if isinstance(viewer, bool):
+        return viewer
+    if isinstance(viewer, str):
+        return viewer.strip().lower() != "off"
+    return True
+
+
+def set_viewer(prefs: dict, enabled: bool) -> dict:
+    """Return a new prefs dict with the viewer switch set (normalized)."""
+    out = normalize(prefs)
+    out["viewer"] = "on" if enabled else "off"
     return out

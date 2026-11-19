@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 0f0dddd
-> **Revised:** 2026-11-18 · **Body hash:** a364b989
+> **Applies to:** Omniscience 1.0.0 · written at commit 4386e6d
+> **Revised:** 2026-11-18 · **Body hash:** 641ade94
+
 
 
 
@@ -387,6 +388,13 @@ side you reopened yourself while you were on the page is left as you set it.
 Turn it off in Hermes Settings → Omniscience → **Make room automatically**. Turning it off while the
 page is open still puts things back when you leave. It applies only inside the Hermes desktop app,
 not in the browser view.
+
+### The viewer on/off switch
+
+The same settings page has **Run the Omniscience viewer**. Off means the viewer does not run at
+all — no server, no page — while recording carries on exactly as before. On (the default) still
+means the viewer starts only when you open the Omniscience pane, and it closes itself after ten
+quiet minutes with no requests and no open live socket. The next pane open starts it again.
 
 ### The turn summary in your chat
 

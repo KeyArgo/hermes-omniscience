@@ -130,7 +130,13 @@ def main(argv: list[str] | None = None) -> int:
     # Never print the token to stdout/stderr — it must not appear in logs.
     # The user can find it in the token file if needed.
 
-    uvicorn.run(app, host=args.host, port=args.port, access_log=False)
+    # The viewer closes itself after a quiet spell (OMNISCIENCE_VIEWER_IDLE_EXIT_S), and the next
+    # pane open starts it again. uvicorn's own server object is the only thing that can stop it
+    # cleanly, so hand the app a way to ask for that.
+    config = uvicorn.Config(app, host=args.host, port=args.port, access_log=False)
+    server = uvicorn.Server(config)
+    app.state.request_exit = lambda: setattr(server, "should_exit", True)
+    server.run()
     return 0
 
 

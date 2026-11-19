@@ -9,6 +9,8 @@ import {
   fetchWarnings,
   getPrefs,
   setPrefs,
+  liveUrl,
+  viewerClient,
   normalizeDiagnose,
   normalizeEvent,
   normalizeSession,
@@ -527,5 +529,48 @@ describe('fetchSessions', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502, statusText: 'Bad Gateway' })));
     await expect(fetchSessions()).rejects.toThrow('502 Bad Gateway');
     vi.unstubAllGlobals();
+  });
+});
+
+describe('the socket log says who opened it', () => {
+  // The desktop passes its markers in the URL; the viewer records the label beside the socket.
+  function atPage(location: Record<string, string>, run: () => void) {
+    const had = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+    const previous = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = { location };
+    try {
+      run();
+    } finally {
+      if (had) (globalThis as { window?: unknown }).window = previous;
+      else delete (globalThis as { window?: unknown }).window;
+    }
+  }
+
+  const page = (search: string) => ({
+    search,
+    hash: '',
+    host: '127.0.0.1:8797',
+    protocol: 'http:',
+  });
+
+  it('labels a browser tab, the docked pane and the mini pane', () => {
+    atPage(page(''), () => expect(viewerClient()).toBe('browser'));
+    atPage(page('?host=hermes&t=k'), () => expect(viewerClient()).toBe('pane'));
+    atPage(page('?host=hermes&mini=1&actions=0'), () => expect(viewerClient()).toBe('mini'));
+  });
+
+  it('finds the markers when the router keeps them in the hash', () => {
+    atPage({ search: '', hash: '#/omniscience?host=hermes&mini=1', host: '127.0.0.1:8797', protocol: 'http:' }, () =>
+      expect(viewerClient()).toBe('mini'),
+    );
+  });
+
+  it('puts the label on the live socket URL, next to the root', () => {
+    atPage(page('?host=hermes&mini=1'), () => {
+      const url = new URL(liveUrl('chat one', 12));
+      expect(url.searchParams.get('root')).toBe('chat one');
+      expect(url.searchParams.get('after')).toBe('12');
+      expect(url.searchParams.get('client')).toBe('mini');
+    });
   });
 });

@@ -413,18 +413,43 @@ def _tokens_command(action: str, platform: str | None) -> str:
     return tokens_report(report, link)
 
 
+# Values that mean "start the viewer with Hermes", the always-on behaviour of 1.0.
+_BOOT_START_VALUES = ("1", "true", "yes", "on", "always")
+
+
+def _viewer_boot_wanted() -> bool:
+    """Start the viewer at Hermes boot only when asked explicitly.
+
+    By default nobody is looking at the viewer, so nothing runs it: the pane starts it through
+    ``GET /viewer`` the first time it is opened (dashboard/plugin_api.py ``_ensure_viewer``), and
+    the viewer exits again after ``OMNISCIENCE_VIEWER_IDLE_EXIT_S`` with no requests or sockets.
+    ``OMNISCIENCE_VIEWER_AUTOSTART=1`` (or ``always``) restores the old always-on behaviour;
+    unset or ``0`` means do not start at boot.
+    """
+    return os.environ.get("OMNISCIENCE_VIEWER_AUTOSTART", "").strip().lower() in _BOOT_START_VALUES
+
+
 def _start_viewer_in_background(db_path: str) -> None:
-    """Start the bundled viewer if it is not running (localhost only; OMNISCIENCE_VIEWER_AUTOSTART=0 opts out).
-    Several Hermes processes register the plugin; a lock file makes sure only one starts it."""
+    """Start the bundled viewer with Hermes (localhost only), when boot start was asked for.
+
+    The user's own switch wins: with the ``viewer`` pref off nothing starts, whatever the
+    environment says. Several Hermes processes register the plugin; the launcher's lock file makes
+    sure only one starts it.
+    """
     import threading
 
     from . import viewer_launcher
 
-    autostart = os.environ.get("OMNISCIENCE_VIEWER_AUTOSTART", "1").strip().lower() not in ("0", "false", "no", "off")
+    try:
+        if not prefs.viewer_enabled(prefs.load(prefs.path_for(db_path))):
+            return
+    except Exception:
+        # A settings file cannot stop the opt-in: an unreadable one reads as the default (on).
+        log.debug("omniscience: could not read the viewer preference at boot", exc_info=True)
     real_db = os.path.realpath(db_path)
     threading.Thread(
         target=lambda: viewer_launcher.ensure_viewer(
-            real_db, log_dir=os.path.dirname(real_db), autostart=autostart, state_db=_state_db_path()
+            real_db, log_dir=os.path.dirname(real_db), autostart=True, state_db=_state_db_path()
         ),
         name="omniscience-viewer-autostart",
         daemon=True,
@@ -497,7 +522,8 @@ def register(ctx):
         log.debug("omniscience: live notices disabled (post_message not available or notices=off)")
     for hook_name in HOOKS:
         ctx.register_hook(hook_name, _make_callback(hook_name))
-    _start_viewer_in_background(db_path)
+    if _viewer_boot_wanted():
+        _start_viewer_in_background(db_path)
     _import_history_in_background(db_path)
     if callable(getattr(ctx, 'register_command', None)):
         ctx.register_command('omni', _omni_command, description='Inspect recorded activity for this chat')

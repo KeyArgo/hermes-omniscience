@@ -1,9 +1,10 @@
 """Omniscience dashboard plugin backend, mounted at /api/plugins/omniscience/.
 
 Read-only health endpoint over the plugin's event database (see docs/DECISIONS.md D4:
-``<HERMES_HOME>/plugin-data/omniscience/events.db``). No write endpoints — the plugin
-itself is the sole writer (D2). Asking for the viewer link also restarts the viewer when it is
-down (see ``_ensure_viewer``); that starts a process but writes nothing to the recording.
+``<HERMES_HOME>/plugin-data/omniscience/events.db``), plus the owner's viewer on/off switch
+(``/viewer/mode``), which writes ``prefs.json`` but never the recording (D2). Asking for the viewer
+link also restarts the viewer when it is down (see ``_ensure_viewer``); that starts a process but
+writes nothing to the recording.
 
 Per the Hermes dashboard doc ("Don't block the event loop"): every handler is async and
 all blocking SQLite work runs off the loop via ``asyncio.to_thread``.
@@ -17,7 +18,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body, HTTPException
 
 try:  # hermes_constants ships with Hermes; keep the module importable outside Hermes too
     from hermes_constants import get_hermes_home
@@ -86,6 +87,7 @@ async def health() -> dict:
 
 
 _LAUNCHER = None
+_PREFS = None
 
 
 def _launcher():
@@ -103,6 +105,40 @@ def _launcher():
     return _LAUNCHER
 
 
+def _prefs():
+    """The plugin's prefs.py, beside this folder: the same file the recorder and the viewer read."""
+    global _PREFS
+    if _PREFS is None:
+        path = Path(__file__).resolve().parents[1] / "prefs.py"
+        spec = importlib.util.spec_from_file_location("omniscience_dashboard_prefs", path)
+        if not spec or not spec.loader:
+            raise ImportError(f"cannot load {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _PREFS = module
+    return _PREFS
+
+
+def _viewer_enabled() -> bool:
+    """The owner's switch. An unreadable settings file reads as the default (on)."""
+    try:
+        prefs_mod = _prefs()
+        return prefs_mod.viewer_enabled(prefs_mod.load(prefs_mod.path_for(str(_db_path()))))
+    except Exception:  # never let settings trouble stop the viewer from being offered
+        log.debug("omniscience: could not read the viewer preference", exc_info=True)
+        return True
+
+
+def _stop_viewer() -> dict:
+    """Stop a viewer this machine started; the launcher refuses anything but its own viewer."""
+    real = os.path.realpath(_db_path())
+    try:
+        return _launcher().stop_viewer(os.path.dirname(real))
+    except Exception as exc:  # a switch that cannot stop is still a switch that is off
+        log.debug("omniscience: stopping the viewer from the dashboard failed", exc_info=True)
+        return {"stopped": False, "reason": f"could not stop the viewer: {exc}"}
+
+
 def _ensure_viewer() -> dict:
     """Start the viewer if it is down, owned by this long-lived dashboard process.
 
@@ -110,7 +146,13 @@ def _ensure_viewer() -> dict:
     one (a one-shot chat, a CLI command), the page later found nothing listening and nothing
     restarted it. Opening the page now restarts it. The launcher still honours
     OMNISCIENCE_VIEWER_AUTOSTART=0, Pause, local-only URLs and its one-minute retry pause.
+
+    The owner's switch comes first: with the ``viewer`` pref off nothing is started, and a viewer
+    started earlier is stopped, so the pane shows "off" rather than an unexplained failure.
     """
+    if not _viewer_enabled():
+        _stop_viewer()
+        return {"running": False, "reason": "off"}
     db = _db_path()
     if not db.is_file():
         return {"running": False, "reason": "event database not found"}
@@ -143,3 +185,34 @@ def _viewer_link_locked() -> dict:
 @router.get("/viewer")
 async def viewer_link() -> dict:
     return await asyncio.to_thread(_viewer_link_locked)
+
+
+def _viewer_mode_locked() -> dict:
+    return {"enabled": _viewer_enabled()}
+
+
+@router.get("/viewer/mode")
+async def viewer_mode() -> dict:
+    """The owner's on/off switch, as stored (off: recording continues, the viewer does not run)."""
+    return await asyncio.to_thread(_viewer_mode_locked)
+
+
+def _set_viewer_mode_locked(enabled: bool) -> dict:
+    """Save the switch, and stop the viewer on the way off.
+
+    The answer is read back from disk, so a save that did not land is not reported as a change.
+    """
+    prefs_mod = _prefs()
+    path = prefs_mod.path_for(str(_db_path()))
+    prefs_mod.save(path, prefs_mod.set_viewer(prefs_mod.load(path), enabled))
+    if not enabled:
+        _stop_viewer()
+    return {"enabled": prefs_mod.viewer_enabled(prefs_mod.load(path))}
+
+
+@router.post("/viewer/mode")
+async def set_viewer_mode(payload: dict = Body(...)) -> dict:
+    enabled = payload.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(status_code=400, detail="enabled must be true or false")
+    return await asyncio.to_thread(_set_viewer_mode_locked, enabled)

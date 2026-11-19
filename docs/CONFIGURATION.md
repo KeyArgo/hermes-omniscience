@@ -1,7 +1,8 @@
 # Configuration
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
-> **Revised:** 2026-11-13 · **Body hash:** 498d344f
+> **Applies to:** Omniscience 1.0.0 · written at commit 4386e6d
+> **Revised:** 2026-11-18 · **Body hash:** 0a7d94f2
+
 
 
 
@@ -17,7 +18,7 @@ database.
 | `OMNISCIENCE_DB` | `<HERMES_HOME>/plugin-data/omniscience/events.db` | plugin, viewer, dashboard | Overrides the event database path. The preferences, token, usage database and bundles sit beside the resolved file. |
 | `OMNISCIENCE_VIEWER_URL` | `http://127.0.0.1:8797` | plugin, launcher, dashboard | Where the viewer is expected. The launcher starts a viewer on this URL's port. |
 | `OMNISCIENCE_DASHBOARD_URL` | `http://127.0.0.1:9120` | plugin, notices, dashboard | Base used for dashboard links in `/omni` replies and notices. |
-| `OMNISCIENCE_VIEWER_AUTOSTART` | `1` | plugin, launcher | Set to `0`, `false`, `no` or `off` to stop the plugin starting the viewer. |
+| `OMNISCIENCE_VIEWER_AUTOSTART` | unset | plugin, launcher | The viewer starts when the Omniscience pane opens, not at Hermes boot. Set to `1` (or `always`) for the old always-on behaviour; `0`, `false`, `no` or `off` is a hard off that even the pane will not override. |
 | `OMNISCIENCE_NOTICES` | `local` | plugin | `off` disables in-chat problem notices; `all` also allows messaging platforms; anything else keeps the local filter. |
 | `OMNISCIENCE_IMPORT_HISTORY` | `1` | plugin | Set to `0`, `false`, `no` or `off` to skip the one-time import of earlier chat metadata from Hermes' `state.db`. |
 | `OMNISCIENCE_DIGEST` | on | plugin, viewer | Hard off switch for the in-chat turn summary. `0`, `false`, `no` or `off` disables it regardless of `prefs.json`. |
@@ -25,6 +26,7 @@ database.
 | `OMNISCIENCE_POLL_INTERVAL_S` | `1.0` | viewer | Seconds between live-feed polls while events are arriving. The guard workflows pin the default and the environment form. |
 | `OMNISCIENCE_IDLE_POLL_INTERVAL_S` | `4.0` | viewer | Slower poll used after three empty polls. The first new row restores the normal interval. |
 | `OMNISCIENCE_PARENT_PID` | unset | viewer | Set by the launcher. The viewer exits when that process is gone. |
+| `OMNISCIENCE_VIEWER_IDLE_EXIT_S` | `600` | viewer | Seconds with no HTTP request and no open live socket before the viewer closes itself. `0` disables the idle exit. The next pane open starts it again. |
 | `OMNISCIENCE_VIEWER_CONTENT_LABELS` | `1` | viewer | Set to `0`, `false`, `no` or `off` to show session ids instead of chat titles from Hermes' `state.db`. |
 | `OMNISCIENCE_STATE_DB` | the active profile's, set by the plugin | viewer | Hermes' own state database for the profile the viewer was started for, used for chat titles, privacy labels and Hermes' cost estimate. The plugin sets it when it spawns the viewer; nothing else is guessed. |
 | `OMNISCIENCE_TENSORFOLD_HOSTS` | empty | viewer | Comma-separated `name=http://host:port` pairs for the optional DGX Sparks usage source. |
@@ -44,7 +46,8 @@ the Settings panel agree.
   "digest": {
     "enabled": true,
     "detail": "standard"
-  }
+  },
+  "viewer": "on"
 }
 ```
 
@@ -52,6 +55,7 @@ the Settings panel agree.
 |---|---|---|
 | `digest.enabled` | `true` / `false` | Whether the turn summary is posted in chat. |
 | `digest.detail` | `brief`, `standard`, `full` | How much the summary says. |
+| `viewer` | `on` / `off` | Whether the viewer may run. Off: recording continues; the viewer does not run. Anything but `off` (including an unknown value) reads as on. |
 
 Unknown keys are preserved but ignored. A missing or broken file falls back to the defaults above.
 
@@ -69,6 +73,7 @@ All of these sit next to the resolved event database, normally under
 | `usage.db` | viewer | Token rows imported from other harnesses, if you switch a source on. |
 | `viewer.log` | launcher | Viewer output. Created `0600`. |
 | `viewer.lock`, `viewer.last-start` | launcher | Prevent duplicate starts and immediate retry loops. |
+| `viewer.pid` | launcher | The pid of the viewer it started, checked before the owner's switch may stop it. |
 | `paused` | `scripts/omni.sh` | Present while the viewer is paused; recording continues. |
 | `brake.json` | `scripts/brake.sh on` | URL and token for Hermes' own run-stop API. |
 | `bundles/` | viewer | Redacted JSON problem bundles you choose to write. |
