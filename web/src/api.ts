@@ -4,8 +4,8 @@ import { tokenHeaders, withToken, wsSubprotocol } from './token';
 export const API_BASE = '/api/v1';
 export const EVENT_PAGE_SIZE = 2000;
 
-async function getJson(path: string): Promise<unknown> {
-  const response = await fetch(path, { headers: { accept: 'application/json', ...tokenHeaders() } });
+async function getJson(path: string, signal?: AbortSignal): Promise<unknown> {
+  const response = await fetch(path, { headers: { accept: 'application/json', ...tokenHeaders() }, signal });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
@@ -102,8 +102,22 @@ export function normalizeEvent(raw: unknown): OmniEvent | null {
   };
 }
 
-export async function fetchSessions(): Promise<SessionMeta[]> {
-  const payload = await getJson(`${API_BASE}/sessions?limit=200`);
+/** How long the chat list may take before the request is given up and the next poll tries again. */
+export const SESSIONS_TIMEOUT_MS = 30_000;
+
+export async function fetchSessions(timeoutMs = SESSIONS_TIMEOUT_MS): Promise<SessionMeta[]> {
+  // The list polls one request at a time, so a request that never answers would freeze it for good.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let payload: unknown;
+  try {
+    payload = await getJson(`${API_BASE}/sessions?limit=200`, controller.signal);
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`The chat list did not answer within ${Math.round(timeoutMs / 1000)}s`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   return arrayFrom(payload, 'sessions')
     .map(normalizeSession)
     .filter((session): session is SessionMeta => session !== null);

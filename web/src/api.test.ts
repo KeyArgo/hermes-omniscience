@@ -5,6 +5,7 @@ import {
   fetchDiagnose,
   fetchEvents,
   fetchEventsPage,
+  fetchSessions,
   fetchWarnings,
   getPrefs,
   setPrefs,
@@ -502,5 +503,29 @@ describe('shared chat settings', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('fetchSessions', () => {
+  it('gives up on a chat list that never answers, so the next poll can try again', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      })));
+      const pending = fetchSessions(30_000);
+      const outcome = expect(pending).rejects.toThrow('did not answer within 30s');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await outcome;
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps an ordinary error as it was', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502, statusText: 'Bad Gateway' })));
+    await expect(fetchSessions()).rejects.toThrow('502 Bad Gateway');
+    vi.unstubAllGlobals();
   });
 });

@@ -6,9 +6,11 @@ Every call opens its own ``mode=ro`` connection: the viewer must never write to
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sqlite3
+import threading
 import time
 from typing import Any
 
@@ -342,7 +344,65 @@ def list_sessions(path: str, limit: int = 100) -> list[dict]:
     return rows
 
 
+# The chat list is rebuilt from every recorded row, which costs seconds on a long history. Every
+# open page asks for it every five seconds, so a few tabs kept the viewer busy and a new page
+# waited tens of seconds for its chat list. The answer only changes when rows are added or a chat
+# is purged, so it is kept until the cheap signature below changes.
+_SESSIONS_CACHE: dict[tuple[str, int], tuple[tuple, list[dict]]] = {}
+_SESSIONS_LOCK = threading.Lock()
+
+
+def _file_stamp(path: str) -> tuple:
+    try:
+        st = os.stat(path)
+        return (st.st_ino, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return (None, None, None)
+
+
+def _sessions_signature(path: str) -> tuple | None:
+    """What the chat list depends on: the newest row, the row count, the purge list, and the
+    database and write-ahead log files themselves, so a write that leaves the counts unchanged
+    (or a replaced database file) is still seen."""
+    try:
+        con = _connect(path)
+    except sqlite3.Error:
+        return None
+    try:
+        newest, count = con.execute("SELECT MAX(rowid), COUNT(*) FROM events").fetchone()
+        try:
+            purged = con.execute("SELECT COUNT(*), MAX(rowid) FROM purged").fetchone()
+        except sqlite3.Error:
+            purged = (0, None)
+        return (newest, count, purged, _file_stamp(path), _file_stamp(path + "-wal"))
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+
+
 def list_sessions_checked(path: str, limit: int = 100) -> tuple[list[dict], str | None]:
+    """:func:`_list_sessions_uncached`, reused until the recording changes.
+
+    Callers get their own copy: the API adds labels to the rows it returns.
+    """
+    if not os.path.exists(path):
+        return [], None
+    signature = _sessions_signature(path)
+    key = (os.path.realpath(path), limit)
+    if signature is not None:
+        with _SESSIONS_LOCK:
+            hit = _SESSIONS_CACHE.get(key)
+        if hit is not None and hit[0] == signature:
+            return copy.deepcopy(hit[1]), None
+    rows, error = _list_sessions_uncached(path, limit)
+    if error is None and signature is not None:
+        with _SESSIONS_LOCK:
+            _SESSIONS_CACHE[key] = (signature, copy.deepcopy(rows))
+    return rows, error
+
+
+def _list_sessions_uncached(path: str, limit: int = 100) -> tuple[list[dict], str | None]:
     """Like :func:`list_sessions` but return ``(roots, error)``.
 
     A missing file means "nothing recorded yet" and is not an error. Anything else that

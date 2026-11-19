@@ -1133,8 +1133,13 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    // One request at a time, and none from a hidden tab: every open page polling a slow chat list
+    // on a timer stacked requests up until a fresh page waited tens of seconds for its list.
+    let inFlight = false;
 
-    const load = async () => {
+    const load = async (force = false) => {
+      if (inFlight || (!force && document.visibilityState === 'hidden')) return;
+      inFlight = true;
       try {
         const list = await fetchSessions();
         if (cancelled) return;
@@ -1151,15 +1156,21 @@ export default function App() {
         if (cancelled) return;
         setSessionsError(error instanceof Error ? error.message : String(error));
       } finally {
+        inFlight = false;
         if (!cancelled) setSessionsLoading(false);
       }
     };
 
-    void load();
-    const timer = window.setInterval(load, 5000);
+    void load(true);
+    const timer = window.setInterval(() => void load(), 5000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 

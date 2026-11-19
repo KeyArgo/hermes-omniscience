@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4de50ec
-> **Revised:** 2026-11-17 · **Body hash:** b2c006c5
+> **Applies to:** Omniscience 1.0.0 · written at commit 0f0dddd
+> **Revised:** 2026-11-18 · **Body hash:** a364b989
+
 
 
 
@@ -159,6 +160,11 @@ A line at the bottom of the page states the moment the facts on screen are true 
 Everything recorded up to that time is included; anything after it has not arrived yet. If the
 line stops advancing while the agent is working, the recorder or the stream has stalled, and the
 line turns amber to say so.
+
+When a chat has taken no step for two hours or more, the header badge reads **Last step** with how
+long ago it was (for example *Last step · 2d ago*). Hover it for the exact date and time; it says no
+step has been recorded in that chat since then. It means the chat is at rest, not that Omniscience
+has stopped updating; a new step in that chat switches the badge back.
 
 ## Latency — how long the models really take, and who refused the call
 
@@ -369,6 +375,18 @@ small screen without changing what is shown. Nothing is hidden or re-arranged �
 layout, drawn smaller. The choice is remembered for the mode you made it in (the browser and the
 docked Hermes pane each keep their own), and **Reset view** leaves it alone: how large the page
 draws is not part of the view Reset view restores.
+
+### Make room
+
+Inside the Hermes desktop app, opening the Omniscience page hides the Hermes status bar, the left
+sidebar and the right pane, so the map gets the most room.
+
+Leaving the page puts back exactly what it hid. A side that was already closed stays closed, and a
+side you reopened yourself while you were on the page is left as you set it.
+
+Turn it off in Hermes Settings → Omniscience → **Make room automatically**. Turning it off while the
+page is open still puts things back when you leave. It applies only inside the Hermes desktop app,
+not in the browser view.
 
 ### The turn summary in your chat
 

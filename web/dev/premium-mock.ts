@@ -515,7 +515,18 @@ export function installShowcaseViewer(): ShowcaseHarness {
     calls.push(url);
     const parsed = new URL(url, window.location.origin);
     const path = parsed.pathname;
-    if (path.endsWith('/sessions')) return respond(200, { sessions: SHOWCASE_SESSIONS });
+    if (path.endsWith('/sessions')) {
+      // ?slowSessions=1: a chat list that takes 7 s, like a long history on a busy viewer.
+      if (new URLSearchParams(window.location.search).get('slowSessions') === '1') {
+        (window as unknown as { __sessionsInFlight?: number }).__sessionsInFlight =
+          ((window as unknown as { __sessionsInFlight?: number }).__sessionsInFlight ?? 0) + 1;
+        const w = window as unknown as { __sessionsInFlight: number; __sessionsMaxInFlight?: number };
+        w.__sessionsMaxInFlight = Math.max(w.__sessionsMaxInFlight ?? 0, w.__sessionsInFlight);
+        await new Promise((resolve) => window.setTimeout(resolve, 7000));
+        w.__sessionsInFlight -= 1;
+      }
+      return respond(200, { sessions: SHOWCASE_SESSIONS });
+    }
     if (path.endsWith('/events')) {
       const root = parsed.searchParams.get('root') ?? '';
       const rows = harness.events[root] ?? [];

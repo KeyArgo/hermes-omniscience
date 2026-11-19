@@ -123,6 +123,19 @@ describe("viewer restart on open", () => {
   });
 });
 
+describe("viewer problem page", () => {
+  // The hook only runs inside a rendered component here (fake React), so this pins the wiring:
+  // the backend's reason for not starting the viewer reaches the problem text.
+  it("passes the backend's reason for a failed start to the problem page", async () => {
+    const source = await import("node:fs").then(fs =>
+      fs.readFileSync(new URL("../desktop/plugin.js", import.meta.url), "utf8"),
+    );
+    expect(source).toContain("answer.viewer.running === false");
+    expect(source.match(/reason: key\.reason/g)?.length).toBe(2);
+    expect(source).toContain("children: text + why");
+  });
+});
+
 describe("automatic room", () => {
   async function setup({ visible = true, allowed = true, enabled = true, action = true, shell = true } = {}) {
     const effects = [];
@@ -184,7 +197,7 @@ describe("automatic room", () => {
 
 
 describe("sidebar room probes", () => {
-  async function setup({ left = true, right = true, enabled = true, action = true, missing = [] } = {}) {
+  async function setup({ left = true, right = true, enabled = true, action = true, missing = [], overlay = [], expanded = false, lag = 0, pinOnly = [] } = {}) {
     const effects = [];
     const mod = await loadPlugin(effects);
     const { ctx, registered } = fakeCtx();
@@ -192,30 +205,53 @@ describe("sidebar room probes", () => {
     const absent = new Set(missing);
     let frames = [];
     globalThis.requestAnimationFrame = fn => { frames.push(fn); };
-    globalThis.testPage = { getBoundingClientRect: () => ({ width: 1000 - (open.left ? 200 : 0) - (open.right ? 200 : 0) }) };
+    const floats = new Set(overlay);
+    const unread = { count: 0 };
+    let clock = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    // `lag` ms after a toggle the page still has its old width, like a pane animating late.
+    const shownWidth = { left: open.left, right: open.right, at: 0 };
+    const width = () => {
+      const view = clock - shownWidth.at >= lag ? open : shownWidth;
+      return 1000 - ['left', 'right'].reduce((sum, side) => sum + (view[side] && !floats.has(side) ? 200 : 0), 0);
+    };
+    globalThis.testPage = { getBoundingClientRect: () => ({ width: width() }) };
     globalThis.document = { querySelector: selector => {
       if (selector === '[data-contrib-shell]') return { querySelector: () => null };
       const side = selector.includes('codicon-layout-sidebar-left') ? 'left' : 'right';
-      return absent.has(side) ? null : { getAttribute: () => open[side] ? `hide-${side}` : `show-${side}` };
+      if (absent.has(side)) return null;
+      return { getAttribute: name => {
+        if (name === 'aria-expanded') return expanded ? String(open[side]) : null;
+        if (name !== 'aria-label') return null;
+        const hint = side === 'left' && unread.count ? ` · ${unread.count} unread` : '';
+        return (open[side] ? `hide-${side}` : `show-${side}`) + hint;
+      } };
     } };
     ctx.storage = { get: () => enabled, set: vi.fn() };
     ctx.onDispose = fn => { ctx.dispose = fn; };
+    const notReady = { count: 0 };
     if (action) ctx.runAction = vi.fn(id => {
+      if (notReady.count > 0) { notReady.count--; return { ok: false, reason: 'unavailable' }; }
       const side = id === 'view.toggleSidebar' ? 'left' : 'right';
+      // A hover-revealed overlay: the first press only pins it, which nothing on the page shows.
+      if (pinOnly.includes(side)) { pinOnly.splice(pinOnly.indexOf(side), 1); return { ok: true }; }
+      shownWidth.left = open.left; shownWidth.right = open.right; shownWidth.at = clock;
       open[side] = !open[side];
       return { ok: true };
     });
     mod.default.register(ctx);
     const page = registered.find(c => c.area === 'routes').render();
     const mount = () => { effects.length = 0; page.t(); return effects[0](); };
+    // Each frame is 50ms of clock time.
     const flush = async () => {
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 120; i++) {
+        clock += 50;
         const next = frames; frames = [];
         next.forEach(fn => fn());
         await Promise.resolve();
       }
     };
-    return { ctx, open, absent, mount, flush };
+    return { ctx, open, absent, unread, notReady, mount, flush, setClock: v => { clock = v; } };
   }
 
   it("hides open sides sequentially and restores on leave", async () => {
@@ -263,5 +299,79 @@ describe("sidebar room probes", () => {
     duplicate(); cleanup(); s.mount(); await s.flush();
     expect(s.open).toEqual({ left: false, right: false });
     expect(s.ctx.runAction.mock.calls.map(c => c[0])).toEqual(['view.toggleSidebar', 'view.toggleSidebar', 'view.toggleSidebar', 'view.toggleRightSidebar']);
+  });
+
+  it("restores the left side after a new unread count changes its label", async () => {
+    const s = await setup(); const cleanup = s.mount(); await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    s.unread.count = 3;
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
+  });
+
+  it("closes a floating pane only when the host reports it collapsed, and restores it", async () => {
+    const s = await setup({ overlay: ['right'], expanded: true }); const cleanup = s.mount(); await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
+  });
+
+  it("does not keep a floating pane it opened, nor guess without aria-expanded", async () => {
+    for (const options of [{ right: false, overlay: ['right'], expanded: true }, { overlay: ['right'] }]) {
+      const s = await setup(options); const before = s.open.right; const cleanup = s.mount(); await s.flush();
+      expect(s.open.right).toBe(before);
+      cleanup();
+      expect(s.open.right).toBe(before);
+    }
+  });
+
+  it("waits for a pane that starts moving late instead of undoing it", async () => {
+    const s = await setup({ lag: 260 }); const cleanup = s.mount(); await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
+  });
+
+  it("tries once more a second later when the shell is not ready", async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const s = await setup(); s.notReady.count = 1;
+    const cleanup = s.mount();
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    await s.flush();
+    expect(s.open).toEqual({ left: false, right: false });
+    expect(info).toHaveBeenCalled();
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
+    info.mockRestore();
+  });
+
+  it("does not retry after the page was left during the wait", async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const s = await setup(); s.notReady.count = 1;
+    s.mount()();
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    await s.flush();
+    expect(s.open).toEqual({ left: true, right: true });
+    expect(s.ctx.runAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a pane alone when the probe changed nothing it can see", async () => {
+    const s = await setup({ overlay: ['right'], expanded: true, pinOnly: ['right'] }); const cleanup = s.mount(); await s.flush();
+    expect(s.open.right).toBe(true);
+    expect(s.ctx.runAction.mock.calls.filter(c => c[0] === 'view.toggleRightSidebar')).toHaveLength(1);
+    cleanup();
+    expect(s.open.right).toBe(true);
+  });
+
+  it("finishes waiting when animation frames stop (hidden tab)", async () => {
+    const s = await setup();
+    globalThis.requestAnimationFrame = () => {};
+    let t = 0;
+    Date.now.mockImplementation(() => (t += 40));
+    const cleanup = s.mount();
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    expect(s.open).toEqual({ left: false, right: false });
+    cleanup();
+    expect(s.open).toEqual({ left: true, right: true });
   });
 });

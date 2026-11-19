@@ -1,7 +1,9 @@
 # Omniscience interface work in progress
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4de50ec
-> **Revised:** 2026-11-18 · **Body hash:** d1a333e9
+> **Applies to:** Omniscience 1.0.0 · written at commit 0f0dddd
+> **Revised:** 2026-11-18 · **Body hash:** 7ee58f1c
+
+
 
 
 
@@ -147,15 +149,27 @@ current as fixes land; report tests and unresolved issues against the exact comm
     two hours, instead of "Chat quiet", which read like a stalled recorder.
   - The viewer restarts when the page opens: the page now asks the backend for the link before it
     pings the viewer, and the backend starts a stopped viewer (`dashboard/plugin_api.py`).
+  - Huddle fixes (Codex, Gemini, DeepSeek review of 11-18), each with a harness test that fails on
+    the old code: make room compares only the part of the sidebar label before " · " (the host
+    appends the unread count, which skipped the restore) or aria-expanded where the host reports
+    it; a floating right pane is kept hidden only when aria-expanded went true to false; the width
+    check waits for 150 ms of stillness (200 ms minimum, 800 ms cap) so a late animation is not
+    undone; a host that is not ready yet gets one retry a second later, never after leaving.
+  - The chat list request gives up after 30 s so the one-at-a-time poll cannot freeze; the list
+    itself is cached in the viewer until the database changes (51 s to 0.1 s with three tabs).
+  - User guide: Make room and the Last step badge.
+  - Open owner choices: 90 % or 100 % default; Simple or Everything as the web start; auto-expand a
+    minimized card on a new failure; header height; Filters inside Workspace at narrow widths;
+    whether to restore a side the user closed again by hand while on the page.
 
 ## Verification and release
 
 - The first-run tour dismissal is saved by the authenticated viewer so it can survive an opaque
   Hermes frame reload; Help includes optional subject lessons. The compact header now applies up
   to 1750 px to leave more vertical room. These changes need verification in the real Desktop.
-- Hermes does not currently expose a supported temporary host layout override for plugins. Automatic
-  Focus on entry and restoration on exit requires a scoped host SDK API that preserves user edits;
-  do not mutate host-owned layout storage. Until then the user chooses Focus in Hermes.
+- Make room uses only the host's public plugin actions (`ctx.runAction`, Hermes v0.23.2+) to hide
+  and restore the status bar and sidebars; it never writes host-owned layout storage. It still needs
+  checking in the real Desktop on Linux and Windows.
 
 - Run meaningful browser interaction checks in an actual opaque-origin frame, plus frontend and
   Python checks appropriate to the changes. Verify built `viewer_app/static` matches web source.

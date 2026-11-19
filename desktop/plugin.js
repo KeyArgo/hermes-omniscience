@@ -126,31 +126,70 @@ function statusbarVisible() {
   return shell ? Boolean(shell.querySelector('[data-slot="statusbar"]')) : null
 }
 
-function sidebarLabel(side) {
+function sidebarButton(side) {
   // The host emits no tool id. The right tool has a tour marker; the left tool
   // is the sidebar glyph in the fixed left cluster.
   const selector = side === 'left'
     ? '[data-titlebar-cluster="left"] button:has(.codicon-layout-sidebar-left)'
     : 'button[data-tour="right-pane-toggle"]'
-  return document.querySelector(selector)?.getAttribute('aria-label') || null
+  return document.querySelector(selector)
 }
 
-function afterHostCommit() {
-  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+// Whether a side reads as open, in a form that only changes when the side does. The browser-hosted
+// shell reports aria-expanded; otherwise the label says Show or Hide, but the host appends the
+// unread count (" · 3 unread") to whichever button sits on the chats side, so only the part before
+// it is compared. Comparing the whole label skipped the restore whenever a chat got a new message.
+function sidebarState(side) {
+  const button = sidebarButton(side)
+  if (!button) return null
+  const expanded = button.getAttribute('aria-expanded')
+  if (expanded === 'true' || expanded === 'false') return 'expanded:' + expanded
+  const label = button.getAttribute('aria-label')
+  return label ? label.split(' · ')[0] : null
 }
 
-// Wait for the host to commit, then until the page width holds still for a frame (at most half a
-// second), so a slow machine or an animated pane is not mistaken for "nothing moved".
+// A hidden tab stops animation frames; the timer keeps a wait from hanging until it is shown again.
+function nextFrame() {
+  return new Promise(resolve => {
+    requestAnimationFrame(resolve)
+    setTimeout(resolve, 100)
+  })
+}
+
+async function afterHostCommit() {
+  await nextFrame()
+  await nextFrame()
+}
+
+// Wait for the host to commit, then until the page width has held still for 150ms, never less
+// than 200ms in all and at most 800ms, so a slow machine or a pane whose animation starts late is
+// not mistaken for "nothing moved".
 async function settled(element) {
   await afterHostCommit()
-  const end = Date.now() + 500
+  const start = Date.now()
+  let stableSince = start
   let last = element?.getBoundingClientRect().width
-  while (Date.now() < end) {
-    await new Promise(resolve => requestAnimationFrame(resolve))
+  while (Date.now() - start < 800) {
+    await nextFrame()
     const width = element?.getBoundingClientRect().width
-    if (width === last) return
-    last = width
+    const now = Date.now()
+    if (width !== last) {
+      last = width
+      stableSince = now
+    } else if (now - start >= 200 && now - stableSince >= 150) {
+      return
+    }
   }
+}
+
+// Run a host action now. When the shell is not mounted yet (early startup), try once more a second
+// later while the page is still open. Returns true or false at once, or a promise of it on a retry.
+function runWhenReady(ctx, action, stillOpen) {
+  const first = ctx.runAction(action)
+  if (first?.reason !== 'unavailable') return first?.ok === true
+  console.info(`[omniscience] ${action} is not ready yet; trying once more in a second`)
+  return new Promise(resolve => setTimeout(resolve, 1000))
+    .then(() => stillOpen() && ctx.runAction(action)?.ok === true)
 }
 
 function makeRoom(ctx, page) {
@@ -162,15 +201,16 @@ function makeRoom(ctx, page) {
     roomAfterClosing = () => { if (!cancelled) nextCleanup = makeRoom(ctx, page) }
     return () => { cancelled = true; nextCleanup?.() }
   }
-  const hidden = statusbarVisible() === true && ctx.runAction('view.toggleStatusbar')?.ok === true
   const sides = []
   let active = true
+  const status = statusbarVisible() === true ? runWhenReady(ctx, 'view.toggleStatusbar', () => active) : false
+  let hidden = status === true
   let pending = true
   // Put back what this page hid even if the preference was switched off meanwhile; the preference
   // only decides whether to make room on the way in.
   const restoreSides = () => {
-    for (const { side, action, label } of sides.splice(0)) {
-      if (sidebarLabel(side) === label) ctx.runAction(action)
+    for (const { side, action, state } of sides.splice(0)) {
+      if (sidebarState(side) === state) ctx.runAction(action)
     }
   }
   const cleanup = () => {
@@ -183,20 +223,29 @@ function makeRoom(ctx, page) {
   }
   roomCleanup = cleanup
   ;(async () => {
+    if (status instanceof Promise) hidden = await status
     for (const [side, action] of [['left', 'view.toggleSidebar'], ['right', 'view.toggleRightSidebar']]) {
       if (!active || !roomWanted(ctx)) break
       const element = page.current
-      const beforeLabel = sidebarLabel(side)
+      const beforeState = sidebarState(side)
       const before = element?.getBoundingClientRect().width
-      if (!beforeLabel || !Number.isFinite(before) || before <= 0) continue
-      if (ctx.runAction(action)?.ok !== true) continue
+      if (!beforeState || !Number.isFinite(before) || before <= 0) continue
+      const ran = runWhenReady(ctx, action, () => active)
+      if (!(ran instanceof Promise ? await ran : ran)) continue
       await settled(element)
       const after = element.getBoundingClientRect().width
-      const label = sidebarLabel(side)
-      if (Number.isFinite(after) && after - before >= 40 && label && label !== beforeLabel) {
-        sides.push({ side, action, label })
-      } else {
-        // Revert a probe that opened a side or could not be identified safely.
+      const state = sidebarState(side)
+      // A docked side gives its width back to the page. A side that floats over the page (overlay
+      // panes) gives none, so there only the host's own aria-expanded going from true to false
+      // counts; a label change alone cannot tell closing an overlay from opening one.
+      const grew = Number.isFinite(after) && after - before >= 40
+      const closed = beforeState === 'expanded:true' && state === 'expanded:false'
+      if (state && state !== beforeState && (grew || closed)) {
+        sides.push({ side, action, state })
+      } else if (state !== beforeState) {
+        // Revert a probe that opened a side or could not be identified safely. A probe that changed
+        // nothing the page can see (pinning an overlay that was already showing) is left alone:
+        // reverting that one would hide the pane without recording it for restoration.
         ctx.runAction(action)
         await afterHostCommit()
       }
@@ -236,12 +285,16 @@ function useViewerKey() {
       // Ask for the link first: the backend restarts a stopped viewer before it answers, so a viewer
       // that went down with a short-lived Hermes process comes back when this page opens or retries.
       let token = null
+      let reason = null
       if (CTX?.rest) {
-        token = await Promise.resolve(CTX.rest('/viewer')).then(r => (r && r.token) || null).catch(() => null)
+        const answer = await Promise.resolve(CTX.rest('/viewer')).catch(() => null)
+        token = (answer && answer.token) || null
+        // Why the backend could not start it ("port in use by another Omniscience viewer", …).
+        if (answer?.viewer && answer.viewer.running === false) reason = answer.viewer.reason || null
       }
       const up = await viewerReachable()
       if (token) viewerToken = token
-      if (alive) setState(prev => ({ ...prev, ready: true, token, up }))
+      if (alive) setState(prev => ({ ...prev, ready: true, token, up, reason }))
     })()
     return () => {
       alive = false
@@ -251,14 +304,15 @@ function useViewerKey() {
   return { ...state, retry }
 }
 
-function ViewerProblem({ up, retry }) {
+function ViewerProblem({ up, retry, reason }) {
   const text = up
     ? 'Omniscience could not get the viewer key. Restart the viewer, then retry.'
     : 'The Omniscience viewer is not running and could not be started. Retry; if it stays down, see viewer.log in the Omniscience data folder.'
+  const why = reason ? ` (${reason})` : ''
   return jsx('div', {
     style: { padding: 24, maxWidth: 560, lineHeight: 1.5 },
     children: [
-      jsx('p', { key: 't', style: { marginBottom: 12 }, children: text }),
+      jsx('p', { key: 't', style: { marginBottom: 12 }, children: text + why }),
       jsx('button', { key: 'b', onClick: retry, style: { padding: '6px 14px', cursor: 'pointer' }, children: 'Retry' }),
     ],
   })
@@ -292,7 +346,7 @@ function OmnisciencePage() {
     // posture (an opaque origin, no bridge, no access to the app's storage). The page is built
     // for that — it authenticates every call with its own key and asks for nothing else.
     children: !key.ready ? jsx('div', { style: { padding: 16, opacity: 0.6 }, children: 'Opening Omniscience…' })
-      : !src ? jsx(ViewerProblem, { up: key.up, retry: key.retry })
+      : !src ? jsx(ViewerProblem, { up: key.up, retry: key.retry, reason: key.reason })
       : jsx(SandboxedFrame, {
       src,
       title: 'Omniscience viewer',
@@ -317,7 +371,7 @@ function LivePane() {
   const key = useViewerKey()
   const session = useFocusedChat()
   if (!key.ready) return jsx('div', { style: { padding: 12, opacity: 0.6 }, children: 'Opening…' })
-  if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry: key.retry })
+  if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry: key.retry, reason: key.reason })
   // The two actions are drawn by the pane itself and call Hermes directly: messages from the
   // embedded page to its parent do not reliably reach a docked pane.
   const btn = { flex: 1, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 6,
