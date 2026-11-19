@@ -2436,9 +2436,11 @@ table.kv.friendly td {
 .live-dot.is-faint { opacity: 0.55; }
 .session-item.is-recent .session-title { color: var(--text); }
 
-/* The build chip: version and commit, read from the running viewer. It sits beside the product
-   name in the brand at every width, and looks and acts like the other plugins' chips (Aura): a
-   mono pill that copies its own line and reports the copy inside itself. */
+/* The build chip: version and commit, read from the running viewer. At wide widths it sits
+   beside the product name (a sibling of the brand in the top bar row); under 460px the premium
+   pass moves it onto its own row below the seal, Chats and the mode switch. It looks and acts
+   like the other plugins' chips (Aura): a mono pill that copies its own line and reports the
+   copy inside itself. */
 .version-chip {
   font-family: var(--mono);
   font-size: 10.5px;

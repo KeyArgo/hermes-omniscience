@@ -390,6 +390,9 @@ export function versionChipTitle(build: BuildInfo): string {
 /** What the chip says after a click: nothing until one, then the truth for 1.4 s. */
 export type ChipCopyState = '' | 'copied' | 'failed';
 
+/** The slot copyChipLine keeps its one 1.4 s reset timer in (a useRef in the chip). */
+export type ChipTimer = { current: ReturnType<typeof setTimeout> | undefined };
+
 export function chipLabel(line: string, copyState: ChipCopyState): string {
   if (copyState === 'copied') return 'copied ✓';
   if (copyState === 'failed') return 'copy failed';
@@ -443,11 +446,19 @@ export async function copyChipLine(
   line: string,
   setCopyState: (state: ChipCopyState) => void,
   onCopied?: (line: string) => void,
+  timer?: ChipTimer,
 ): Promise<void> {
   const ok = await copyText(`Omniscience ${line}`);
   setCopyState(ok ? 'copied' : 'failed');
   if (ok && onCopied) onCopied(line);
-  setTimeout(() => setCopyState(''), 1400);
+  // One timer, kept in the caller's ref: a second click restarts the 1.4 s instead of letting the
+  // first click's timer revert the label early, and unmount can cancel a reset with no chip left.
+  if (timer) {
+    if (timer.current !== undefined) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopyState(''), 1400);
+  } else {
+    setTimeout(() => setCopyState(''), 1400);
+  }
 }
 
 /** The build chip, styled and behaving like the other Hermes plugins' chips (Aura): a mono pill
@@ -461,6 +472,11 @@ export function VersionChip({
   onCopy: (line: string) => void;
 }) {
   const [copyState, setCopyState] = useState<ChipCopyState>('');
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // A reset that fires after the chip is gone would set state on an unmounted component.
+  useEffect(() => () => {
+    if (resetTimer.current !== undefined) clearTimeout(resetTimer.current);
+  }, []);
   if (!build) return null;
   const line = versionChipText(build);
   return (
@@ -469,7 +485,7 @@ export function VersionChip({
       className={chipClasses(build, copyState)}
       title={versionChipTitle(build)}
       onClick={() => {
-        void copyChipLine(line, setCopyState, onCopy);
+        void copyChipLine(line, setCopyState, onCopy, resetTimer);
       }}
     >
       {chipLabel(line, copyState)}
@@ -477,9 +493,12 @@ export function VersionChip({
   );
 }
 
-/** The header's brand: seal, product name, tagline, mode, and the version chip. The chip sits
- *  beside the product name at EVERY width — the compact header hides the tagline, never the
- *  build. This is the one obvious place the running version appears. */
+/** The header's brand: seal, product name, tagline, mode, and the version chip. The chip renders
+ *  as the brand's sibling inside `.topbar-main` so it can share the brand's line at wide widths
+ *  (right beside the product name) and break to its own row on phones, where `.brand` is pinned
+ *  to one nowrap line with the Chats button and mode switch. The chip sits beside the product
+ *  name at EVERY width — the compact header hides the tagline, never the build. This is the one
+ *  obvious place the running version appears. */
 export function HeaderBrand({
   build,
   followNewest,
@@ -494,17 +513,19 @@ export function HeaderBrand({
   onCopyVersion: (line: string) => void;
 }) {
   return (
-    <div className="brand">
-      <span className="brand-mark">
-        <Seal size={52} />
-      </span>
-      <span className="brand-name">OMNISCIENCE</span>
-      <span className="brand-sub">Every run, made legible</span>
-      <span className={`brand-status${followNewest ? ' is-following' : ''}`} title={modeBlurb}>
-        · {modeLabel}
-      </span>
+    <>
+      <div className="brand">
+        <span className="brand-mark">
+          <Seal size={52} />
+        </span>
+        <span className="brand-name">OMNISCIENCE</span>
+        <span className="brand-sub">Every run, made legible</span>
+        <span className={`brand-status${followNewest ? ' is-following' : ''}`} title={modeBlurb}>
+          · {modeLabel}
+        </span>
+      </div>
       <VersionChip build={build} onCopy={onCopyVersion} />
-    </div>
+    </>
   );
 }
 

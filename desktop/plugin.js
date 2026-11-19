@@ -174,13 +174,18 @@ function buildTitle(build) {
 function VersionChip() {
   const [build, setBuild] = useState(null)
   const [copyState, setCopyState] = useState('')   // '' | 'copied' | 'failed'
+  const resetTimer = useRef(null)                  // the one 1.4 s reset, restartable per click
   useEffect(() => {
     if (!CTX?.rest) return undefined
     let alive = true
     Promise.resolve(CTX.rest('/version', { timeoutMs: 4000 }))
       .then(info => { if (alive && info && info.version) setBuild(info) })
       .catch(() => {})            // no guess beats a wrong number
-    return () => { alive = false }
+    return () => {
+      alive = false
+      // A reset with no chip left to reset would set state on an unmounted component.
+      if (resetTimer.current) clearTimeout(resetTimer.current)
+    }
   }, [])
   const line = build ? buildLine(build) : ''
   if (!line) return null
@@ -191,7 +196,10 @@ function VersionChip() {
       // Say "copied" only when something was copied: a badge that lies is worse than no badge.
       const ok = await copyText('Omniscience ' + line)
       setCopyState(ok ? 'copied' : 'failed')
-      setTimeout(() => setCopyState(''), 1400)
+      // One timer: a second click restarts the 1.4 s instead of the first click's timer
+      // reverting the label early.
+      if (resetTimer.current) clearTimeout(resetTimer.current)
+      resetTimer.current = setTimeout(() => setCopyState(''), 1400)
     },
     style: {
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',

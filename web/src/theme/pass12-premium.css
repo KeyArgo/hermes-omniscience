@@ -2540,7 +2540,8 @@ button.ctx-strip-cost:hover {
   }
 
   .topbar-main {
-    flex-wrap: nowrap;
+    /* The chip needs a second row of its own (below), so the row must be allowed to wrap. */
+    flex-wrap: wrap;
     gap: 6px;
   }
 
@@ -2585,6 +2586,15 @@ button.ctx-strip-cost:hover {
     min-height: 44px;
     padding: 0 7px;
     font-size: 18px;
+  }
+
+  /* The chip never shares the phone row with the seal, Chats and the mode switch: it takes a row
+     of its own below them (full width, left aligned) instead of hiding under their buttons. */
+  .version-chip {
+    order: 1;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    text-align: left;
   }
 }
 

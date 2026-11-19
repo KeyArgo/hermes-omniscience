@@ -637,6 +637,31 @@ describe("the settings version chip", () => {
     }
   });
 
+  it("keeps saying copied ✓ for 1.4 s after the last of two clicks 1 s apart", async () => {
+    const s = await chipSetup();
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // One chip node, clicked twice: both clicks share the component's one timer ref.
+    const chip = s.chip(s.renderTree());
+    vi.stubGlobal("navigator", { clipboard: { writeText: async () => {} } });
+    vi.useFakeTimers();
+    try {
+      await chip.p.onClick();
+      expect(s.chipText(s.chip(s.renderTree()))).toBe("copied ✓");
+      vi.advanceTimersByTime(1000);
+      await chip.p.onClick();
+      // 1400 ms after the FIRST click: its timer was cleared, so the label never reverted.
+      vi.advanceTimersByTime(400);
+      expect(s.chipText(s.chip(s.renderTree()))).toBe("copied ✓");
+      // Now the second click's own 1.4 s runs out and the line comes back.
+      vi.advanceTimersByTime(1000);
+      expect(s.chipText(s.chip(s.renderTree()))).toBe("v1.2.3-dev.9 · abc12345 · 2026-11-10");
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("builds its own line in the suite order when the backend has no chip_line", async () => {
     const s = await chipSetup({ ...BUILD, chip_line: undefined, dirty: true });
     s.effects.forEach(fn => fn());

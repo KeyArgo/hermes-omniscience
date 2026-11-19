@@ -108,6 +108,28 @@ describe('VersionChip', () => {
     }
   });
 
+  it('restarts the 1.4 s on a second click: still copied ✓ 1400 ms after the first click', async () => {
+    vi.useFakeTimers();
+    try {
+      const states: ChipCopyState[] = [];
+      const writeText = vi.fn(async () => {});
+      vi.stubGlobal('navigator', { clipboard: { writeText } });
+      const timer = { current: undefined as ReturnType<typeof setTimeout> | undefined };
+      await copyChipLine('v1 · a · b', (s) => states.push(s), undefined, timer);
+      vi.advanceTimersByTime(1000);
+      await copyChipLine('v1 · a · b', (s) => states.push(s), undefined, timer);
+      // 1400 ms after the FIRST click: its timer was cleared by the second, so nothing reverted.
+      vi.advanceTimersByTime(400);
+      expect(states).toEqual(['copied', 'copied']);
+      // Now the second click's own 1.4 s runs out and the label returns to the line.
+      vi.advanceTimersByTime(1000);
+      expect(states).toEqual(['copied', 'copied', '']);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('says copy failed when the clipboard refuses', async () => {
     vi.useFakeTimers();
     try {

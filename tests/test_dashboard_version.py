@@ -7,6 +7,7 @@ without needing a viewer process, a database, or the web app.
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -66,3 +67,35 @@ def test_dashboard_version_keeps_the_suite_order(tmp_path, monkeypatch):
         assert parts[-2] == str(data["commit_date"])[:10]
     else:
         assert tail == str(data["commit_date"])[:10]
+
+
+def test_dashboard_version_reports_the_build_info_it_was_handed(tmp_path, monkeypatch):
+    """A BUILD_INFO.json the test wrote must come back verbatim, not the module's own truth.
+
+    The two tests above quote the same version_stamp the route loaded, so they cannot see a
+    route that drops or rewrites a field. Here the expected values are written down first and
+    the stamp is pointed at a BUILD_INFO.json in the temp dir (its _HERE, where
+    _find_build_info looks first) so real files are never touched."""
+    module = _load_plugin_api(monkeypatch, tmp_path)
+    stamp = module._version_stamp()
+    build_info = {
+        "version": "1.0.0-dev.99",
+        "commit": "abcdef1234567890",
+        "commit_date": "2026-01-02",
+        "dirty": False,
+        "channel": "dev",
+    }
+    (tmp_path / "BUILD_INFO.json").write_text(json.dumps(build_info), encoding="utf-8")
+    monkeypatch.setattr(stamp, "_HERE", tmp_path)
+    client = _make_app(module)
+
+    resp = client.get("/api/plugins/omniscience/version")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["version"] == "1.0.0-dev.99"
+    assert data["commit"] == "abcdef1234567890"
+    assert data["commit_short"] == "abcdef12"
+    assert data["commit_date"] == "2026-01-02"
+    assert data["dirty"] is False
+    assert data["channel"] == "dev"
+    assert data["chip_line"] == "v1.0.0-dev.99 · abcdef12 · 2026-01-02"
