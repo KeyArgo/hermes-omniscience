@@ -372,13 +372,26 @@ def _sessions_signature(path: str) -> tuple | None:
         newest, count = con.execute("SELECT MAX(rowid), COUNT(*) FROM events").fetchone()
         try:
             purged = con.execute("SELECT COUNT(*), MAX(rowid) FROM purged").fetchone()
-        except sqlite3.Error:
+        except sqlite3.OperationalError as exc:
+            if _is_locked(exc):
+                raise
             purged = (0, None)
         return (newest, count, purged, _file_stamp(path), _file_stamp(path + "-wal"))
+    except sqlite3.OperationalError as exc:
+        # A writer holding the lock already cost one busy wait; the caller reports it rather than
+        # waiting again for the full read, so a locked recording still fails fast.
+        if _is_locked(exc):
+            raise
+        return None
     except sqlite3.Error:
         return None
     finally:
         con.close()
+
+
+def _is_locked(exc: sqlite3.Error) -> bool:
+    text = str(exc).lower()
+    return "locked" in text or "busy" in text
 
 
 def list_sessions_checked(path: str, limit: int = 100) -> tuple[list[dict], str | None]:
@@ -388,7 +401,10 @@ def list_sessions_checked(path: str, limit: int = 100) -> tuple[list[dict], str 
     """
     if not os.path.exists(path):
         return [], None
-    signature = _sessions_signature(path)
+    try:
+        signature = _sessions_signature(path)
+    except sqlite3.OperationalError as exc:
+        return [], str(exc)
     key = (os.path.realpath(path), limit)
     if signature is not None:
         with _SESSIONS_LOCK:
