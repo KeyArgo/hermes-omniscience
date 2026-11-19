@@ -251,6 +251,7 @@ def test_stop_viewer_signals_the_viewer_and_waits_for_it_to_go(tmp_path, monkeyp
     with open(launcher.pid_path(str(tmp_path)), "w", encoding="utf-8") as fh:
         fh.write(str(pid))
     monkeypatch.setattr(launcher, "_pid_cmdline", lambda p: f"/usr/bin/python3 -m omniscience_viewer --db x")
+    monkeypatch.setattr(launcher.sys, "platform", "linux")  # the POSIX path; Windows has its own test
     signalled = []
     monkeypatch.setattr(launcher.os, "kill", lambda p, sig: signalled.append((p, sig)))
     # Alive when checked, then gone on the first wait: the viewer got the signal and exited.
@@ -278,3 +279,53 @@ def test_stop_viewer_clears_a_pid_the_viewer_left_behind(tmp_path, monkeypatch):
     assert signalled == []
     assert result["stopped"] is False and result["reason"] == "not running"
     assert not os.path.exists(launcher.pid_path(str(tmp_path)))
+
+
+def test_stop_viewer_on_windows_force_stops_the_verified_viewer(tmp_path, monkeypatch):
+    """A background viewer has no window, so a plain taskkill (a polite close) never stops it."""
+    from omniscience import viewer_launcher as launcher
+
+    with open(launcher.pid_path(str(tmp_path)), "w", encoding="utf-8") as fh:
+        fh.write("4242")
+    monkeypatch.setattr(launcher.sys, "platform", "win32")
+    monkeypatch.setattr(launcher, "_pid_cmdline", lambda p: "python.exe -m omniscience_viewer --db x")
+    ran = []
+    monkeypatch.setattr(launcher.subprocess, "run", lambda args, **kw: ran.append(args))
+    checks = iter([True, False])
+    monkeypatch.setattr(launcher, "_pid_running", lambda p: next(checks, False))
+
+    assert launcher.stop_viewer(str(tmp_path)) == {"stopped": True, "reason": "stopped"}
+    assert ran == [["taskkill", "/F", "/T", "/PID", "4242"]]
+
+
+def test_windows_cmdline_falls_back_when_one_tool_is_missing(monkeypatch):
+    """wmic is missing on current Windows; PowerShell answers. Either missing must not mean a kill."""
+    from omniscience import viewer_launcher as launcher
+
+    monkeypatch.setattr(launcher.sys, "platform", "win32")
+
+    class Done:
+        def __init__(self, out, code=0):
+            self.stdout, self.returncode = out, code
+
+    def only_wmic(args, **kw):
+        if args[0] == "powershell":
+            raise FileNotFoundError("powershell")
+        return Done("CommandLine\npython.exe -m omniscience_viewer\n")
+
+    monkeypatch.setattr(launcher.subprocess, "run", only_wmic)
+    assert launcher._pid_cmdline(4242) == "python.exe -m omniscience_viewer"
+
+    def only_powershell(args, **kw):
+        if args[0] == "wmic":
+            raise FileNotFoundError("wmic")
+        return Done("python.exe -m omniscience_viewer\n")
+
+    monkeypatch.setattr(launcher.subprocess, "run", only_powershell)
+    assert launcher._pid_cmdline(4242) == "python.exe -m omniscience_viewer"
+
+    def neither(args, **kw):
+        raise FileNotFoundError(args[0])
+
+    monkeypatch.setattr(launcher.subprocess, "run", neither)
+    assert launcher._pid_cmdline(4242) is None

@@ -132,19 +132,25 @@ def _pid_cmdline(pid: int) -> str | None:
     if pid <= 0:
         return None
     if sys.platform == "win32":
-        # No /proc and no portable cmdline call. wmic answers where it exists; where it does not,
-        # None means "cannot check", which stop_viewer treats as a refusal, never as a kill.
-        try:
-            proc = subprocess.run(
-                ["wmic", "process", "where", f"processid={pid}", "get", "commandline"],
-                capture_output=True,
-                text=True,
-                timeout=3,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-        return lines[1] if len(lines) > 1 else None
+        # No /proc. PowerShell's CIM query answers on every supported Windows (wmic is gone from
+        # Windows 11 24H2 and the CI images); wmic stays as a fallback for older machines. None
+        # means "cannot check", which stop_viewer treats as a refusal, never as a kill.
+        queries = (
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine"],
+            ["wmic", "process", "where", f"processid={pid}", "get", "commandline"],
+        )
+        for query in queries:
+            try:
+                proc = subprocess.run(query, capture_output=True, text=True, timeout=10)
+            except (OSError, subprocess.SubprocessError):
+                continue
+            lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+            if query[0] == "wmic":
+                lines = lines[1:]  # its first line is the column header
+            if proc.returncode == 0 and lines:
+                return lines[0]
+        return None
     try:
         raw = Path(f"/proc/{pid}/cmdline").read_bytes()
     except OSError:
@@ -189,7 +195,7 @@ def stop_viewer(log_dir: str) -> dict:
 
     The pid comes from ``viewer.pid``; the process it names is signalled only when its command
     line still contains ``omniscience_viewer``. On Windows stopping is refused unless the command
-    line can be read (``wmic``), because killing by pid without that check is how the wrong
+    line can be read (PowerShell, or ``wmic`` where it still exists), because killing by pid without that check is how the wrong
     process gets killed.
 
     Returns ``{"stopped": bool, "reason": str}``.
@@ -226,7 +232,7 @@ def stop_viewer(log_dir: str) -> dict:
     if sys.platform == "win32":
         try:
             subprocess.run(
-                ["taskkill", "/PID", str(pid), "/T"],
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
                 capture_output=True,
                 timeout=5,
             )
