@@ -28,10 +28,17 @@ async function loadPlugin(effects = [], reactMock = null) {
     useState: v => [v, () => {}],
   });
   // No hermesDesktop on purpose: touching it is the failure this harness is looking for.
+  // The window records its listeners so a test can check that none is left behind.
+  const listeners = new Map();
   globalThis.window = {
     location: { search: "", hash: "" },
     localStorage: { getItem: () => null, setItem: () => {} },
-    addEventListener: () => {},
+    addEventListener: (name, fn) => {
+      if (!listeners.has(name)) listeners.set(name, new Set());
+      listeners.get(name).add(fn);
+    },
+    removeEventListener: (name, fn) => { listeners.get(name)?.delete(fn); },
+    __listeners: listeners,
   };
   return import("../desktop/plugin.js");
 }
@@ -92,15 +99,51 @@ describe("desktop plugin wiring", () => {
     expect(odd.searchParams.get("view")).toBeNull();
   });
 
-  it("answers an open-web request only from the viewer, and says when it cannot open", async () => {
+  it("answers an open-web request only from the viewer's own frame, and says when it cannot open", async () => {
     const mod = await loadPlugin();
     const replies = [];
     const source = { postMessage: m => replies.push(m) };
+    const unregister = mod.registerViewerRecovery({ recovery: { request: () => {} }, frameWindow: () => source });
     mod.handleViewerMessage({ origin: "https://evil.example", source, data: { type: "omniscience:open-web", requestId: "r0" } });
     expect(replies).toEqual([]);
     // No ctx registered and no key yet: an honest "no".
     mod.handleViewerMessage({ origin: "null", source, data: { type: "omniscience:open-web", requestId: "r1" } });
     expect(replies).toEqual([{ type: "omniscience:open-web-result", requestId: "r1", ok: false }]);
+    unregister();
+  });
+
+  it("ignores a message from any window but the embedded viewer frame", async () => {
+    const mod = await loadPlugin();
+    const { ctx, registered } = fakeCtx();
+    mod.default.register(ctx);
+    const own = { postMessage: vi.fn() };
+    const stranger = { postMessage: vi.fn() };
+    mod.registerViewerRecovery({ recovery: { request: vi.fn() }, frameWindow: () => own });
+
+    // Right origin, wrong window: every sandboxed guest reports the opaque "null", so the
+    // source window is the only thing that says who sent this.
+    mod.handleViewerMessage({ origin: "null", source: stranger, data: { type: "omniscience:open-web", requestId: "r1" } });
+    expect(stranger.postMessage).not.toHaveBeenCalled();
+
+    // Another plugin's frame is not ours either, even when the message names our types.
+    const before = registered.length;
+    mod.handleViewerMessage({ origin: "null", source: { other: true }, data: { type: "omniscience:toggle-pane" } });
+    expect(registered.length).toBe(before);
+  });
+
+  it("removes its message listener when the plugin is disposed", async () => {
+    const effects = [];
+    const mod = await loadPlugin(effects);
+    const { ctx, registered } = fakeCtx();
+    ctx.onDispose = fn => { ctx.dispose = fn; };
+    mod.default.register(ctx);
+    const page = registered.find(c => c.area === "routes").render();
+    page.t();
+    effects.forEach(fn => fn());
+    expect(globalThis.window.__listeners.get("message")?.size).toBe(1);
+
+    ctx.dispose();
+    expect(globalThis.window.__listeners.get("message")?.size ?? 0).toBe(0);
   });
 });
 

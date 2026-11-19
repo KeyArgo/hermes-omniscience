@@ -38,7 +38,8 @@ const VIEWER_ORIGINS = new Set([VIEWER_URL, 'null'])
 const SESSION_RE = /^[A-Za-z0-9_.:-]{1,200}$/
 const VIEW_RE = /^[a-z]{1,24}$/
 let viewerToken = null
-let externalListener = null
+let messageListener = null
+let listenerMounts = 0
 
 // The recoveries of the frames currently on screen (full page and docked pane). A frame reports
 // "omniscience:viewer-unreachable" when its requests fail; the report goes to the recovery of the
@@ -56,9 +57,22 @@ export function browserLinkFor(data, token) {
   return viewerSrc(session, token, view ? { host: 'web', view } : { host: 'web' })
 }
 
+// Every sandboxed guest reports the same opaque origin "null", so origin alone cannot say who
+// sent a message. Only the contentWindow of a frame we embedded may speak for the viewer.
+function viewerFrameWindows() {
+  const windows = []
+  for (const entry of viewerRecoveries) {
+    const win = entry.frameWindow?.()
+    if (win) windows.push(win)
+  }
+  return windows
+}
+
 export function handleViewerMessage(event) {
   const data = event.data
   if (!VIEWER_ORIGINS.has(event.origin) || !data || typeof data !== 'object') return
+  const source = event.source
+  if (!source || !viewerFrameWindows().includes(source)) return
   if (data.type === 'omniscience:open-full') {
     const session = typeof data.session === 'string' ? data.session : null
     host.navigate(session ? `/omniscience?session=${encodeURIComponent(session)}` : '/omniscience')
@@ -71,11 +85,9 @@ export function handleViewerMessage(event) {
   if (data.type === 'omniscience:viewer-unreachable') {
     // The embedded page cannot reach the viewer (it stopped under the open frame). Ask the
     // backend to start it again — throttled inside the recovery, so a page polling every few
-    // seconds cannot start a storm. Only our own frame counts: every sandboxed guest reports
-    // the opaque origin "null", so the source window is compared with the iframe we embedded.
+    // seconds cannot start a storm.
     for (const entry of viewerRecoveries) {
-      const own = entry.frameWindow?.()
-      if (own && event.source && event.source !== own) continue
+      if (entry.frameWindow?.() !== source) continue
       entry.recovery.request()
     }
     return
@@ -100,10 +112,28 @@ export function handleViewerMessage(event) {
     .then(ok => reply(ok !== false), () => reply(false))
 }
 
+// One message listener for every mounted frame; the last one to leave removes it again, and
+// disposing the plugin removes it outright. A stale listener outlives the page it served.
 function listenForOpenExternal() {
-  if (externalListener) return
-  externalListener = handleViewerMessage
-  window.addEventListener('message', externalListener)
+  listenerMounts += 1
+  if (!messageListener) {
+    messageListener = handleViewerMessage
+    window.addEventListener('message', messageListener)
+  }
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    listenerMounts = Math.max(0, listenerMounts - 1)
+    if (listenerMounts === 0) stopListeningForOpenExternal()
+  }
+}
+
+function stopListeningForOpenExternal() {
+  listenerMounts = 0
+  if (!messageListener) return
+  window.removeEventListener('message', messageListener)
+  messageListener = null
 }
 
 let CTX = null
@@ -686,7 +716,6 @@ function viewerSrc(session, token, extra) {
 }
 
 function OmnisciencePage() {
-  listenForOpenExternal()
   const page = useRef(null)
   useEffect(() => makeRoom(CTX, page), [])
   const key = useViewerKey()
@@ -701,6 +730,8 @@ function OmnisciencePage() {
     frameWindow: () => page.current?.querySelector?.('iframe')?.contentWindow || null,
   }), [])
   useEffect(() => watchViewerHealth(page.current, undefined, { onDown: () => recovery.request() }), [])
+  // The frame's messages are heard while this page is on screen, and not after it leaves.
+  useEffect(() => listenForOpenExternal(), [])
   // Default to the chat the user was in when they opened Omniscience.
   const session = linkedSession() || focusedChat()
   const src = key.ready && key.up && key.token ? viewerSrc(session, key.token, HOST_MARKER) : null
@@ -735,7 +766,6 @@ function useFocusedChat() {
 }
 
 function LivePane() {
-  listenForOpenExternal()
   const pane = useRef(null)
   const key = useViewerKey()
   const recovery = useMemo(() => createViewerRecovery({ onState: key.applyRecovery }), [])
@@ -746,6 +776,8 @@ function LivePane() {
     frameWindow: () => pane.current?.querySelector?.('iframe')?.contentWindow || null,
   }), [])
   useEffect(() => watchViewerHealth(pane.current, undefined, { onDown: () => recovery.request() }), [])
+  // The pane's frame reports with a new message listener per mount; the last unmount removes it.
+  useEffect(() => listenForOpenExternal(), [])
   const session = useFocusedChat()
   if (!key.ready) return jsx('div', { style: { padding: 12, opacity: 0.6 }, children: 'Opening…' })
   if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry, reason: key.reason })
@@ -838,6 +870,7 @@ export default {
   register(ctx) {
     CTX = ctx
     ctx.onDispose?.(() => {
+      stopListeningForOpenExternal()
       roomAfterClosing = null
       roomCleanup?.()
       const dispose = paneDisposer

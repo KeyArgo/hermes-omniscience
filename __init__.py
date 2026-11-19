@@ -90,11 +90,12 @@ def _make_callback(hook_name):
 
 
 def _state_db_path() -> str:
-    profile_home = Path(__file__).resolve().parents[2]
-    candidate = profile_home / "state.db"
-    if candidate.is_file():
-        return str(candidate)
+    """Hermes' own store for the profile running this process — never another one's.
 
+    The plugin may sit in a shared or symlinked checkout, so where this file lives says nothing
+    about which profile is active; ``HERMES_HOME`` is what Hermes sets for it. Deriving the path
+    from the plugin's location used to reach another profile's chats when the install was shared.
+    """
     home = os.environ.get("HERMES_HOME") or os.path.expanduser("~/.hermes")
     return os.path.join(home, "state.db")
 

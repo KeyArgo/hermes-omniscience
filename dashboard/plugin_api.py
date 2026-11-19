@@ -43,6 +43,15 @@ def _db_path() -> Path:
     return get_hermes_home() / "plugin-data" / PLUGIN_NAME / "events.db"
 
 
+def _state_db_path() -> Path:
+    """Hermes' own store for the active profile — the same one the plugin reads.
+
+    Never derived from where the plugin files sit: a shared or symlinked install would hand the
+    viewer another profile's chat titles.
+    """
+    return get_hermes_home() / "state.db"
+
+
 def _viewer_url() -> str:
     env = os.environ.get("OMNISCIENCE_VIEWER_URL")
     return env.strip() or DEFAULT_VIEWER_URL if env else DEFAULT_VIEWER_URL
@@ -199,7 +208,7 @@ def _ensure_viewer() -> dict:
             real,
             log_dir=os.path.dirname(real),
             autostart=True,
-            state_db=str(get_hermes_home() / "state.db"),
+            state_db=str(_state_db_path()),
         )
     except Exception as exc:  # never let a launch problem break the link answer
         log.debug("omniscience: viewer restart from the dashboard failed", exc_info=True)
