@@ -435,6 +435,39 @@ def test_both_viewer_copies_carry_the_same_health_module():
     assert a == b
 
 
+# ---------------------------------------------------------------------------
+# the Windows working-set read
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the working-set counters are a Windows API")
+def test_windows_memory_reads_as_numbers_not_question_marks():
+    """Owner report: health lines on Windows showed rss_mb=? peak_mb=?.
+
+    Without argtypes, ctypes passes the 64-bit process pseudo-handle as a 32-bit int and the
+    call fails; read_memory_mb then swallows the error and prints '?'. On Windows the reader
+    must return real numbers for this very process.
+    """
+    from omniscience_viewer import health as health_mod
+
+    rss, peak = health_mod._memory_from_windows()
+    assert isinstance(rss, float) and rss > 0, (rss, peak)
+    assert isinstance(peak, float) and peak >= rss, (rss, peak)
+    assert health_mod.read_memory_mb() == (rss, peak)
+
+
+def test_the_windows_call_declares_its_argument_types():
+    """The fix is checkable from source on every platform: the handle and the counters pointer
+    need declared argtypes, or ctypes truncates the 64-bit pseudo-handle to a C int and the
+    call fails (the '?' health line). Runs here even though the API itself is Windows-only."""
+    source = (ROOT / "viewer" / "omniscience_viewer" / "health.py").read_text(encoding="utf-8")
+    start = source.index("def _memory_from_windows")
+    body = source[start:source.index("def _memory_from_rusage")]
+    assert "GetCurrentProcess.argtypes" in body
+    assert "GetCurrentProcess.restype = wintypes.HANDLE" in body
+    assert "get_memory_info.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]" in body
+    assert "counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)" in body
+
+
 def test_cached_session_count_reads_the_fold(tmp_path):
     from omniscience_viewer import db as db_mod
 

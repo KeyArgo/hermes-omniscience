@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../api';
 import { tokenHeaders } from '../token';
+import { notifyViewerUnreachable, viewerReadFailure } from '../shell/viewerSignal';
 import './PrivacyView.css';
 
 export interface PrivacyRun {
@@ -77,7 +78,11 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
       if (!Array.isArray(runsBody.runs)) throw new Error('the viewer returned an unreadable record');
       if (id === loadId.current) setRuns(runsBody.runs);
     } catch (failure) {
-      if (id === loadId.current) setError(failure instanceof Error ? failure.message : 'could not read the record');
+      if (id === loadId.current) {
+        // A stopped viewer is reported to the host (which restarts it) and read as a sentence,
+        // not as a raw "Failed to fetch".
+        setError(viewerReadFailure(failure, 'could not read the record'));
+      }
     } finally {
       if (id === loadId.current) setLoading(false);
     }
@@ -166,7 +171,7 @@ export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) =>
         </p>
       </header>
 
-      {error ? <p className="pv-error">Could not read the record: {error} <button type="button" onClick={() => void load(days)}>Retry</button></p> : null}
+      {error ? <p className="pv-error">Could not read the record: {error} <button type="button" onClick={() => { notifyViewerUnreachable(); void load(days); }}>Retry</button></p> : null}
       {note ? <p className="pv-note">{note}</p> : null}
 
       {loading || error ? null : runs.length === 0 ? (

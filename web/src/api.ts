@@ -1,11 +1,21 @@
 import type { ChatPrefs, OmniEvent, SessionMeta, UsageReport, Warning } from './types';
 import { tokenHeaders, withToken, wsSubprotocol } from './token';
+import { isViewerUnreachableError, notifyViewerUnreachable } from './shell/viewerSignal';
 
 export const API_BASE = '/api/v1';
 export const EVENT_PAGE_SIZE = 2000;
 
 async function getJson(path: string, signal?: AbortSignal): Promise<unknown> {
-  const response = await fetch(path, { headers: { accept: 'application/json', ...tokenHeaders() }, signal });
+  let response: Response;
+  try {
+    response = await fetch(path, { headers: { accept: 'application/json', ...tokenHeaders() }, signal });
+  } catch (error) {
+    // Nothing listening is not a bad answer: tell the Hermes page so it can start the viewer
+    // again and reload this frame with the fresh key. A browser tab has no host; the caller
+    // shows the stopped-viewer sentence instead.
+    if (isViewerUnreachableError(error)) notifyViewerUnreachable();
+    throw error;
+  }
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }

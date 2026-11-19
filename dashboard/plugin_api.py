@@ -3,8 +3,9 @@
 Read-only health endpoint over the plugin's event database (see docs/DECISIONS.md D4:
 ``<HERMES_HOME>/plugin-data/omniscience/events.db``), plus the owner's viewer on/off switch
 (``/viewer/mode``), which writes ``prefs.json`` but never the recording (D2). Asking for the viewer
-link also restarts the viewer when it is down (see ``_ensure_viewer``); that starts a process but
-writes nothing to the recording.
+link also restarts the viewer when it is down (see ``_ensure_viewer``); ``POST /viewer/restart``
+stops it first and starts it again, the reset that does not quit Hermes. Starting a process writes
+nothing to the recording.
 
 Per the Hermes dashboard doc ("Don't block the event loop"): every handler is async and
 all blocking SQLite work runs off the loop via ``asyncio.to_thread``.
@@ -221,6 +222,24 @@ def _viewer_link_locked() -> dict:
 @router.get("/viewer")
 async def viewer_link() -> dict:
     return await asyncio.to_thread(_viewer_link_locked)
+
+
+def _restart_viewer_locked() -> dict:
+    """Stop the viewer this machine started, then start it again and hand over the fresh link.
+
+    The reset that does not quit Hermes: the viewer can stop under an open page (its parent
+    process exited, or ten idle minutes passed), and a stuck or stale one is cleared by a real
+    stop-then-start rather than by reopening the pane. The owner's switch still wins — with the
+    viewer off nothing is started, and the answer says ``off``.
+    """
+    _stop_viewer()
+    return _viewer_link_locked()
+
+
+@router.post("/viewer/restart")
+async def restart_viewer() -> dict:
+    """Stop the viewer and start it again (the owner's on/off switch is respected)."""
+    return await asyncio.to_thread(_restart_viewer_locked)
 
 
 def _viewer_mode_locked() -> dict:

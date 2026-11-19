@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_BASE, fetchInsight } from '../api';
 import { tokenHeaders } from '../token';
+import { notifyViewerUnreachable, viewerReadFailure } from '../shell/viewerSignal';
 import './ConcernsView.css';
 
 interface ConcernItem {
@@ -66,7 +67,11 @@ export function ConcernsView() {
       if (!body || !Array.isArray(body.items) || !body.counts) throw new Error('the viewer returned an unreadable report');
       if (id === loadId.current) setReport(body);
     } catch (failure) {
-      if (id === loadId.current) setError(failure instanceof Error ? failure.message : 'could not read the recording');
+      if (id === loadId.current) {
+        // A stopped viewer is reported to the host (which restarts it) and read as a sentence,
+        // not as a raw "Failed to fetch".
+        setError(viewerReadFailure(failure, 'could not read the recording'));
+      }
     }
   }, []);
 
@@ -120,7 +125,7 @@ export function ConcernsView() {
         </p>
       </header>
 
-      {error ? <p className="cv-error">Could not read the recording: {error} <button type="button" onClick={() => void load(days)}>Retry</button></p> : null}
+      {error ? <p className="cv-error">Could not read the recording: {error} <button type="button" onClick={() => { notifyViewerUnreachable(); void load(days); }}>Retry</button></p> : null}
 
       <section className="cv-ai">
         <button

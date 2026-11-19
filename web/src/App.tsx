@@ -3,6 +3,7 @@ import { API_BASE } from './api';
 import { tokenHeaders } from './token';
 import { EVENT_PAGE_SIZE, downloadCsv, fetchBuildId, fetchEvents, fetchEventsPage, fetchSessions, fetchVersion, fetchWarnings, liveSubprotocol, liveUrl, normalizeEvent, type BuildInfo } from './api';
 import { recoverStaleKey } from './token';
+import { notifyViewerUnreachable } from './shell/viewerSignal';
 import { pageVisible, subscribePageVisible, usePageVisible } from './usePageVisible';
 import type { OmniEvent, SessionMeta, Warning } from './types';
 import { groupMembers } from './graph/collapse';
@@ -1410,6 +1411,11 @@ export default function App() {
         // A close we asked for by hiding is not a failure: no reconnect loop while hidden. The
         // visibility subscription opens the new socket when the page is looked at again.
         if (paused || !pageVisible()) return;
+        // A socket that closes while somebody is looking usually means the viewer stopped (its
+        // parent Hermes exited, or ten idle minutes passed). Tell the host frame so it can start
+        // the viewer again and reload this page with the fresh key; the reconnect below keeps
+        // trying either way.
+        notifyViewerUnreachable();
         const delay = Math.min(15000, 500 * 2 ** attempt);
         attempt += 1;
         retryTimer = window.setTimeout(() => {
@@ -2822,8 +2828,9 @@ export default function App() {
               </div>
             ) : (
               <div className="stage-state is-offline" role="status">
-                <strong>Viewer can't be reached.</strong> Omniscience can't load recordings right now. It reconnects
-                by itself when the viewer is back; if it stays like this, restart the Hermes gateway.
+                <strong>Viewer can't be reached.</strong> Omniscience can't load recordings right now. It asks
+                Hermes to start the viewer again by itself; if it stays like this, use <strong>Restart viewer</strong> in
+                Omniscience's settings, or open Omniscience in Hermes again.
               </div>
             )
           ) : !loading && selectedRoot && notRecorded ? (

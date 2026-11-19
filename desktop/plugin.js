@@ -4,7 +4,7 @@
  */
 import { host, SandboxedFrame } from '@hermes/plugin-sdk'
 import { jsx } from 'react/jsx-runtime'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const VIEWER_URL = 'http://127.0.0.1:8797'
 
@@ -40,6 +40,15 @@ const VIEW_RE = /^[a-z]{1,24}$/
 let viewerToken = null
 let externalListener = null
 
+// The recoveries of the frames currently on screen (full page and docked pane). A frame reports
+// "omniscience:viewer-unreachable" when its requests fail; the report goes to the recovery of the
+// frame it came from, never to a stranger's.
+const viewerRecoveries = new Set()
+export function registerViewerRecovery(entry) {
+  viewerRecoveries.add(entry)
+  return () => viewerRecoveries.delete(entry)
+}
+
 export function browserLinkFor(data, token) {
   if (!token) return null
   const session = typeof data?.session === 'string' && SESSION_RE.test(data.session) ? data.session : null
@@ -57,6 +66,18 @@ export function handleViewerMessage(event) {
   }
   if (data.type === 'omniscience:toggle-pane') {
     setPane(!paneWanted())
+    return
+  }
+  if (data.type === 'omniscience:viewer-unreachable') {
+    // The embedded page cannot reach the viewer (it stopped under the open frame). Ask the
+    // backend to start it again — throttled inside the recovery, so a page polling every few
+    // seconds cannot start a storm. Only our own frame counts: every sandboxed guest reports
+    // the opaque origin "null", so the source window is compared with the iframe we embedded.
+    for (const entry of viewerRecoveries) {
+      const own = entry.frameWindow?.()
+      if (own && event.source && event.source !== own) continue
+      entry.recovery.request()
+    }
     return
   }
   if (data.type !== 'omniscience:open-web') return
@@ -121,6 +142,36 @@ function RoomSettings() {
       'Make room automatically',
     ] }),
     jsx(ViewerSwitch, { key: 'viewer' }),
+    jsx(RestartViewerButton, { key: 'restart' }),
+  ] })
+}
+
+// The reset that does not quit Hermes: stop the viewer process and start it again. The backend
+// honours the owner's switch, and the answer says what happened — a button that lies is worse
+// than no button.
+function RestartViewerButton() {
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  return jsx('div', { style: { display: 'grid', gap: 4 }, children: [
+    jsx('button', {
+      key: 'b',
+      type: 'button',
+      disabled: busy,
+      onClick: () => {
+        setBusy(true)
+        setNote('')
+        restartViewer().then(answer => {
+          setBusy(false)
+          const viewer = answer && answer.viewer
+          if (viewer && viewer.running) setNote('Viewer restarted.')
+          else if (viewer && viewer.reason === 'off') setNote('The viewer is off; turn it on above first.')
+          else setNote('Could not restart the viewer' + (viewer && viewer.reason ? ` (${viewer.reason})` : '') + '. See viewer.log in the Omniscience data folder.')
+        })
+      },
+      style: { padding: '6px 14px', cursor: 'pointer', justifySelf: 'start' },
+      children: busy ? 'Restarting…' : 'Restart viewer',
+    }),
+    note ? jsx('p', { key: 'n', style: { margin: 0, opacity: 0.7, fontSize: 12 }, children: note }) : null,
   ] })
 }
 
@@ -408,18 +459,103 @@ async function viewerReachable() {
   }
 }
 
+// The viewer can stop under an open page: the Hermes process that spawned it exited (viewer.log
+// says "parent … is gone"), or ten idle minutes passed with every socket closed. The page reports
+// it (omniscience:viewer-unreachable) or the probe below finds it; either way ask the backend for
+// the link again — that starts the viewer — and hand the fresh key to the frame so it reloads.
+// Throttled: at most one restart per 10 s, and after 3 tries that did not bring it back the page
+// shows ViewerProblem with its buttons instead of looping. A manual Retry resets the count.
+const RECOVERY_GAP_MS = 10_000
+const RECOVERY_MAX_TRIES = 3
+export function createViewerRecovery({
+  ask = () => Promise.resolve(CTX?.rest?.('/viewer')),
+  probe = viewerReachable,
+  now = () => Date.now(),
+  onState = () => {},
+} = {}) {
+  let lastAt = null
+  let tries = 0
+  let busy = false
+  let givenUp = false
+  const fail = reason => {
+    tries += 1
+    if (tries >= RECOVERY_MAX_TRIES) {
+      givenUp = true
+      onState({ up: false, reason: reason || null })
+    }
+  }
+  const request = () => {
+    if (givenUp || busy) return Promise.resolve(false)
+    if (lastAt !== null && now() - lastAt < RECOVERY_GAP_MS) return Promise.resolve(false)
+    lastAt = now()
+    busy = true
+    return Promise.resolve()
+      .then(ask)
+      .then(answer => {
+        const reason = answer?.viewer && answer.viewer.running === false ? (answer.viewer.reason || null) : null
+        // Off is the owner's decision, not a failure to retry: show it at once.
+        if (reason === 'off') {
+          givenUp = true
+          onState({ up: false, reason: 'off' })
+          return false
+        }
+        return Promise.resolve(probe()).then(up => {
+          if (up) {
+            tries = 0
+            onState({ up: true, reason: null, token: (answer && answer.token) || null })
+            return true
+          }
+          fail(reason)
+          return false
+        })
+      })
+      .catch(() => { fail(null); return false })
+      .finally(() => { busy = false })
+  }
+  const reset = () => { tries = 0; givenUp = false; lastAt = null; busy = false }
+  return { request, reset }
+}
+
+// A cheap probe while the pane is on screen: one no-cors ping every 30 s. The page's own failure
+// report covers the case where it is actively fetching; this covers a pane that sits quiet while
+// the viewer stops underneath it. A failed ping goes through the same recovery as the report.
+const HEALTH_PROBE_MS = 30_000
+export function watchViewerHealth(target, doc = globalThis.document, options = {}) {
+  const { probe = viewerReachable, onDown = () => {}, intervalMs = HEALTH_PROBE_MS } = options
+  let shown = true
+  const update = visible => { shown = visible }
+  const onVisibility = () => update(doc?.visibilityState !== 'hidden')
+  doc?.addEventListener?.('visibilitychange', onVisibility)
+  let observer = null
+  if (target && typeof IntersectionObserver === 'function') {
+    observer = new IntersectionObserver(entries => update(entries.some(entry => entry.isIntersecting)))
+    observer.observe(target)
+  }
+  const timer = setInterval(() => {
+    if (!shown) return
+    Promise.resolve(probe()).then(up => { if (!up && shown) onDown() }, () => {})
+  }, intervalMs)
+  return () => {
+    clearInterval(timer)
+    doc?.removeEventListener?.('visibilitychange', onVisibility)
+    observer?.disconnect()
+  }
+}
+
 // A hidden pane closes its live connection, so after ten quiet minutes the viewer exits by itself.
 // When the pane is looked at again, ask the backend for the link once more: it starts the viewer
-// if it is down (and starts nothing while the owner's switch is off), and the page's own
-// reconnect then finds it. Throttled so a flickering layout cannot start a storm of requests.
+// if it is down (and starts nothing while the owner's switch is off). The answer goes to onAnswer
+// so the frame reloads with the fresh key — a restarted viewer writes a new one, and the old src
+// would keep authenticating with the key that died with it. Throttled so a flickering layout
+// cannot start a storm of requests.
 const WAKE_MIN_GAP_MS = 30_000
-export function wakeViewerOnReturn(target, doc = globalThis.document, now = () => Date.now()) {
+export function wakeViewerOnReturn(target, doc = globalThis.document, now = () => Date.now(), onAnswer = () => {}) {
   let shown = true
   let last = 0
   const update = visible => {
     if (visible && !shown && now() - last >= WAKE_MIN_GAP_MS) {
       last = now()
-      Promise.resolve(CTX?.rest?.('/viewer')).catch(() => {})
+      Promise.resolve(CTX?.rest?.('/viewer')).then(onAnswer, () => {})
     }
     shown = visible
   }
@@ -437,7 +573,7 @@ export function wakeViewerOnReturn(target, doc = globalThis.document, now = () =
 }
 
 function useViewerKey() {
-  const [state, setState] = useState({ ready: false, token: null, up: true, attempt: 0 })
+  const [state, setState] = useState({ ready: false, token: null, up: true, attempt: 0, reason: null })
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -461,14 +597,43 @@ function useViewerKey() {
       alive = false
     }
   }, [state.attempt])
-  const retry = () => setState(prev => ({ ...prev, ready: false, attempt: prev.attempt + 1 }))
-  return { ...state, retry }
+  const retry = () => setState(prev => ({ ...prev, ready: false, attempt: prev.attempt + 1, reason: null }))
+  // A fresh link from the backend (the wake on return): adopt its key so the frame reloads with
+  // it, or show the backend's reason when it could not start the viewer. Same probe as the first
+  // load — a viewer still answering on the port belongs to an earlier build when the switch is off.
+  const adopt = answer => {
+    if (!answer || typeof answer !== 'object') return
+    const reason = answer.viewer && answer.viewer.running === false ? (answer.viewer.reason || null) : null
+    const token = answer.token || null
+    Promise.resolve(reason === 'off' ? false : viewerReachable()).then(up => {
+      if (token) viewerToken = token
+      setState(prev => ({ ...prev, ready: true, token: token || prev.token, up, reason }))
+    })
+  }
+  // What a recovery restart found: up with a fresh key (the frame reloads), or down with a reason
+  // (ViewerProblem). A missing token keeps the one already held.
+  const applyRecovery = patch => setState(prev => ({
+    ...prev,
+    ready: true,
+    up: patch.up,
+    reason: patch.reason ?? null,
+    token: patch.token || prev.token,
+  }))
+  return { ...state, retry, adopt, applyRecovery }
 }
 
 // Turn the owner's switch back on, then let the caller ask for the link again (which starts it).
 function turnOnViewer() {
   return Promise.resolve()
     .then(() => CTX?.rest?.('/viewer/mode', { method: 'POST', body: { enabled: true } }))
+    .catch(() => null)
+}
+
+// Stop the viewer and start it again without quitting Hermes. The backend honours the owner's
+// switch, so an off viewer stays off and the answer says so.
+function restartViewer() {
+  return Promise.resolve()
+    .then(() => CTX?.rest?.('/viewer/restart', { method: 'POST' }))
     .catch(() => null)
 }
 
@@ -488,12 +653,22 @@ export function ViewerProblem({ up, retry, reason }) {
       children: 'Turn on',
     })
     : jsx('button', { key: 'b', onClick: retry, style: { padding: '6px 14px', cursor: 'pointer' }, children: 'Retry' })
+  const children = [
+    jsx('p', { key: 't', style: { marginBottom: 12 }, children: text + why }),
+    button,
+  ]
+  if (!off) {
+    // The reset that does not quit Hermes: stop the viewer, start it again, then ask for the link.
+    children.push(jsx('button', {
+      key: 'r',
+      onClick: () => restartViewer().then(retry),
+      style: { padding: '6px 14px', cursor: 'pointer', marginLeft: 8 },
+      children: 'Restart viewer',
+    }))
+  }
   return jsx('div', {
     style: { padding: 24, maxWidth: 560, lineHeight: 1.5 },
-    children: [
-      jsx('p', { key: 't', style: { marginBottom: 12 }, children: text + why }),
-      button,
-    ],
+    children,
   })
 }
 
@@ -514,8 +689,18 @@ function OmnisciencePage() {
   listenForOpenExternal()
   const page = useRef(null)
   useEffect(() => makeRoom(CTX, page), [])
-  useEffect(() => wakeViewerOnReturn(page.current), [])
   const key = useViewerKey()
+  // One recovery per mounted page: the frame's failure reports and the health probe both go
+  // through it, and a manual Retry resets its give-up count.
+  const recovery = useMemo(() => createViewerRecovery({ onState: key.applyRecovery }), [])
+  const retry = () => { recovery.reset(); key.retry() }
+  // The wake on return adopts the backend's fresh link, so the frame reloads when the key changed.
+  useEffect(() => wakeViewerOnReturn(page.current, undefined, undefined, key.adopt), [])
+  useEffect(() => registerViewerRecovery({
+    recovery,
+    frameWindow: () => page.current?.querySelector?.('iframe')?.contentWindow || null,
+  }), [])
+  useEffect(() => watchViewerHealth(page.current, undefined, { onDown: () => recovery.request() }), [])
   // Default to the chat the user was in when they opened Omniscience.
   const session = linkedSession() || focusedChat()
   const src = key.ready && key.up && key.token ? viewerSrc(session, key.token, HOST_MARKER) : null
@@ -526,8 +711,11 @@ function OmnisciencePage() {
     // posture (an opaque origin, no bridge, no access to the app's storage). The page is built
     // for that — it authenticates every call with its own key and asks for nothing else.
     children: !key.ready ? jsx('div', { style: { padding: 16, opacity: 0.6 }, children: 'Opening Omniscience…' })
-      : !src ? jsx(ViewerProblem, { up: key.up, retry: key.retry, reason: key.reason })
+      : !src ? jsx(ViewerProblem, { up: key.up, retry, reason: key.reason })
       : jsx(SandboxedFrame, {
+      // The key is part of the frame's identity: a restarted viewer writes a new one, and the
+      // frame must reload with it rather than keep the dead key in its src.
+      key: key.token,
       src,
       title: 'Omniscience viewer',
       style: { flex: 1, border: 'none', display: 'block' },
@@ -549,11 +737,18 @@ function useFocusedChat() {
 function LivePane() {
   listenForOpenExternal()
   const pane = useRef(null)
-  useEffect(() => wakeViewerOnReturn(pane.current), [])
   const key = useViewerKey()
+  const recovery = useMemo(() => createViewerRecovery({ onState: key.applyRecovery }), [])
+  const retry = () => { recovery.reset(); key.retry() }
+  useEffect(() => wakeViewerOnReturn(pane.current, undefined, undefined, key.adopt), [])
+  useEffect(() => registerViewerRecovery({
+    recovery,
+    frameWindow: () => pane.current?.querySelector?.('iframe')?.contentWindow || null,
+  }), [])
+  useEffect(() => watchViewerHealth(pane.current, undefined, { onDown: () => recovery.request() }), [])
   const session = useFocusedChat()
   if (!key.ready) return jsx('div', { style: { padding: 12, opacity: 0.6 }, children: 'Opening…' })
-  if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry: key.retry, reason: key.reason })
+  if (!key.up || !key.token) return jsx(ViewerProblem, { up: key.up, retry, reason: key.reason })
   // The two actions are drawn by the pane itself and call Hermes directly: messages from the
   // embedded page to its parent do not reliably reach a docked pane.
   const btn = { flex: 1, padding: '6px 8px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 6,
@@ -565,7 +760,7 @@ function LivePane() {
     style: { display: 'flex', flexDirection: 'column', width: '100%', height: '100%' },
     children: [
       jsx(SandboxedFrame, {
-        key: session || 'none',
+        key: `${session || 'none'}:${key.token}`,
         src: viewerSrc(session, key.token, { ...HOST_MARKER, mini: '1', actions: '0' }),
         title: 'Omniscience live',
         style: { flex: 1, width: '100%', border: 'none', display: 'block' },

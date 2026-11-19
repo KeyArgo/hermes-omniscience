@@ -3,6 +3,7 @@ import type { UsageChat, UsageReport } from '../types';
 import { fetchUsage } from '../api';
 import { CancelledError, withRetry } from '../graph/retry';
 import { pageVisible, usePageVisible } from '../usePageVisible';
+import { notifyViewerUnreachable, viewerReadFailure } from '../shell/viewerSignal';
 import { Tip } from './Tip';
 import { UsageSources } from './UsageSources';
 import { PanelFrame } from './PanelFrame';
@@ -193,7 +194,9 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
       })
       .catch((exc: unknown) => {
         if (cancelled || exc instanceof CancelledError) return;
-        setError(exc instanceof Error ? exc.message : 'could not read usage');
+        // A stopped viewer is reported to the host (which restarts it) and read as a sentence,
+        // not as a raw "Failed to fetch".
+        setError(viewerReadFailure(exc, 'could not read usage'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -292,7 +295,7 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
       <div className="us-root">
         <p className="us-error">
           Usage could not be read: {error}.{' '}
-          <button type="button" className="us-retry" onClick={() => setReload((n) => n + 1)}>
+          <button type="button" className="us-retry" onClick={() => { notifyViewerUnreachable(); setReload((n) => n + 1); }}>
             Try again
           </button>
         </p>
@@ -334,7 +337,7 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
           <button
             type="button"
             className="us-retry"
-            onClick={() => setReload((n) => n + 1)}
+            onClick={() => { notifyViewerUnreachable(); setReload((n) => n + 1); }}
             title="Read the databases again now."
           >
             {loading ? 'reading…' : 'refresh'}

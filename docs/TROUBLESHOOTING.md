@@ -1,7 +1,8 @@
 # Troubleshooting
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 21c07b0
-> **Revised:** 2026-11-19 · **Body hash:** a7bbf9b6
+> **Applies to:** Omniscience 1.0.0 · written at commit 6fe8aad
+> **Revised:** 2026-11-19 · **Body hash:** 6bd8206a
+
 
 
 
@@ -82,6 +83,32 @@ itself after ten quiet minutes. The launcher returns a reason and writes it to
 | `a start was attempted less than a minute ago` | The launcher refuses to retry immediately. Fix the cause, then wait or delete `viewer.last-start`. |
 
 Only one start runs at a time thanks to `viewer.lock`.
+
+## Viewer can't be reached
+
+The page says **"Viewer can't be reached"**, or Concerns/Privacy/Usage say they could not read the
+recording, while the pane stays open. The viewer process stopped underneath the page: the Hermes
+process that started it exited (`viewer.log` says `parent … is gone, closing the viewer`), or ten
+quiet minutes passed with no requests and no open live socket (`OMNISCIENCE_VIEWER_IDLE_EXIT_S`).
+Both are by design — the viewer is not a daemon.
+
+The page recovers by itself:
+
+- Inside Hermes, the page tells the pane it cannot reach the viewer; the pane asks the plugin
+  backend for the link again (which starts the viewer) and reloads the frame with the fresh key.
+  Restarts are throttled to one per 10 seconds and stop after 3 tries that did not bring it back;
+  the problem screen then offers **Retry** and **Restart viewer**. A quiet pane is also pinged
+  every 30 seconds while it is on screen, and looking at a hidden pane again asks for the link.
+- A manual reset that does not quit Hermes: **Settings → Omniscience → Restart viewer**, or the
+  same button on the problem screen. It calls `POST /api/plugins/omniscience/viewer/restart`,
+  which stops the viewer and starts it again. The owner's on/off switch is respected: an off
+  viewer stays off.
+- In a plain browser tab there is no Hermes to ask, so the page says **"The viewer stopped. Open
+  Omniscience in Hermes to start it again."** Opening the Omniscience pane in Hermes starts the
+  viewer; the tab's own retry then finds it (reload the tab if its key is out of date).
+
+If it stays down, read `viewer.log` and the reason table above — the switch, `OMNISCIENCE_VIEWER_AUTOSTART`,
+a paused recording, or another viewer holding the port are the usual causes.
 
 ## The top bar says OFFLINE
 

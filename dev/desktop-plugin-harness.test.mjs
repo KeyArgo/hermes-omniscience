@@ -671,3 +671,276 @@ describe("the settings version chip", () => {
     expect(chip.p.style.color).toBe("#e8a33d");   // amber for a dirty tree, like Aura
   });
 });
+
+describe("recovering a viewer that stopped under the open page", () => {
+  // The owner's report: the gateway that spawned the viewer exited ("parent … is gone"), the
+  // viewer closed by design, and the open page never asked for a new one. The recovery asks the
+  // backend (which starts it), confirms with the cheap probe, and hands the fresh key to the
+  // frame — throttled, and giving up after three tries instead of looping.
+  function setup({ up = true, answer = { token: "k2", viewer: { running: true } }, askError = null } = {}) {
+    const calls = { ask: 0, probe: 0, states: [] };
+    let clock = 1_000_000;
+    const mod = loadPlugin().then(m => {
+      const recovery = m.createViewerRecovery({
+        ask: async () => { calls.ask += 1; if (askError) throw askError; return answer; },
+        probe: async () => { calls.probe += 1; return up; },
+        now: () => clock,
+        onState: patch => calls.states.push(patch),
+      });
+      return { m, recovery, calls, advance: ms => { clock += ms; } };
+    });
+    return mod;
+  }
+
+  it("asks the backend, confirms with the probe, and hands the fresh key to the frame", async () => {
+    const s = await setup();
+    expect(await s.recovery.request()).toBe(true);
+    expect(s.calls.ask).toBe(1);
+    expect(s.calls.probe).toBe(1);
+    expect(s.calls.states).toEqual([{ up: true, reason: null, token: "k2" }]);
+  });
+
+  it("restarts at most once per 10 s, however often the page reports failure", async () => {
+    const s = await setup();
+    await s.recovery.request();
+    s.advance(5_000);
+    expect(await s.recovery.request()).toBe(false);   // a poll every few seconds must not storm
+    expect(s.calls.ask).toBe(1);
+    s.advance(5_000);
+    expect(await s.recovery.request()).toBe(true);
+    expect(s.calls.ask).toBe(2);
+  });
+
+  it("gives up after 3 tries that did not bring it back, and a manual Retry starts over", async () => {
+    const s = await setup({ up: false, answer: { token: null, viewer: { running: false, reason: "spawn failed" } } });
+    for (let i = 0; i < 3; i++) {
+      expect(await s.recovery.request()).toBe(false);
+      s.advance(10_000);
+    }
+    expect(s.calls.ask).toBe(3);
+    expect(s.calls.states.at(-1)).toEqual({ up: false, reason: "spawn failed" });
+    // Given up: no fourth automatic ask…
+    expect(await s.recovery.request()).toBe(false);
+    expect(s.calls.ask).toBe(3);
+    // …until the owner presses Retry, which resets the count.
+    s.recovery.reset();
+    await s.recovery.request();
+    expect(s.calls.ask).toBe(4);
+  });
+
+  it("shows the owner's off switch at once instead of retrying it", async () => {
+    const s = await setup({ answer: { token: null, viewer: { running: false, reason: "off" } } });
+    expect(await s.recovery.request()).toBe(false);
+    expect(s.calls.probe).toBe(0);
+    expect(s.calls.states).toEqual([{ up: false, reason: "off" }]);
+    s.advance(60_000);
+    await s.recovery.request();
+    expect(s.calls.ask).toBe(1);
+  });
+
+  it("counts a backend that cannot answer as a try, and never overlaps two restarts", async () => {
+    const s = await setup({ askError: new Error("gateway down") });
+    await s.recovery.request();
+    expect(s.calls.states).toEqual([]);   // one failed try is not yet a problem page
+    s.advance(10_000);
+    await s.recovery.request();
+    s.advance(10_000);
+    await s.recovery.request();
+    expect(s.calls.states.at(-1)).toEqual({ up: false, reason: null });
+    // A request still in flight is not joined by a second one.
+    const t = await setup();
+    let release;
+    const slow = t.m.createViewerRecovery({
+      ask: () => new Promise(resolve => { release = resolve; }),
+      probe: async () => true,
+      onState: () => {},
+    });
+    const first = slow.request();
+    expect(await slow.request()).toBe(false);
+    release({ token: "k", viewer: { running: true } });
+    expect(await first).toBe(true);
+  });
+});
+
+describe("the frame's failure report reaches its own recovery only", () => {
+  it("routes omniscience:viewer-unreachable to the frame it came from, and ignores strangers", async () => {
+    const mod = await loadPlugin();
+    const ownWindow = {};
+    const strangerWindow = {};
+    const mine = { request: vi.fn() };
+    const other = { request: vi.fn() };
+    const unregister = mod.registerViewerRecovery({ recovery: mine, frameWindow: () => ownWindow });
+    mod.registerViewerRecovery({ recovery: other, frameWindow: () => strangerWindow });
+    const report = source => mod.handleViewerMessage({
+      origin: "null", source, data: { type: "omniscience:viewer-unreachable" },
+    });
+    report(ownWindow);
+    expect(mine.request).toHaveBeenCalledTimes(1);
+    expect(other.request).not.toHaveBeenCalled();
+    report(strangerWindow);
+    expect(other.request).toHaveBeenCalledTimes(1);
+    // A stranger's window with our origin, and an outside origin, are both dropped.
+    report({});
+    expect(mine.request).toHaveBeenCalledTimes(1);
+    mod.handleViewerMessage({ origin: "https://evil.example", source: ownWindow, data: { type: "omniscience:viewer-unreachable" } });
+    expect(mine.request).toHaveBeenCalledTimes(1);
+    unregister();
+    report(ownWindow);
+    expect(mine.request).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the wake on return reloads the frame with the fresh key", () => {
+  it("hands the backend's answer to the page instead of dropping it", async () => {
+    const mod = await loadPlugin();
+    const { ctx, rest } = fakeCtx();
+    mod.default.register(ctx);
+    rest.mockClear();
+    rest.mockImplementation(async () => ({ token: "k-fresh", viewer: { running: true } }));
+    const answers = [];
+    const listeners = {};
+    const doc = {
+      visibilityState: "visible",
+      addEventListener: (name, fn) => { listeners[name] = fn; },
+      removeEventListener: name => { delete listeners[name]; },
+    };
+    let clock = 1_000_000;
+    const stop = mod.wakeViewerOnReturn(null, doc, () => clock, answer => answers.push(answer));
+    doc.visibilityState = "hidden"; listeners.visibilitychange();
+    clock += 60_000;   // the viewer idled out while the pane was hidden
+    doc.visibilityState = "visible"; listeners.visibilitychange();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(rest).toHaveBeenCalledWith("/viewer");
+    // Without this hand-off the frame kept the dead key in its src after the restart.
+    expect(answers).toEqual([{ token: "k-fresh", viewer: { running: true } }]);
+    stop();
+  });
+
+  it("wires the wake, the probe and the frame identity in both components", async () => {
+    const source = await import("node:fs").then(fs =>
+      fs.readFileSync(new URL("../desktop/plugin.js", import.meta.url), "utf8"),
+    );
+    // The wake's answer is adopted (which reloads the frame when the key changed)…
+    expect(source).toContain("wakeViewerOnReturn(page.current, undefined, undefined, key.adopt)");
+    expect(source).toContain("wakeViewerOnReturn(pane.current, undefined, undefined, key.adopt)");
+    // …the quiet pane is probed while it is on screen…
+    expect(source).toContain("watchViewerHealth(page.current, undefined, { onDown: () => recovery.request() })");
+    expect(source).toContain("watchViewerHealth(pane.current, undefined, { onDown: () => recovery.request() })");
+    // …and a new key remounts the frame rather than leaving the old one in the src.
+    expect(source).toContain("key: key.token,");
+    expect(source).toContain("key: `${session || 'none'}:${key.token}`,");
+    // Both components register their recovery for the frame's failure reports.
+    expect(source.match(/registerViewerRecovery\(\{/g)?.length).toBe(2);
+  });
+});
+
+describe("the health probe while the pane is on screen", () => {
+  it("pings on a timer, reports a failed ping, and stays quiet while hidden", async () => {
+    const mod = await loadPlugin();
+    vi.useFakeTimers();
+    try {
+      let up = true;
+      const downs = [];
+      const listeners = {};
+      const doc = {
+        visibilityState: "visible",
+        addEventListener: (name, fn) => { listeners[name] = fn; },
+        removeEventListener: name => { delete listeners[name]; },
+      };
+      const stop = mod.watchViewerHealth(null, doc, {
+        probe: async () => up,
+        onDown: () => downs.push(true),
+        intervalMs: 30_000,
+      });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(downs).toEqual([]);          // answering: nothing to report
+      up = false;
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(downs).toEqual([true]);      // stopped under the open pane: recovery is asked
+      doc.visibilityState = "hidden"; listeners.visibilitychange();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(downs).toEqual([true]);      // nobody looking: no probe, no report
+      stop();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(downs).toEqual([true]);      // stopped watching: the timer is gone
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("Restart viewer: the reset that does not quit Hermes", () => {
+  function render(node) {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.t === "function") return render(node.t(node.p || {}));
+    const children = node.p?.children;
+    if (!children) return node;
+    const list = Array.isArray(children) ? children : [children];
+    return { ...node, p: { ...node.p, children: list.map(render) } };
+  }
+
+  function find(node, match) {
+    if (!node || typeof node !== "object") return null;
+    if (match(node)) return node;
+    const children = node.p?.children;
+    const list = Array.isArray(children) ? children : [];
+    for (const child of list) {
+      const hit = find(child, match);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  it("ViewerProblem offers Restart viewer beside Retry, and it posts the restart then retries", async () => {
+    const mod = await loadPlugin();
+    const { ctx, rest } = fakeCtx();
+    rest.mockImplementation(async (path, options) => {
+      if (path === "/viewer/restart") return { token: "k2", viewer: { running: true } };
+      return { token: "k" };
+    });
+    mod.default.register(ctx);
+    const retry = vi.fn();
+    const tree = mod.ViewerProblem({ up: false, retry, reason: "spawn failed" });
+    const restart = find(tree, n => n.t === "button" && n.p.children === "Restart viewer");
+    expect(restart).toBeTruthy();
+    expect(tree.p.children[1].p.children).toBe("Retry");   // Retry keeps its place
+    restart.p.onClick();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(rest).toHaveBeenCalledWith("/viewer/restart", { method: "POST" });
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("an off viewer keeps only Turn on — restarting against the switch would contradict it", async () => {
+    const mod = await loadPlugin();
+    const { ctx } = fakeCtx();
+    mod.default.register(ctx);
+    const tree = mod.ViewerProblem({ up: false, retry: vi.fn(), reason: "off" });
+    expect(find(tree, n => n.t === "button" && n.p.children === "Restart viewer")).toBeNull();
+    expect(tree.p.children[1].p.children).toBe("Turn on");
+  });
+
+  it("the settings page has the button, and it says what the backend did", async () => {
+    const mod = await loadPlugin();
+    const pages = [];
+    const rest = vi.fn(async (path, options) => {
+      if (path === "/viewer/restart") return { token: "k2", viewer: { running: true } };
+      if (path === "/viewer/mode") return { enabled: options?.body ? options.body.enabled : true };
+      return { token: "k" };
+    });
+    const ctx = {
+      register: () => () => {},
+      registerSettingsPage: page => { pages.push(page); return () => {}; },
+      rest,
+      storage: { get: () => true, set: vi.fn() },
+    };
+    mod.default.register(ctx);
+    const tree = render(pages[0].render());
+    // render() normalises a single child into an array, so the button's text comes back wrapped.
+    const buttonText = n => (Array.isArray(n.p?.children) ? n.p.children.join("") : n.p?.children);
+    const button = find(tree, n => n.t === "button" && buttonText(n) === "Restart viewer");
+    expect(button).toBeTruthy();
+    button.p.onClick();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(rest).toHaveBeenCalledWith("/viewer/restart", { method: "POST" });
+  });
+});

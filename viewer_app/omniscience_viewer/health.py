@@ -59,7 +59,13 @@ def _memory_from_proc() -> tuple[float | None, float | None]:
 
 
 def _memory_from_windows() -> tuple[float | None, float | None]:
-    """Windows: the kernel's working-set counters for this process, in MB."""
+    """Windows: the kernel's working-set counters for this process, in MB.
+
+    The call needs its argument types declared: without them ctypes passes the process handle
+    as a 32-bit int, and the 64-bit pseudo-handle from GetCurrentProcess does not fit — the call
+    fails and the health line reads ``rss_mb=? peak_mb=?``. K32GetProcessMemoryInfo in kernel32
+    is the same entry point as psapi's, used when psapi.dll is not loadable.
+    """
     import ctypes
     from ctypes import wintypes
 
@@ -78,12 +84,19 @@ def _memory_from_windows() -> tuple[float | None, float | None]:
         ]
 
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetCurrentProcess.argtypes = []
     kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    try:
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        get_memory_info = psapi.GetProcessMemoryInfo
+    except OSError:
+        get_memory_info = kernel32.K32GetProcessMemoryInfo
+    get_memory_info.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]
+    get_memory_info.restype = wintypes.BOOL
     counters = PROCESS_MEMORY_COUNTERS()
     counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
     handle = kernel32.GetCurrentProcess()
-    if not psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+    if not get_memory_info(handle, ctypes.byref(counters), counters.cb):
         return None, None
     return counters.WorkingSetSize / (1024.0 * 1024.0), counters.PeakWorkingSetSize / (1024.0 * 1024.0)
 

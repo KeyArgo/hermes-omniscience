@@ -530,6 +530,41 @@ describe('fetchSessions', () => {
     await expect(fetchSessions()).rejects.toThrow('502 Bad Gateway');
     vi.unstubAllGlobals();
   });
+
+  it('tells the host frame when nothing is listening, so the viewer can be started again', async () => {
+    const sent: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    vi.stubGlobal('window', { parent: { postMessage: (m: unknown) => sent.push(m) }, location: { search: '', hash: '' } });
+    try {
+      await expect(fetchSessions()).rejects.toThrow('Failed to fetch');
+      expect(sent).toEqual([{ type: 'omniscience:viewer-unreachable' }]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not tell the host about a bad answer or the page\'s own timeout', async () => {
+    const sent: unknown[] = [];
+    vi.stubGlobal('window', { parent: { postMessage: (m: unknown) => sent.push(m) }, location: { search: '', hash: '' } });
+    try {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502, statusText: 'Bad Gateway' })));
+      await expect(fetchSessions()).rejects.toThrow('502');
+      expect(sent).toEqual([]);
+      vi.useFakeTimers();
+      vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      })));
+      const pending = fetchSessions(30_000);
+      const outcome = expect(pending).rejects.toThrow('did not answer within 30s');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await outcome;
+      vi.useRealTimers();
+      expect(sent).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('the socket log says who opened it', () => {
