@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { UsageChat, UsageReport } from '../types';
 import { fetchUsage } from '../api';
 import { CancelledError, withRetry } from '../graph/retry';
+import { pageVisible, usePageVisible } from '../usePageVisible';
 import { Tip } from './Tip';
 import { UsageSources } from './UsageSources';
 import { PanelFrame } from './PanelFrame';
@@ -162,9 +163,14 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
   const [tick, setTick] = useState(0);
   const [stamped, setStamped] = useState<number | null>(null);
   const haveReport = useRef(false);
+  const visible = usePageVisible();
+  const wasVisible = useRef(visible);
 
   useEffect(() => {
     let cancelled = false;
+    // Nothing is read while nobody is looking: the tick effect below asks again as soon as the
+    // page is back on screen.
+    if (!pageVisible()) return;
     // A silent refresh must not flash the "waiting" state on a page that already has numbers.
     if (!haveReport.current) {
       setLoading(true);
@@ -198,8 +204,17 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
   }, [days, reload, tick]);
 
   // Usage is a live number: a page left open for an hour must not show the hour it opened.
+  // While the page is not on screen there is no timer at all; coming back refreshes once.
   useEffect(() => {
+    if (!visible) {
+      wasVisible.current = false;
+      return;
+    }
     const bump = () => setTick((n) => n + 1);
+    if (!wasVisible.current) {
+      wasVisible.current = true;
+      bump();
+    }
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') bump();
     }, 30000);
@@ -208,14 +223,14 @@ export function UsageView({ onOpenChat }: { onOpenChat: (sessionId: string) => v
       window.clearInterval(timer);
       window.removeEventListener('focus', bump);
     };
-  }, []);
+  }, [visible]);
 
   // Waiting with no number is what looks broken: count the seconds out loud while it loads.
   useEffect(() => {
-    if (!loading) return;
+    if (!loading || !visible) return;
     const timer = window.setInterval(() => setWaited((n) => n + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [loading]);
+  }, [loading, visible]);
 
   function pick(next: number) {
     setDays(next);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchLatency, type LatencyReport, type ModelLatency, type ProviderLatency } from '../api';
+import { usePageVisible } from '../usePageVisible';
 import { Tip } from './Tip';
 
 /**
@@ -21,6 +22,9 @@ export function LatencyView() {
     const saved = Number(window.localStorage.getItem('omni.latencyWindow') ?? '0');
     return Number.isFinite(saved) && saved >= 0 ? saved : 0;
   });
+  // Report figures are for reading: nothing is fetched while the page is not on screen, and the
+  // numbers are refreshed once the moment it is looked at again (this effect re-runs on `visible`).
+  const visible = usePageVisible();
 
   useEffect(() => {
     let stopped = false;
@@ -28,13 +32,18 @@ export function LatencyView() {
       const next = await fetchLatency(period);
       if (!stopped) setReport(next);
     };
+    if (!visible) {
+      return () => {
+        stopped = true;
+      };
+    }
     void load();
     const timer = window.setInterval(() => void load(), 30_000);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [period]);
+  }, [period, visible]);
 
   if (report === null) return <p className="lat-empty">Reading recorded call times…</p>;
   const { models, providers } = report;

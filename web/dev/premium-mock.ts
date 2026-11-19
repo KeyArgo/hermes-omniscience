@@ -415,6 +415,7 @@ declare global {
   interface Window {
     __showcase: ShowcaseHarness;
     __showcaseAppend: () => number;
+    __showcaseAppended: number[];
   }
 }
 
@@ -594,6 +595,9 @@ export function installShowcaseViewer(): ShowcaseHarness {
   };
 
   window.__showcase = harness;
+  // The rowids `__showcaseAppend` pushes over the live socket, so a check can say what `after`
+  // the reopened socket must name.
+  window.__showcaseAppended = LIVE_APPEND.map((row) => row.rowid);
   window.__showcaseAppend = () =>
     SyntheticSocket.all.reduce(
       (sent, socket) => (socket.deliver({ type: 'events', events: LIVE_APPEND }) ? sent + 1 : sent),

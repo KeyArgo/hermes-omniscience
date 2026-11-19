@@ -3,6 +3,7 @@ import { API_BASE } from './api';
 import { tokenHeaders } from './token';
 import { EVENT_PAGE_SIZE, downloadCsv, fetchBuildId, fetchEvents, fetchEventsPage, fetchSessions, fetchVersion, fetchWarnings, liveSubprotocol, liveUrl, normalizeEvent, type BuildInfo } from './api';
 import { recoverStaleKey } from './token';
+import { pageVisible, subscribePageVisible, usePageVisible } from './usePageVisible';
 import type { OmniEvent, SessionMeta, Warning } from './types';
 import { groupMembers } from './graph/collapse';
 import { type Graph, type GNode } from './graph/reduce';
@@ -502,6 +503,10 @@ export function LiveBadge({
 }
 
 export default function App() {
+  // Nothing live runs while nobody is looking: see usePageVisible.ts. Every timer below either
+  // takes this as a dependency (so hiding clears it and showing re-runs it once) or asks
+  // `pageVisible()` directly when re-running the effect would be wrong (the chat socket).
+  const visible = usePageVisible();
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -510,6 +515,8 @@ export default function App() {
   // The viewer can be updated underneath an open tab. Its bundle is immutable and this page
   // keeps running the old one until it is reloaded, so say so rather than look wrong.
   const [staleBuild, setStaleBuild] = useState(false);
+  // Which build this page first saw, kept across pauses (hiding the page stops the check).
+  const loadedBuild = useRef<string | null>(null);
   // Which build is answering. Read from the viewer, never compiled in, so the chip cannot
   // announce a version other than the one installed.
   const [build, setBuild] = useState<BuildInfo | null>(null);
@@ -521,21 +528,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    let loadedBuild: string | null = null;
     let stopped = false;
     const check = async () => {
       const build = await fetchBuildId();
       if (stopped || !build) return;
-      if (loadedBuild === null) loadedBuild = build;
-      else if (build !== loadedBuild) setStaleBuild(true);
+      if (loadedBuild.current === null) loadedBuild.current = build;
+      else if (build !== loadedBuild.current) setStaleBuild(true);
     };
+    // A paused check is still the same check: the baseline has to survive the pause, or a viewer
+    // updated while the tab was hidden would never be noticed.
     void check();
-    const timer = window.setInterval(() => void check(), 60_000);
+    // No polling while the page is not on screen. Hiding clears the timer, showing runs one check
+    // immediately and starts it again.
+    const timer = visible ? window.setInterval(() => void check(), 60_000) : undefined;
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      if (timer !== undefined) window.clearInterval(timer);
     };
-  }, []);
+  }, [visible]);
 
   // A viewer key that rotated under this tab answers 401 to everything. Reload once so the
   // page gets the key the viewer now writes into it, rather than leaving a dead screen that
@@ -599,9 +609,13 @@ export default function App() {
     : `${connectionText.tooltip}${ageText ? ` Last event ${ageText}.` : ''}`;
 
   useEffect(() => {
+    // A clock that only re-renders is still work the machine does for nobody. Pause it, and stamp
+    // the time the moment the page is back so the badge is not reading a stale minute.
+    if (!visible) return;
+    setNowSec(Date.now() / 1000);
     const timer = window.setInterval(() => setNowSec(Date.now() / 1000), 5000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [visible]);
 
   const [replayIndex, setReplayIndexState] = useState<number | null>(null);
   const replayRef = useRef<number | null>(null);
@@ -1133,12 +1147,12 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    // One request at a time, and none from a hidden tab: every open page polling a slow chat list
-    // on a timer stacked requests up until a fresh page waited tens of seconds for its list.
+    // One request at a time: every open page polling a slow chat list on a timer stacked requests
+    // up until a fresh page waited tens of seconds for its list.
     let inFlight = false;
 
     const load = async (force = false) => {
-      if (inFlight || (!force && document.visibilityState === 'hidden')) return;
+      if (inFlight || (!force && !pageVisible())) return;
       inFlight = true;
       try {
         const list = await fetchSessions();
@@ -1161,18 +1175,21 @@ export default function App() {
       }
     };
 
+    // Not on screen means nothing to poll: the timer does not exist while hidden, and the page
+    // loads the list once the moment it is looked at again (this effect re-runs on `visible`).
+    if (!visible) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     void load(true);
     const timer = window.setInterval(() => void load(), 5000);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void load();
-    };
-    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [visible]);
 
   useEffect(() => {
     if (!selectedRoot) {
@@ -1186,6 +1203,10 @@ export default function App() {
     let socket: WebSocket | null = null;
     let retryTimer: number | undefined;
     let attempt = 0;
+    // Nobody looking means no socket. The visit keeps its rows and its cursor while paused, so
+    // coming back is a single reopen with `after=<the last rowid already on screen>`.
+    let paused = !pageVisible();
+    let started = false;
 
     visitRef.current += 1;
     rootRef.current = selectedRoot;
@@ -1202,17 +1223,38 @@ export default function App() {
     eventsRef.current = [];
     setEvents([]);
 
-    const connect = () => {
-      if (closed || !selectedRoot) return;
-      const after = eventsRef.current.reduce((max, event) => Math.max(max, event.rowid), 0);
-      socket = new WebSocket(liveUrl(selectedRoot, after), liveSubprotocol() ? [liveSubprotocol()!] : []);
+    /** Drops the live socket without any of its handlers being able to schedule another one. */
+    const dropSocket = () => {
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+        retryTimer = undefined;
+      }
+      const previous = socket;
+      socket = null;
+      if (!previous) return;
+      previous.onopen = null;
+      previous.onmessage = null;
+      previous.onclose = null;
+      previous.onerror = null;
+      previous.close();
+    };
 
-      socket.onopen = () => {
-        if (!closed) setSocketOpen(true);
+    const connect = () => {
+      if (closed || paused || !selectedRoot || !pageVisible()) return;
+      // Exactly one socket per visit: a reconnect, a return from hidden, or both in quick
+      // succession close the old one first, and the handlers below ignore anything that arrives
+      // from a socket that is no longer the current one.
+      dropSocket();
+      const after = eventsRef.current.reduce((max, event) => Math.max(max, event.rowid), 0);
+      const live = new WebSocket(liveUrl(selectedRoot, after), liveSubprotocol() ? [liveSubprotocol()!] : []);
+      socket = live;
+
+      live.onopen = () => {
+        if (!closed && socket === live) setSocketOpen(true);
       };
 
-      socket.onmessage = (message) => {
-        if (closed) return;
+      live.onmessage = (message) => {
+        if (closed || socket !== live) return;
         let payload: unknown;
         try {
           payload = JSON.parse(String(message.data));
@@ -1241,52 +1283,81 @@ export default function App() {
         }
       };
 
-      socket.onclose = () => {
-        if (closed) return;
+      live.onclose = () => {
+        if (closed || socket !== live) return;
+        socket = null;
         setSocketOpen(false);
+        // A close we asked for by hiding is not a failure: no reconnect loop while hidden. The
+        // visibility subscription opens the new socket when the page is looked at again.
+        if (paused || !pageVisible()) return;
         const delay = Math.min(15000, 500 * 2 ** attempt);
         attempt += 1;
-        retryTimer = window.setTimeout(connect, delay);
+        retryTimer = window.setTimeout(() => {
+          retryTimer = undefined;
+          connect();
+        }, delay);
       };
 
-      socket.onerror = () => {
-        socket?.close();
+      live.onerror = () => {
+        if (socket === live) live.close();
       };
     };
 
-    fetchEvents(selectedRoot, 0)
-      .then((loaded) => {
-        if (closed) return;
-        eventsRef.current = loaded;
-        setEvents(loaded);
-        const latest = loaded.reduce(
-          (max, event) => (Number.isFinite(event.ts) ? Math.max(max, event.ts) : max),
-          0,
-        );
-        setLastEventAt(latest > 0 ? latest : null);
-        setEventsFetchFailed(false);
-        setLoading(false);
-        connect();
-      })
-      .catch(() => {
-        if (closed) return;
-        eventsRef.current = [];
-        setEvents([]);
-        setLastEventAt(null);
-        setEventsFetchFailed(true);
-        setLoading(false);
-        connect();
-      });
+    const startVisit = () => {
+      if (closed || started || paused || !selectedRoot) return;
+      started = true;
+      fetchEvents(selectedRoot, 0)
+        .then((loaded) => {
+          if (closed) return;
+          eventsRef.current = loaded;
+          setEvents(loaded);
+          const latest = loaded.reduce(
+            (max, event) => (Number.isFinite(event.ts) ? Math.max(max, event.ts) : max),
+            0,
+          );
+          setLastEventAt(latest > 0 ? latest : null);
+          setEventsFetchFailed(false);
+          setLoading(false);
+          connect();
+        })
+        .catch(() => {
+          if (closed) return;
+          eventsRef.current = [];
+          setEvents([]);
+          setLastEventAt(null);
+          setEventsFetchFailed(true);
+          setLoading(false);
+          connect();
+        });
+    };
+
+    // Hiding closes the socket (a normal close, not a failure); being looked at again reopens it
+    // from the cursor. A chat switch or a hidden first load goes through the same door.
+    const unsubscribeVisibility = subscribePageVisible(() => {
+      if (closed) return;
+      if (!pageVisible()) {
+        paused = true;
+        attempt = 0;
+        dropSocket();
+        setSocketOpen(false);
+        return;
+      }
+      paused = false;
+      if (started) connect();
+      else startVisit();
+    });
+
+    startVisit();
 
     return () => {
       closed = true;
+      unsubscribeVisibility();
       // Leaving the chat ends the visit: a loadEarlier still in flight must not prepend into (or
       // report a failure against) whatever visit comes next, including a return to this same id.
       visitRef.current += 1;
       rootRef.current = null;
       setSocketOpen(false);
-      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-      socket?.close();
+      dropSocket();
     };
   }, [selectedRoot, appendEvents, setReplay]);
 
@@ -1304,16 +1375,25 @@ export default function App() {
       if (list.length > 0 || !isLive) setWarnings(list);
     };
 
+    // Paused while nobody is looking; the effect re-runs on `visible` and refreshes once.
+    if (!visible) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     void refresh();
     const timer = window.setInterval(refresh, 10000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [selectedRoot, isLive]);
+  }, [selectedRoot, isLive, visible]);
 
   useEffect(() => {
-    if (!playing) return;
+    // Replay is a saved position, so pausing it for a hidden page loses nothing: the cursor stays
+    // where it was and resumes at the same step when the page is looked at again.
+    if (!playing || !visible) return;
     const timer = window.setInterval(() => {
       const total = eventsRef.current.length;
       const current = replayRef.current ?? 0;
@@ -1326,7 +1406,7 @@ export default function App() {
       }
     }, 400);
     return () => window.clearInterval(timer);
-  }, [playing, speed, setReplay]);
+  }, [playing, speed, setReplay, visible]);
 
   const visibleEvents = useMemo(
     () => (replayIndex === null ? events : events.slice(0, replayPrefixCount(replayIndex, events.length))),
@@ -1499,11 +1579,11 @@ export default function App() {
 
   const [nowTs, setNowTs] = useState(() => Date.now() / 1000);
   useEffect(() => {
-    if (!summary.isRunning) return;
+    if (!summary.isRunning || !visible) return;
     setNowTs(Date.now() / 1000);
     const timer = window.setInterval(() => setNowTs(Date.now() / 1000), 1000);
     return () => window.clearInterval(timer);
-  }, [summary.isRunning]);
+  }, [summary.isRunning, visible]);
 
   const failedNodes = useMemo(
     () => graph.nodes.filter((node: GNode) => node.status === 'error'),

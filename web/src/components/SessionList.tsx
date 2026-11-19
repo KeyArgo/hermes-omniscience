@@ -14,6 +14,7 @@ import {
 import { SESSION_SORTS, type SessionSort, sortSessions, workingSessionId } from '../graph/sessions';
 import { heatLevel, heatSentence } from '../graph/heat';
 import { GROUP_MODES, groupSessions, type GroupMode } from '../graph/grouping';
+import { usePageVisible } from '../usePageVisible';
 
 const SORT_KEY = 'omni.sessionSort';
 const GROUP_KEY = 'omni.sessionGroup';
@@ -124,10 +125,15 @@ export function SessionList({
   );
 
   const workingId = workingSessionId(visibleSessions, now);
+  // A relative timestamp is a clock, not a request: it stops while the page is not on screen and
+  // restamps the moment it is.
+  const pageOnScreen = usePageVisible();
   useEffect(() => {
+    if (!pageOnScreen) return;
+    setNow(Date.now() / 1000);
     const timer = window.setInterval(() => setNow(Date.now() / 1000), 15_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [pageOnScreen]);
 
   function changeSort(next: SessionSort) {
     setSort(next);

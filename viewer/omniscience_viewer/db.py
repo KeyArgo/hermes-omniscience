@@ -350,6 +350,15 @@ def list_sessions(path: str, limit: int = 100) -> list[dict]:
 # is purged, so it is kept until the cheap signature below changes.
 _SESSIONS_CACHE: dict[tuple[str, int], tuple[tuple, list[dict]]] = {}
 _SESSIONS_LOCK = threading.Lock()
+# The chat list is folded from every row once and then *grown*: on a busy recording a new row
+# arrives every second, and rebuilding the whole list for it cost most of the viewer's CPU. Per
+# realpath: (accumulator state, last rowid folded, rows folded, purged ids, file identity). The
+# rows themselves are never kept, only what the per-row loop derives from them.
+_SESSIONS_STATE: dict[str, tuple] = {}
+_SESSIONS_STATE_LOCK = threading.Lock()
+# One chat-list build at a time: pages that ask together (several tabs opening at once) wait for
+# the first build and then reuse it, instead of each re-reading the whole recording in parallel.
+_SESSIONS_BUILD_LOCK = threading.Lock()
 
 
 def _file_stamp(path: str) -> tuple:
@@ -358,6 +367,15 @@ def _file_stamp(path: str) -> tuple:
         return (st.st_ino, st.st_mtime_ns, st.st_size)
     except OSError:
         return (None, None, None)
+
+
+def _file_identity(path: str) -> tuple:
+    """What identifies *this recording*: the same inode is the same file, a replaced one is not."""
+    try:
+        st = os.stat(path)
+        return (st.st_dev, st.st_ino)
+    except OSError:
+        return (None, None)
 
 
 def _sessions_signature(path: str) -> tuple | None:
@@ -395,7 +413,11 @@ def _is_locked(exc: sqlite3.Error) -> bool:
 
 
 def list_sessions_checked(path: str, limit: int = 100) -> tuple[list[dict], str | None]:
-    """:func:`_list_sessions_uncached`, reused until the recording changes.
+    """The chat list, kept in two layers until the recording changes.
+
+    Unchanged recording: the answer is reused whole. New rows only: the new rows are folded into
+    the accumulated state instead of re-reading and re-decoding the entire history. Anything
+    else (a purge, a replaced file, a row removed) rebuilds, exactly as every call used to.
 
     Callers get their own copy: the API adds labels to the rows it returns.
     """
@@ -411,50 +433,76 @@ def list_sessions_checked(path: str, limit: int = 100) -> tuple[list[dict], str 
             hit = _SESSIONS_CACHE.get(key)
         if hit is not None and hit[0] == signature:
             return copy.deepcopy(hit[1]), None
-    rows, error = _list_sessions_uncached(path, limit)
-    if error is None and signature is not None:
-        with _SESSIONS_LOCK:
-            _SESSIONS_CACHE[key] = (signature, copy.deepcopy(rows))
+    with _SESSIONS_BUILD_LOCK:
+        # Pages that asked together waited here for the first build: reuse it if nothing changed.
+        if signature is not None:
+            with _SESSIONS_LOCK:
+                hit = _SESSIONS_CACHE.get(key)
+            if hit is not None and hit[0] == signature:
+                return copy.deepcopy(hit[1]), None
+        rows, error = _sessions_for(path, key[0], limit, signature)
+        if error is None and signature is not None:
+            with _SESSIONS_LOCK:
+                _SESSIONS_CACHE[key] = (signature, copy.deepcopy(rows))
     return rows, error
 
 
-def _list_sessions_uncached(path: str, limit: int = 100) -> tuple[list[dict], str | None]:
-    """Like :func:`list_sessions` but return ``(roots, error)``.
+def _read_session_rows(
+    con: sqlite3.Connection, after_rowid: int | None = None, upto_rowid: int | None = None
+) -> list[tuple]:
+    """The columns the chat list folds, in rowid order.
 
-    A missing file means "nothing recorded yet" and is not an error. Anything else that
-    cannot be read - a writer holding the lock, a corrupt file - has to be reported by the
-    caller: an empty list renders as "this viewer found 0 conversations", which is
-    indistinguishable from an empty install and hides a real failure.
+    ``after_rowid`` reads only the rows appended since a previous fold. That is a range scan
+    from one rowid instead of an ORDER BY over the whole table, which is the whole point: on a
+    152k-row recording the full read is seconds of work for one new row.
     """
-    if not os.path.exists(path):
-        return [], None
-    try:
-        con = _connect(path)
-    except sqlite3.Error as exc:
-        return [], str(exc)
-    try:
-        # Older recordings (and the fixtures) may predate the turn_id column: read what exists and
-        # pass NULL for what does not, rather than 503-ing on a database that is merely old.
-        columns = {row[1] for row in con.execute("PRAGMA table_info(events)")}
-        turn_column = "turn_id" if "turn_id" in columns else "NULL AS turn_id"
-        rows = con.execute(
-            "SELECT rowid, kind, session_id, parent_session_id, status, attrs, ts, "
-            f"{turn_column} FROM events ORDER BY rowid ASC"
-        ).fetchall()
-        purged = _purged_ids(con)
-    except sqlite3.Error as exc:
-        if _uninitialised(exc):
-            return [], None
-        return [], str(exc)
-    finally:
-        con.close()
+    # Older recordings (and the fixtures) may predate the turn_id column: read what exists and
+    # pass NULL for what does not, rather than 503-ing on a database that is merely old.
+    columns = {row[1] for row in con.execute("PRAGMA table_info(events)")}
+    turn_column = "turn_id" if "turn_id" in columns else "NULL AS turn_id"
+    sql = (
+        "SELECT rowid, kind, session_id, parent_session_id, status, attrs, ts, "
+        f"{turn_column} FROM events"
+    )
+    params: tuple = ()
+    if after_rowid is not None:
+        sql += " WHERE rowid > ?"
+        params = (int(after_rowid),)
+        if upto_rowid is not None:
+            sql += " AND rowid <= ?"
+            params += (int(upto_rowid),)
+    sql += " ORDER BY rowid ASC"
+    return con.execute(sql, params).fetchall()
 
-    sessions: dict[str, dict] = {}
-    children: set[str] = set()
-    # child session id -> parent session id (first relation wins)
-    parent_of: dict[str, str] = {}
+
+def _empty_sessions_state() -> dict:
+    return {
+        "sessions": {},
+        "children": set(),
+        # child session id -> parent session id (first relation wins)
+        "parent_of": {},
+        # session id of every gateway-wide drop marker, in rowid order
+        "dropped": [],
+    }
+
+
+def _fold_session_rows(state: dict, rows, purged) -> None:
+    """Apply *rows* to the accumulator the chat list is built from.
+
+    Every decision that depends on a single row lives here, so the same code builds the state
+    from the whole recording and grows it with the rows appended since the last call. Rows are
+    applied in rowid order, which is what makes the turn/error/usage state come out the same.
+    """
+    sessions: dict[str, dict] = state["sessions"]
+    children: set[str] = state["children"]
+    parent_of: dict[str, str] = state["parent_of"]
+    dropped: list = state["dropped"]
 
     for _rowid, kind, session_id, parent_session_id, status, raw_attrs, ts, turn_id in rows:
+        if kind == "omni.dropped":
+            # Recorded before the two checks below skip the row: a gateway marker counts
+            # whether or not it carries a session, and whether or not that session was purged.
+            dropped.append(session_id)
         if session_id is None:
             continue
         if session_id in purged or (parent_session_id and parent_session_id in purged):
@@ -586,6 +634,18 @@ def _list_sessions_uncached(path: str, limit: int = 100) -> tuple[list[dict], st
         elif kind == "subagent.start":
             session["subagents"] += 1
 
+
+def _finish_sessions(state: dict, limit: int) -> list[dict]:
+    """Turn the accumulator into the chat list, on a copy so the state can keep growing."""
+    # Finishing mutates what it reads: helper events are folded into their root, statuses are
+    # settled and token counts are rounded. The accumulator must stay the untouched history, so
+    # this works on a copy of it — a copy of thousands of small dicts is still far cheaper than
+    # re-reading and re-decoding every attrs blob in the recording.
+    sessions = copy.deepcopy(state["sessions"])
+    children = state["children"]
+    parent_of = state["parent_of"]
+    dropped_sessions = state["dropped"]
+
     # Attribute each helper (child) session's events to its ultimate root so the
     # session list shows the full run, matching /api/v1/events for that root.
     root_of_child: dict[str, str] = {}
@@ -657,7 +717,6 @@ def _list_sessions_uncached(path: str, limit: int = 100) -> tuple[list[dict], st
     # with or without a session id. Rows are already counted under the session
     # that carries them (main loop); every other marker is counted
     # individually for each root, matching /events for that root.
-    dropped_sessions = [row[2] for row in rows if row[1] == "omni.dropped"]
     for session_id, session in sessions.items():
         if session_id in children:
             continue
@@ -672,12 +731,171 @@ def _list_sessions_uncached(path: str, limit: int = 100) -> tuple[list[dict], st
 
     if limit is not None and limit >= 0:
         roots = roots[:limit]
-    return roots, None
+    return roots
 
 
-def _descendant_ids(con: sqlite3.Connection, root: str) -> set[str]:
-    seen: set[str] = {root}
-    frontier: set[str] = {root}
+def _load_sessions_state(path: str) -> dict:
+    """Read every row and fold it, plus what identifies what was read."""
+    loaded = {
+        "state": _empty_sessions_state(),
+        "last_rowid": 0,
+        "count": 0,
+        "purged": frozenset(),
+        "identity": _file_identity(path),
+        "error": None,
+    }
+    try:
+        con = _connect(path)
+    except sqlite3.Error as exc:
+        loaded["error"] = str(exc)
+        return loaded
+    try:
+        rows = _read_session_rows(con)
+        purged = frozenset(_purged_ids(con))
+    except sqlite3.Error as exc:
+        if not _uninitialised(exc):
+            loaded["error"] = str(exc)
+        return loaded
+    finally:
+        con.close()
+    _fold_session_rows(loaded["state"], rows, purged)
+    # Taken from the rows themselves, not a second query: a row written between the two reads
+    # would otherwise be counted as folded and never appear in the chat list.
+    loaded.update(last_rowid=rows[-1][0] if rows else 0, count=len(rows), purged=purged)
+    return loaded
+
+
+def _appended_session_rows(
+    path: str, newest: int | None = None, count: int | None = None
+) -> dict | None:
+    """The rows appended since the cached fold, or ``None`` when the cache cannot be reused.
+
+    ``None`` means "rebuild", and covers every reason to: no cached fold, a replaced file, a
+    purge, a row removed while the file grew, a read that failed. Rebuilding is what every call
+    used to do, so the fallback costs no correctness — only the work this fast path saves.
+    """
+    realpath = os.path.realpath(path)
+    with _SESSIONS_STATE_LOCK:
+        entry = _SESSIONS_STATE.get(realpath)
+    if entry is None:
+        return None
+    _state, last_rowid, row_count, purged_ids, identity = entry
+    if _file_identity(path) != identity:
+        return None
+    try:
+        con = _connect(path)
+    except sqlite3.Error:
+        return None
+    try:
+        if newest is None or count is None:
+            # The caller's signature already counted the rows; counting them again is a whole
+            # table scan, which is the cost this whole change exists to remove.
+            newest, count = con.execute(
+                "SELECT COALESCE(MAX(rowid), 0), COUNT(*) FROM events"
+            ).fetchone()
+        newest, count = int(newest or 0), int(count or 0)
+        purged = frozenset(_purged_ids(con))
+        if purged != purged_ids or newest <= last_rowid or count < row_count:
+            return None
+        # Only up to the newest row that was counted: a row written since then would make the
+        # count look wrong and force a rebuild on every poll of a busy recording.
+        rows = _read_session_rows(con, after_rowid=last_rowid, upto_rowid=newest)
+        # Exactly the rows that are new: nothing else was removed or added behind them. A
+        # rewrite that keeps the counts (a row deleted and another added) fails here and is
+        # rebuilt, which is why this is not just a rowid comparison.
+        if len(rows) != count - row_count:
+            return None
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+    return {
+        "entry": entry,
+        "rows": rows,
+        "last_rowid": newest,
+        "count": count,
+        "purged": purged,
+        "identity": identity,
+    }
+
+
+def _sessions_incremental(
+    path: str, limit: int, newest: int | None = None, count: int | None = None
+) -> list[dict] | None:
+    """The chat list from the cached fold plus the new rows, or ``None`` if it must be rebuilt."""
+    found = _appended_session_rows(path, newest, count)
+    if found is None:
+        return None
+    realpath = os.path.realpath(path)
+    with _SESSIONS_STATE_LOCK:
+        if _SESSIONS_STATE.get(realpath) is not found["entry"]:
+            # Another thread folded first and those rows are already applied; folding them
+            # again would count them twice. A rebuild is cheap next to a wrong chat list.
+            return None
+        state = found["entry"][0]
+        _fold_session_rows(state, found["rows"], found["purged"])
+        _SESSIONS_STATE[realpath] = (
+            state,
+            found["last_rowid"],
+            found["count"],
+            found["purged"],
+            found["identity"],
+        )
+        return _finish_sessions(state, limit)
+
+
+def _sessions_rebuild(path: str, realpath: str, limit: int) -> tuple[list[dict], str | None]:
+    """Build the chat list from the whole recording, and keep the fold for the next call."""
+    loaded = _load_sessions_state(path)
+    if loaded["error"] is not None:
+        return [], loaded["error"]
+    with _SESSIONS_STATE_LOCK:
+        _SESSIONS_STATE[realpath] = (
+            loaded["state"],
+            loaded["last_rowid"],
+            loaded["count"],
+            loaded["purged"],
+            loaded["identity"],
+        )
+        return _finish_sessions(loaded["state"], limit), None
+
+
+def _sessions_for(
+    path: str, realpath: str, limit: int, signature: tuple | None = None
+) -> tuple[list[dict], str | None]:
+    """Fold only what is new where possible, and report a database that cannot be read."""
+    newest = count = None
+    if signature is not None:
+        newest, count = signature[0], signature[1]
+    try:
+        incremental = _sessions_incremental(path, limit, newest, count)
+    except sqlite3.Error as exc:
+        return [], str(exc)
+    if incremental is not None:
+        return incremental, None
+    return _sessions_rebuild(path, realpath, limit)
+
+
+def _list_sessions_uncached(path: str, limit: int = 100) -> tuple[list[dict], str | None]:
+    """Like :func:`list_sessions` but return ``(roots, error)``.
+
+    A missing file means "nothing recorded yet" and is not an error. Anything else that
+    cannot be read - a writer holding the lock, a corrupt file - has to be reported by the
+    caller: an empty list renders as "this viewer found 0 conversations", which is
+    indistinguishable from an empty install and hides a real failure.
+    """
+    if not os.path.exists(path):
+        return [], None
+    loaded = _load_sessions_state(path)
+    if loaded["error"] is not None:
+        return [], loaded["error"]
+    return _finish_sessions(loaded["state"], limit), None
+
+
+def _descendant_closure(con: sqlite3.Connection, seeds: set[str]) -> set[str]:
+    """Every session reachable from *seeds* through parent_session_id or a subagent link."""
+    seen: set[str] = set(seeds)
+    frontier: set[str] = set(seeds)
     while frontier:
         ids = list(frontier)
         placeholders = ", ".join("?" for _ in ids)
@@ -701,6 +919,90 @@ def _descendant_ids(con: sqlite3.Connection, root: str) -> set[str]:
         frontier = found - seen
         seen |= frontier
     return seen
+
+
+def _descendant_ids(con: sqlite3.Connection, root: str) -> set[str]:
+    return _descendant_closure(con, {root})
+
+
+# The live feed asks "which sessions belong to this root" on every poll, and the answer only
+# changes when a row arrives. Both queries below scan the whole table (the links live in a
+# column with no index), so on a busy recording this was 19% of the viewer's CPU.
+# Per (realpath, root): (ids, last rowid folded, file identity, purged ids).
+_DESCENDANT_CACHE: dict[tuple[str, str], tuple] = {}
+_DESCENDANT_LOCK = threading.Lock()
+# A viewer can be pointed at a chat, then another; keep the last few hundred subtrees, not every
+# root a long session ever opened.
+_DESCENDANT_CACHE_MAX = 512
+
+
+def _remember_descendants(key, ids: set[str], last_rowid: int, identity: tuple, purged) -> None:
+    with _DESCENDANT_LOCK:
+        if len(_DESCENDANT_CACHE) >= _DESCENDANT_CACHE_MAX and key not in _DESCENDANT_CACHE:
+            _DESCENDANT_CACHE.clear()
+        _DESCENDANT_CACHE[key] = (frozenset(ids), last_rowid, identity, purged)
+
+
+def _new_child_links(con: sqlite3.Connection, after_rowid: int, known: set[str]) -> set[str]:
+    """Sessions the rows past *after_rowid* attach to something already in *known*."""
+    seeds: set[str] = set()
+    for child, parent in con.execute(
+        "SELECT session_id, parent_session_id FROM events "
+        "WHERE rowid > ? AND parent_session_id IS NOT NULL AND session_id IS NOT NULL",
+        (after_rowid,),
+    ):
+        if child and parent in known and child not in known:
+            seeds.add(child)
+    for parent, child in con.execute(
+        "SELECT session_id, json_extract(attrs, '$.child_session_id') FROM events "
+        "WHERE rowid > ? AND kind = 'subagent.start'",
+        (after_rowid,),
+    ):
+        if child and parent in known and child not in known:
+            seeds.add(child)
+    return seeds
+
+
+def _descendant_ids_cached(
+    con: sqlite3.Connection, path: str, root: str, purged
+) -> set[str]:
+    """``_descendant_ids``, remembered per recording until a row, purge or file change lands.
+
+    With new rows this runs the same whole-table walk starting from just the sessions those rows
+    newly attach to the subtree: the walk still sees every link ever written, so nothing that
+    was already linked is lost. Anything else (a replaced file, a purge, a rowid that went
+    backwards) falls back to the full walk.
+    """
+    key = (os.path.realpath(path), root)
+    identity = _file_identity(path)
+    purged_ids = frozenset(purged)
+    try:
+        newest = int(
+            con.execute("SELECT COALESCE(MAX(rowid), 0) FROM events").fetchone()[0] or 0
+        )
+    except sqlite3.Error:
+        return _descendant_ids(con, root)
+    with _DESCENDANT_LOCK:
+        entry = _DESCENDANT_CACHE.get(key)
+    if entry is not None:
+        cached, last_rowid, cached_identity, cached_purged = entry
+        if cached_identity == identity and cached_purged == purged_ids:
+            if newest == last_rowid:
+                return set(cached)
+            if newest > last_rowid:
+                try:
+                    seeds = _new_child_links(con, last_rowid, cached)
+                except sqlite3.Error:
+                    seeds = None
+                if seeds is not None:
+                    ids = set(cached)
+                    if seeds:
+                        ids |= _descendant_closure(con, seeds)
+                    _remember_descendants(key, ids, newest, identity, purged_ids)
+                    return ids
+    ids = _descendant_ids(con, root)
+    _remember_descendants(key, ids, newest, identity, purged_ids)
+    return ids
 
 
 def events_for_root(
@@ -743,8 +1045,8 @@ def events_for_root_checked(
     except sqlite3.Error as exc:
         return [], str(exc)
     try:
-        ids = _descendant_ids(con, root)
         purged = _purged_ids(con)
+        ids = _descendant_ids_cached(con, path, root, purged)
         if root in purged:
             # A deleted chat has no steps left to show, whatever rows still point at it.
             ids = set()
@@ -839,6 +1141,85 @@ def events_for_sessions_checked(
     finally:
         con.close()
     return [_row_to_dict(row) for row in rows], None
+
+
+def data_stamp(path: str) -> tuple | None:
+    """What any answer cached per chat depends on: which rows exist and which chat was purged.
+
+    ``(MAX(rowid), COUNT(*), purged ids, file identity)``, read without decoding a single row.
+    ``None`` when the database cannot be read: a caller caches nothing rather than caching a
+    failure as if it were an answer.
+    """
+    try:
+        con = _connect(path)
+    except sqlite3.Error:
+        return None
+    try:
+        newest, count = con.execute(
+            "SELECT COALESCE(MAX(rowid), 0), COUNT(*) FROM events"
+        ).fetchone()
+        purged = _purged_ids(con)
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+    return (int(newest or 0), int(count or 0), frozenset(purged), _file_identity(path))
+
+
+# One open page asks the live feed for new rows every second, and on a quiet chat almost every
+# one of those polls finds nothing — but each still ran the per-socket query and the subtree
+# walk. "Is there anything past my cursor" is one index seek, and every socket in the process can
+# share the answer for half a second: a stale value only ever costs a query, never a lost row,
+# because the real query is still what delivers rows.
+LATEST_TTL_S = 0.5
+_LATEST_CACHE: dict[str, tuple] = {}
+_LATEST_LOCK = threading.Lock()
+
+
+def latest_rowid(path: str, ttl: float = LATEST_TTL_S) -> tuple[int, tuple] | None:
+    """``(MAX(rowid), file identity)``, shared for *ttl* seconds. ``None`` if it cannot be read.
+
+    ``None`` is the fail-open answer: the caller runs its real query, which is what reports a
+    database that is locked, missing or broken.
+    """
+    try:
+        realpath = os.path.realpath(path)
+    except OSError:
+        realpath = path
+    now = time.monotonic()
+    with _LATEST_LOCK:
+        hit = _LATEST_CACHE.get(realpath)
+    if hit is not None and now - hit[0] < ttl:
+        return hit[1], hit[2]
+    try:
+        con = _connect(path)
+    except sqlite3.Error:
+        return None
+    try:
+        # This read is a hint on the event loop's own tick, not a page load: do not sit out the
+        # full busy timeout behind a writer. "Cannot tell" merely means the real query runs.
+        con.execute("PRAGMA busy_timeout=50")
+        newest = con.execute("SELECT COALESCE(MAX(rowid), 0) FROM events").fetchone()[0]
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+    value = (int(newest or 0), _file_identity(path))
+    with _LATEST_LOCK:
+        _LATEST_CACHE[realpath] = (now, value[0], value[1])
+    return value
+
+
+def clear_caches() -> None:
+    """Forget every read cache. For tests, and for a recording replaced under the viewer."""
+    with _SESSIONS_LOCK:
+        _SESSIONS_CACHE.clear()
+    with _SESSIONS_STATE_LOCK:
+        _SESSIONS_STATE.clear()
+    with _DESCENDANT_LOCK:
+        _DESCENDANT_CACHE.clear()
+    with _LATEST_LOCK:
+        _LATEST_CACHE.clear()
 
 
 class Database:

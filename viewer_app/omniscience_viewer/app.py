@@ -804,18 +804,46 @@ def create_app(db_path: str, static_dir: str | None = None,
         db_broken = False
         seen_sessions: set[str] = {root} if root else set()
         pending_backfill: set[str] = set()
+        # The recording this socket last read. A different file, or a row past this socket's
+        # cursor, means the per-socket query has something to find.
+        polled_identity: tuple | None = None
         try:
             while True:
                 if root:
-                    try:
-                        rows, error = await live_queries.run(
-                            (db_path, root, cursor, 1000),
-                            db_mod.events_for_root_checked,
-                            db_path,
-                            root,
-                            cursor,
-                            1000,
+                    # On a quiet chat almost every poll finds nothing, and the per-socket query
+                    # (subtree walk plus a row scan) was the most expensive thing the viewer
+                    # did. "Is anything newer than my cursor" is one index seek, shared across
+                    # sockets: when the answer is no, the query cannot find anything either.
+                    latest = None
+                    quiet = False
+                    if not pending_backfill and not db_broken:
+                        try:
+                            latest = db_mod.latest_rowid(db_path)
+                        except (OSError, sqlite3.Error):
+                            latest = None
+                        quiet = (
+                            latest is not None
+                            and polled_identity == latest[1]
+                            and latest[0] <= cursor
                         )
+                    try:
+                        if quiet:
+                            # An idle poll, exactly as if the query had run and found nothing:
+                            # the answer cannot have changed since this socket last read the
+                            # recording, so the query would only cost time.
+                            rows, error = [], None
+                        else:
+                            polled_identity = (
+                                latest[1] if latest is not None else polled_identity
+                            )
+                            rows, error = await live_queries.run(
+                                (db_path, root, cursor, 1000),
+                                db_mod.events_for_root_checked,
+                                db_path,
+                                root,
+                                cursor,
+                                1000,
+                            )
                     except Exception:
                         # Never let a transient failure kill the feed silently.
                         rows, error = [], "database unavailable"
