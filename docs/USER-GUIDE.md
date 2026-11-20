@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 126bf74
-> **Revised:** 2026-11-18 · **Body hash:** d6de2dad
+> **Applies to:** Omniscience 1.0.0 · written at commit a456bf7
+> **Revised:** 2026-11-19 · **Body hash:** 4072ea72
+
 
 
 
@@ -492,7 +493,7 @@ The line is edited in place instead of repeated. Turn notices off with `OMNISCIE
 
 **Your controls:** `/omni off` and `/omni on` control recording; `/omni forget` deletes recorded data after confirmation. The viewer only answers this computer and requires the per-launch key.
 
-Chat titles in the viewer come from Hermes and may contain the start of what you typed. Settings can hide them for screen sharing.
+Chat titles in the viewer are the names Hermes itself shows — a chat's title, or the start of its first message when it has none — and may contain the start of what you typed. Settings can hide them for screen sharing.
 
 ## Limits
 

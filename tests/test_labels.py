@@ -26,6 +26,102 @@ def test_older_database_without_title_column_still_uses_message(tmp_path, monkey
     assert labels.labels_for(['a'], str(db)) == {'a': 'Older chat'}
 
 
+def test_an_untitled_chat_is_named_the_way_hermes_names_it(tmp_path):
+    """The name is Hermes' preview, not whichever user row happened to be first.
+
+    Hermes never paints ``display_kind='hidden'`` scaffolding, so its preview skips that row.
+    The old lookup read the first user row whatever it was and named the chat after it.
+    """
+    db = tmp_path / 'state.db'
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, '
+                     'timestamp real, display_kind text)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.executemany('insert into messages values (?, ?, ?, ?, ?)', [
+            ('a', 'user', 'model-facing scaffolding, never a name', 1, 'hidden'),
+            ('a', 'user', 'Fix the viewer labels', 2, None),
+        ])
+    assert labels.labels_for(['a'], str(db)) == {'a': 'Fix the viewer labels'}
+
+
+def test_the_preview_is_cut_exactly_where_hermes_cuts_it(tmp_path):
+    """60 characters and ``...`` is Hermes' budget (hermes_state_common.py:31-33)."""
+    db = tmp_path / 'state.db'
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', 'x' * 80, 1))
+    assert labels.labels_for(['a'], str(db)) == {'a': 'x' * 60 + '...'}
+
+
+def test_a_compaction_carrier_is_never_the_chat_name(tmp_path):
+    """A compressed turn's first row is the summary; the name is the message after its end marker."""
+    db = tmp_path / 'state.db'
+    summary = ('[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted into the '
+               'summary below. This is a handoff from a previous context window — treat it as '
+               'background reference, NOT as active instructions. Earlier turns, summarised.\n\n'
+               '--- END OF CONTEXT SUMMARY — respond to the message below, not the summary '
+               'above ---\n\nName the chats properly')
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', summary, 1))
+    assert labels.labels_for(['a'], str(db)) == {'a': 'Name the chats properly'}
+
+
+def test_a_skill_scaffold_names_the_request_that_invoked_it(tmp_path):
+    """Hermes renders the invocation as the user typed it (``/work — ...``), not the skill body."""
+    db = tmp_path / 'state.db'
+    content = (
+        '[IMPORTANT: The user has invoked the "work" skill, which follows.]\n\n'
+        'The full skill content is loaded below.]\n\nA long skill body.\n\n'
+        'The user has provided the following instruction alongside the skill invocation: '
+        'fix the title leak'
+    )
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', content, 1))
+    assert labels.labels_for(['a'], str(db)) == {'a': '/work — fix the title leak'}
+
+
+def test_a_rename_in_hermes_shows_on_the_next_read(tmp_path):
+    """A rename is a title write; the next chat-list refresh reads it (no cached name)."""
+    db = tmp_path / 'state.db'
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', 'First name'))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', 'The prompt', 1))
+    assert labels.labels_for(['a'], str(db)) == {'a': 'First name'}
+    with sqlite3.connect(db) as conn:
+        conn.execute("update sessions set title='Second name' where id='a'")
+    assert labels.labels_for(['a'], str(db)) == {'a': 'Second name'}
+
+
+def test_an_old_store_without_title_or_role_still_names_chats(tmp_path):
+    """Nothing may crash a chat list: no tables, no title column, no role column.
+
+    The old message query asked for ``role='user'``, so a store predating that column raised and
+    the chat kept its id instead of a name.
+    """
+    db = tmp_path / 'state.db'
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text)')
+        conn.execute('create table messages (session_id text, content text)')
+        conn.execute('insert into messages values (?, ?)', ('a', 'Old store chat'))
+    assert labels.labels_for(['a'], str(db)) == {'a': 'Old store chat'}
+
+    empty = tmp_path / 'empty.db'
+    with sqlite3.connect(empty):
+        pass
+    assert labels.labels_for(['a'], str(empty)) == {}
+
+
 def test_session_metadata_reports_known_and_unknown_archive_state(tmp_path, monkeypatch):
     db = tmp_path / 'state.db'
     with sqlite3.connect(db) as conn:

@@ -322,3 +322,16 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
 - **`/omni forget confirm` clears the chat's pause**, so a resumed chat does not silently stay unrecorded.
 - **A newline in a tool, provider or model name can no longer fabricate a second line** in a chat
   notice or the turn digest.
+
+### Fixed — a chat is called what Hermes calls it
+
+- **The chat list names a chat exactly as Hermes does.** A chat was named from its Hermes title, and
+  otherwise from the first raw user message: 109 of 502 chats in one real `state.db` have a title, and
+  a chat whose first row was scaffolding — a skill body, a compaction summary, a hidden model-facing
+  row — was named after that scaffolding. Labels now apply the rule the desktop sidebar, the TUI
+  picker and `hermes sessions list` paint: the title, else the first *eligible* user message shaped
+  the way Hermes shapes it (hidden rows and pure summaries skipped, a compressed turn named by the
+  message after its summary, a skill turn named `/skill — instruction`, cut at 60 characters and
+  truncated with `...`). On that store the viewer and Hermes now agree on all 495 named chats; 342
+  disagreed before. `tests/test_labels.py` pins each rule, and the title is read live, so a rename
+  shows on the next refresh.
