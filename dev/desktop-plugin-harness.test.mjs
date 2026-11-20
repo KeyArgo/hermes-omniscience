@@ -1,7 +1,9 @@
 // Developer harness for desktop/plugin.js — kept OUT of the shipped desktop/ directory on
 // purpose: catalog rule 8 allows the desktop surface to import only the SDK and react, and a
 // dynamic import inside desktop/ fails `hermes plugins validate`. Nothing runs this in CI.
-// Run by hand with vitest (there is no config file in the repo; pass this path directly).
+// It is a vitest file, so it cannot run under `node --test`: vitest lives in web/node_modules,
+// and the harness sits outside that root. Run it from web/ with the root raised one level:
+//     cd web && npx vitest run --root .. ../dev/desktop-plugin-harness.test.mjs
 //
 // What it pins: the page registers its routes/palette entries, and it reaches the host only
 // through `ctx` — the viewer key comes from ctx.rest('/viewer') and links open through

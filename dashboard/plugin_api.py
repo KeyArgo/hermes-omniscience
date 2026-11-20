@@ -67,10 +67,20 @@ def _query_locked(db_path: Path) -> dict:
     try:
         try:
             row = conn.execute("SELECT COUNT(*), MAX(ts) FROM events").fetchone()
-        except sqlite3.OperationalError as exc:
+        except sqlite3.Error as exc:
+            # OperationalError is an old store with no events table; DatabaseError is a file that
+            # is not a database at all (a torn copy, a half-written recording). Both are answers
+            # this endpoint owes the panel — a 500 would report the corruption as a broken plugin.
             return {"ok": False, "error": f"query failed: {exc}"}
         count, last_ts = int(row[0] or 0), row[1]
-        return {"ok": True, "events": count, "last_ts": float(last_ts) if last_ts is not None else None}
+        if last_ts is None:
+            return {"ok": True, "events": count, "last_ts": None}
+        try:
+            last_ts = float(last_ts)
+        except (TypeError, ValueError):
+            # A store that wrote timestamps as text has no number to show; the count still counts.
+            return {"ok": True, "events": count, "last_ts": None}
+        return {"ok": True, "events": count, "last_ts": last_ts}
     finally:
         conn.close()
 

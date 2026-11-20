@@ -329,3 +329,75 @@ def test_windows_cmdline_falls_back_when_one_tool_is_missing(monkeypatch):
 
     monkeypatch.setattr(launcher.subprocess, "run", neither)
     assert launcher._pid_cmdline(4242) is None
+
+
+def _dead_port_env(monkeypatch):
+    """A viewer URL nothing answers on, with nothing auto-starting behind our back."""
+    monkeypatch.setenv("OMNISCIENCE_VIEWER_URL", "http://127.0.0.1:1")
+    monkeypatch.delenv("OMNISCIENCE_VIEWER_AUTOSTART", raising=False)
+
+
+def test_a_stop_clears_the_start_stamp_so_a_restart_can_start(tmp_path, monkeypatch):
+    """Restart viewer is stop-then-start: the stop must not leave the next start held back.
+
+    ``viewer.last-start`` is written before every spawn, so a start that succeeded leaves one
+    too. The retry pause then answered the restart with "a start was attempted less than a
+    minute ago" — the viewer stayed down for up to a minute after the owner pressed Restart
+    viewer (or switched the viewer off and on again) within a minute of a start.
+    """
+    from omniscience import viewer_launcher as launcher
+
+    db = tmp_path / "events.db"
+    db.write_bytes(b"")
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    # A start a moment ago: any successful start writes this.
+    (log_dir / "viewer.last-start").write_text(str(int(time.time())), encoding="utf-8")
+    _dead_port_env(monkeypatch)
+
+    def no_spawn(*args, **kwargs):
+        raise OSError("no spawn in tests")
+
+    monkeypatch.setattr(launcher.subprocess, "Popen", no_spawn)
+
+    assert launcher.stop_viewer(str(log_dir))["stopped"] is False
+    assert not (log_dir / "viewer.last-start").exists()
+
+    result = launcher.ensure_viewer(str(db), log_dir=str(log_dir), autostart=True)
+    assert "less than a minute ago" not in result["reason"], result
+    # It went on to try the spawn (refused here), which is the point.
+    assert "spawn failed" in result["reason"], result
+
+
+def test_stopping_a_live_viewer_clears_the_start_stamp_too(tmp_path, monkeypatch):
+    """The same reset, for a viewer that is actually running when it is stopped."""
+    from omniscience import viewer_launcher as launcher
+
+    log_dir = tmp_path
+    (log_dir / "viewer.last-start").write_text(str(int(time.time())), encoding="utf-8")
+    with open(launcher.pid_path(str(log_dir)), "w", encoding="utf-8") as fh:
+        fh.write("4242")
+    monkeypatch.setattr(launcher, "_pid_cmdline", lambda p: "python -m omniscience_viewer --db x")
+    monkeypatch.setattr(launcher.os, "kill", lambda p, sig: None)
+    running = iter([True, False])
+    monkeypatch.setattr(launcher, "_pid_running", lambda p: next(running, False))
+
+    assert launcher.stop_viewer(str(log_dir)) == {"stopped": True, "reason": "stopped"}
+    assert not (log_dir / "viewer.last-start").exists()
+    assert not os.path.exists(launcher.pid_path(str(log_dir)))
+
+
+def test_a_refused_stop_keeps_the_stamp(tmp_path, monkeypatch):
+    """A stop that could not prove the process is ours must not lift the retry pause."""
+    from omniscience import viewer_launcher as launcher
+
+    log_dir = tmp_path
+    stamp = log_dir / "viewer.last-start"
+    stamp.write_text(str(int(time.time())), encoding="utf-8")
+    with open(launcher.pid_path(str(log_dir)), "w", encoding="utf-8") as fh:
+        fh.write("4242")
+    monkeypatch.setattr(launcher, "_pid_running", lambda p: True)
+    monkeypatch.setattr(launcher, "_pid_cmdline", lambda p: None)
+
+    assert launcher.stop_viewer(str(log_dir))["stopped"] is False
+    assert stamp.exists()

@@ -326,8 +326,16 @@ def labels_for(session_ids: list[str], state_db: str | os.PathLike | None = None
             if label:
                 break
         if not label:
+            # Nothing Hermes' preview query would paint. That is a row it deliberately skips — a
+            # compaction summary with no message after it, which is how a chat came to be named
+            # "[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were ..." — so the fallback
+            # must not paint it raw. A session with no name keeps its id, as Hermes shows nothing.
             for content in messages:
-                label = _clean(content or '')
+                if not isinstance(content, str):
+                    continue
+                if content.lstrip(' \t\r\n').startswith(SUMMARY_PREFIXES):
+                    continue
+                label = _clean(content)
                 if label:
                     break
         if label:

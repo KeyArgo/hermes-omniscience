@@ -102,16 +102,17 @@ def _memory_from_windows() -> tuple[float | None, float | None]:
 
 
 def _memory_from_rusage() -> tuple[float | None, float | None]:
-    """macOS/BSD: getrusage reports only the peak. It is bytes on macOS, kB elsewhere.
+    """macOS/BSD: getrusage reports only the peak, in bytes on macOS and kB elsewhere.
 
     Current RSS has no stdlib source on these platforms, so it reads as ``?``.
     """
     import resource
 
-    peak_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if sys.platform != "darwin":
-        peak_kb = peak_kb / 1024.0  # BSD reports kB, macOS reports bytes
-    return None, float(peak_kb) / 1024.0
+    peak = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    # One divisor for the unit the platform reports in, so the answer is megabytes on both:
+    # dividing macOS bytes once reported a 512 MB peaker as 524288 MB.
+    divisor = 1024.0 * 1024.0 if sys.platform == "darwin" else 1024.0
+    return None, peak / divisor
 
 
 def read_memory_mb() -> tuple[float | None, float | None]:

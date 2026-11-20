@@ -468,6 +468,32 @@ def test_the_windows_call_declares_its_argument_types():
     assert "counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)" in body
 
 
+def test_a_mac_peak_reads_as_megabytes_not_kilobytes(monkeypatch):
+    """macOS reports ``ru_maxrss`` in bytes; the health line is in MB on every platform.
+
+    The reader divided by 1024 once and called it MB, so on macOS a 512 MB process logged
+    ``peak_mb=524288.0`` — a number that makes every macOS health line a false alarm.
+    """
+    import resource
+
+    from omniscience_viewer import health as health_mod
+
+    class Usage:
+        def __init__(self, peak: int) -> None:
+            self.ru_maxrss = peak
+
+    monkeypatch.setattr(health_mod.sys, "platform", "darwin")
+    monkeypatch.setattr(resource, "getrusage", lambda *args: Usage(512 * 1024 * 1024))
+    rss, peak = health_mod.read_memory_mb()
+    assert rss is None  # no stdlib source for it on these platforms
+    assert peak == pytest.approx(512.0), peak
+
+    # A BSD reports the same peak in kB, and must land on the same number.
+    monkeypatch.setattr(health_mod.sys, "platform", "freebsd14")
+    monkeypatch.setattr(resource, "getrusage", lambda *args: Usage(512 * 1024))
+    assert health_mod.read_memory_mb() == (None, pytest.approx(512.0))
+
+
 def test_cached_session_count_reads_the_fold(tmp_path):
     from omniscience_viewer import db as db_mod
 

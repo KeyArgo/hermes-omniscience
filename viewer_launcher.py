@@ -224,6 +224,24 @@ def _pid_running(pid: int) -> bool:
     return state not in (b"Z", b"X")
 
 
+def _clear_start_stamp(log_dir: str) -> None:
+    """Forget the last start attempt: the viewer is being stopped on purpose.
+
+    ``viewer.last-start`` exists so a crashing viewer is not relaunched by every Hermes process
+    that loads the plugin. It is written before the spawn, so it also records starts that
+    succeeded — and it outlived them. A deliberate stop (Restart viewer, or the owner's switch
+    off and on again) then found the stamp younger than a minute and refused to start, leaving
+    the viewer down with "a start was attempted less than a minute ago". Nothing is being
+    backed off from once the viewer has been stopped, so the stamp goes with it.
+    """
+    try:
+        os.unlink(os.path.join(log_dir, "viewer.last-start"))
+    except FileNotFoundError:
+        pass
+    except OSError:
+        log.debug("omniscience: could not clear the viewer start stamp", exc_info=True)
+
+
 def stop_viewer(log_dir: str) -> dict:
     """Stop the viewer this launcher started. Never raises, never signals anything else.
 
@@ -239,6 +257,8 @@ def stop_viewer(log_dir: str) -> dict:
     try:
         raw = Path(path).read_text(encoding="utf-8").strip()
     except OSError:
+        # Nothing this launcher started is recorded, so nothing is running under its name.
+        _clear_start_stamp(log_dir)
         result["reason"] = "no viewer pid"
         return result
     try:
@@ -246,11 +266,13 @@ def stop_viewer(log_dir: str) -> dict:
     except ValueError:
         result["reason"] = "viewer pid file holds no pid"
         _remove_pid_file(path)
+        _clear_start_stamp(log_dir)
         return result
 
     if not _pid_running(pid):
         # The viewer closed itself (the idle exit) and left its pid behind: nothing to signal.
         _remove_pid_file(path)
+        _clear_start_stamp(log_dir)
         result["reason"] = "not running"
         return result
 
@@ -261,6 +283,7 @@ def stop_viewer(log_dir: str) -> dict:
     if "omniscience_viewer" not in cmdline:
         result["reason"] = f"process {pid} is not the viewer"
         _remove_pid_file(path)
+        _clear_start_stamp(log_dir)
         return result
 
     if sys.platform == "win32":
@@ -278,6 +301,7 @@ def stop_viewer(log_dir: str) -> dict:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
             _remove_pid_file(path)
+            _clear_start_stamp(log_dir)
             result["reason"] = "not running"
             return result
         except OSError as exc:
@@ -288,6 +312,8 @@ def stop_viewer(log_dir: str) -> dict:
     while time.time() < deadline:
         if not _pid_running(pid):
             _remove_pid_file(path)
+            # Stopped on purpose: the next start is the owner's ask, not a retry to be held back.
+            _clear_start_stamp(log_dir)
             result["stopped"] = True
             result["reason"] = "stopped"
             return result

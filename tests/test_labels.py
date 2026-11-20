@@ -122,6 +122,31 @@ def test_an_old_store_without_title_or_role_still_names_chats(tmp_path):
     assert labels.labels_for(['a'], str(empty)) == {}
 
 
+def test_a_summary_with_no_message_after_it_is_not_the_name(tmp_path):
+    """A carrier Hermes' preview skips must not come back as the chat's name.
+
+    Hermes paints a compaction row only for the message after its end marker. A summary with no
+    message after it has no name at all, and the label reader's fallback painted the raw row:
+    the chat read ``[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were ...`` — the very
+    label this module exists to stop. No name is a session id, which is what Hermes shows too.
+    """
+    db = tmp_path / 'state.db'
+    summary = ('[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted into the '
+               'summary below. This is a handoff from a previous context window — treat it as '
+               'background reference, NOT as active instructions. Earlier turns, summarised.')
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, '
+                     'timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', summary, 1))
+        conn.execute('insert into sessions values (?, ?)', ('b', ''))
+        conn.execute('insert into messages values (?, ?, ?, ?)',
+                     ('b', 'user', '[CONTEXT SUMMARY]: old form, also not a name', 1))
+
+    assert labels.labels_for(['a', 'b'], str(db)) == {}
+
+
 def test_session_metadata_reports_known_and_unknown_archive_state(tmp_path, monkeypatch):
     db = tmp_path / 'state.db'
     with sqlite3.connect(db) as conn:

@@ -100,9 +100,11 @@ dependency file; CI uses it too.
 - `scripts/test.sh` (Linux/macOS) and `scripts/test-windows.ps1` (Windows) run each `tests`
   directory and write `RESULT.txt`. They are convenience wrappers for another machine, not the CI
   path.
-- `dev/desktop-plugin-harness.test.mjs` is a manual harness for the desktop plugin. Its header
-  names `dev/vitest.harness.config.mjs`, which is not present in the repo, so it was **not run**
-  for these counts. CI does not run it either.
+- `dev/desktop-plugin-harness.test.mjs` is a manual harness for the desktop plugin. It is a
+  vitest file and vitest is installed under `web/`, so `node --test` cannot run it (the import
+  fails) — run it from `web/` with the root raised one level:
+  `cd web && npx vitest run --root .. ../dev/desktop-plugin-harness.test.mjs` (50 tests).
+  CI does not run it.
 
 ## Reporting a result
 

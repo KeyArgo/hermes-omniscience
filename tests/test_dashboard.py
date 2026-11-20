@@ -125,3 +125,58 @@ def test_health_default_viewer_url(tmp_path, monkeypatch):
 
     data = client.get("/api/plugins/omniscience/health").json()
     assert data["viewer_url"] == "http://127.0.0.1:8797"
+
+
+def test_health_reports_a_file_that_is_not_a_database(tmp_path, monkeypatch):
+    """A torn or foreign events.db is the one moment the health panel is opened.
+
+    Only ``OperationalError`` was caught, so sqlite's ``DatabaseError: file is not a database``
+    escaped the endpoint as a 500 — the panel said the plugin was broken instead of saying the
+    recording could not be read.
+    """
+    module = _load_plugin_api(monkeypatch, tmp_path)
+    db_file = tmp_path / "plugin-data" / "omniscience" / "events.db"
+    db_file.parent.mkdir(parents=True)
+    db_file.write_bytes(b"this is not a sqlite database" * 40)
+    client = _make_app(module)
+
+    resp = client.get("/api/plugins/omniscience/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert "query failed" in data["error"]
+    assert data["events"] == 0
+
+
+def test_health_survives_a_truncated_recording(tmp_path, monkeypatch):
+    """A half-copied file: sqlite fails mid-read, which must not become a 500 either."""
+    module = _load_plugin_api(monkeypatch, tmp_path)
+    db_file = _make_db(tmp_path)
+    db_file.write_bytes(db_file.read_bytes()[:60])
+    client = _make_app(module)
+
+    resp = client.get("/api/plugins/omniscience/health")
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is False
+
+
+def test_health_counts_a_store_whose_timestamps_are_text(tmp_path, monkeypatch):
+    """An imported store may hold ``ts`` as text; the count is still the answer, not a 500."""
+    module = _load_plugin_api(monkeypatch, tmp_path)
+    db_file = tmp_path / "plugin-data" / "omniscience" / "events.db"
+    db_file.parent.mkdir(parents=True)
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute("CREATE TABLE events (rowid INTEGER PRIMARY KEY, kind TEXT, ts TEXT)")
+        conn.execute("INSERT INTO events (kind, ts) VALUES ('turn.start', '2026-11-20T06:00:00Z')")
+        conn.commit()
+    finally:
+        conn.close()
+    client = _make_app(module)
+
+    resp = client.get("/api/plugins/omniscience/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["events"] == 1
+    assert data["last_ts"] is None
