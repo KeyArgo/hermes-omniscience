@@ -86,9 +86,6 @@ import {
   type InterfaceMode,
 } from './shell/mode';
 import {
-  defaultCompact,
-  defaultPreset,
-  isModePrefKey,
   readCompact as readModeCompact,
   readPreset as readModePreset,
   readScopedBool,
@@ -98,6 +95,15 @@ import {
   writeScopedBool,
   writeScopedPref,
 } from './shell/modePrefs';
+import {
+  DETAILS_CLOSED,
+  detailsRailShown,
+  detailsWorkspaceClass,
+  escapeClosesDetails,
+  isTypingTarget,
+  type RailMode,
+} from './shell/detailsPanel';
+import { VIEW_RESET, isResetPanelKey, resetStorageKeys } from './shell/viewReset';
 import { PrefScopeProvider } from './shell/prefScope';
 import {
   applyInterfaceSize,
@@ -633,6 +639,13 @@ export default function App() {
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   // What the CSV export did, said out loud: a silent download is indistinguishable from a broken one.
   const [exportNote, setExportNote] = useState<string | null>(null);
+  // Reset view is one click with no dialog, so the click says what it did.
+  const [viewResetNote, setViewResetNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!viewResetNote) return;
+    const timer = window.setTimeout(() => setViewResetNote(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [viewResetNote]);
   // The viewer can be updated underneath an open tab. Its bundle is immutable and this page
   // keeps running the old one until it is reloaded, so say so rather than look wrong.
   const [staleBuild, setStaleBuild] = useState(false);
@@ -744,6 +757,10 @@ export default function App() {
   const [speed, setSpeed] = useState<Speed>(1);
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // The event behind the selected step: it drives the failure stepper and the lens cursor. It is
+  // declared with the node selection so closing the panel can end both together.
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectNonce, setSelectNonce] = useState(0);
   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(new Set());
   // A lens selection can name an event the current graph has not built yet (seeking forward
   // rebuilds the graph from the new replay prefix). Keep that id until the node appears.
@@ -1191,7 +1208,7 @@ export default function App() {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [followNewest, setFollowNewest] = useState<boolean>(() => readScopedBool('followNewest', mode, false));
   // What the right frame shows: the usual details, or only what the user follows.
-  const [railMode, setRailMode] = useState<'details' | 'follow'>(
+  const [railMode, setRailMode] = useState<RailMode>(
     () => (readScopedPref('railMode', mode) === 'follow' ? 'follow' : 'details'),
   );
 
@@ -1644,6 +1661,57 @@ export default function App() {
     [baseGraph.nodes, selectedNodeId],
   );
 
+  /**
+   * The details rail exists only while it has something to show. A selected step opens it; with
+   * nothing selected there is no rail, and the workspace is two columns — not a third column
+   * holding an empty inspector.
+   */
+  const detailsRail = detailsRailShown(selectedNodeId, railMode);
+
+  /**
+   * Closing the details panel ends the selection, and the rail goes with it. Every closing path
+   * — the × in the panel head, Escape, a click on empty map space, Reset view — ends here, which
+   * is what stops any of them leaving the frame behind.
+   */
+  const closeDetails = useCallback(() => {
+    setSelectedNodeId(DETAILS_CLOSED.selectedNodeId);
+    setSelectedEventId(null);
+    setPendingLensEventId(null);
+    setRightCollapsed(DETAILS_CLOSED.railFolded);
+    // "Expand details" draws the rail over the whole stage; closing the panel must leave it too.
+    setFocusedArea((area) => (area === 'details' ? null : area));
+  }, []);
+
+  // Escape closes the panel only while it is the innermost layer: a dialog, a menu, the tour or a
+  // text field owns Escape before the panel does.
+  useEffect(() => {
+    if (!detailsRail) return;
+    const onKey = (event: KeyboardEvent) => {
+      const context = {
+        anyDialogOpen:
+          panelsOpen || settingsOpen || helpOpen || privacyOpen || insightOpen || workspaceOpen,
+        menuOpen: document.querySelector('[role="menu"]') !== null,
+        tourActive,
+        typing: isTypingTarget(document.activeElement),
+      };
+      if (!escapeClosesDetails(event, context, detailsRail)) return;
+      event.preventDefault();
+      closeDetails();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [
+    detailsRail,
+    panelsOpen,
+    settingsOpen,
+    helpOpen,
+    privacyOpen,
+    insightOpen,
+    workspaceOpen,
+    tourActive,
+    closeDetails,
+  ]);
+
   const expandTurn = useCallback((turnId: string) => {
     setExpandedTurnIds((previous) => new Set(previous).add(turnId));
   }, []);
@@ -1665,7 +1733,8 @@ export default function App() {
       // Any explicit node choice settles a lens selection that was waiting for the graph.
       setPendingLensEventId(null);
       if (nodeId === null) {
-        setSelectedNodeId(null);
+        // Empty map space: the selection, the panel and the step behind it all go together.
+        closeDetails();
         return;
       }
       setRailTab('inspect');
@@ -1686,7 +1755,7 @@ export default function App() {
       setSelectedNodeId(nodeId);
       if (options?.focus !== false) setFocusToken((token) => token + 1);
     },
-    [baseGraph, expandTurn],
+    [baseGraph, expandTurn, closeDetails],
   );
 
   const summary = useMemo(() => computeRunSummary(visibleEvents), [visibleEvents]);
@@ -1716,8 +1785,6 @@ export default function App() {
     [graph.nodes],
   );
 
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [selectNonce, setSelectNonce] = useState(0);
   const onSelectEvent = useCallback(
     (eventId: string) => {
       setSelectedEventId(eventId);
@@ -1853,15 +1920,73 @@ export default function App() {
   };
 
   /**
-   * Put the view back the way it started, for the mode on screen only.
+   * Put the view back the way the preset on screen starts, for the mode on screen only.
    *
-   * Anyone can end up with every panel folded, an odd zoom, filters on and a remembered chat.
-   * This forgets this mode's saved view preferences, restores its defaults, and re-frames the map.
-   * It never touches the recording, and the key removal is an allow list (modePrefs.ts): only
-   * keys this mode's own view settings use are removed. Privacy choices, the API token, the chat
-   * list's sort/group/collapse, the follow list, usage windows, problem acknowledgements and the
-   * other mode's keys are deliberately left alone.
+   * Anyone can end up with every panel folded, an odd zoom, a step selected and filters on. Reset
+   * clears the selection — which takes the details panel with it — closes the mini panel,
+   * un-minimizes the status card, brings the map back to its default camera, clears the filters
+   * and puts the panel layout back to the defaults of the preset you are in.
+   *
+   * It changes only where you are looking. The recording is never touched, and neither are the
+   * Settings switches or the look: turning the theme back to Console on a page someone set to
+   * Paper was the old behaviour, and a reader who lost the details panel never asked for that.
+   * The stored keys removed are this preset's panel layout and its panel heights —
+   * `resetStorageKeys` and `isResetPanelKey` are the allow list, and it is deliberately narrow.
    */
+  const resetView = () => {
+    // The preset on screen keeps its place; its own defaults are what Reset view restores. Switching
+    // presets here would change how much interface you see, which is not what "lost your place" means.
+    const resetPreset = preset;
+    const empty: Overrides = { hidden: [], shown: [] };
+    // Reset the in-memory layout for this preset: no overrides, whatever was hidden or shown.
+    prefs.reset();
+    // The rails are part of the layout, not a separate memory: in Simple the preset hides both side
+    // panels, and the rails must follow it even though the visibility did not change.
+    // Then forget what was stored, so a stale override cannot keep hiding a panel the preset shows.
+    // Panel heights and folds are layout too. All of it is this mode's own namespace: the theme, the
+    // interface size and the other mode's storage are not removed — Reset View used to erase the
+    // theme with this sweep, which is the behaviour this replaces.
+    const removeKeys = resetStorageKeys(mode, resetPreset);
+    try {
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const key = window.localStorage.key(i);
+        if (key && isResetPanelKey(key, mode)) removeKeys.push(key);
+      }
+    } catch {
+      /* storage unavailable: still reset what is on screen */
+    }
+    for (const key of removeKeys) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        /* storage unavailable: still reset what is on screen */
+      }
+    }
+    setLeftCollapsed(!isVisible('chats', resetPreset, empty));
+    // Nothing selected: the details rail has nothing to show and is not drawn at all.
+    setSelectedNodeId(VIEW_RESET.selectedNodeId);
+    setSelectedEventId(null);
+    setRailMode(VIEW_RESET.railMode);
+    writeScopedPref('railMode', mode, VIEW_RESET.railMode);
+    setRightCollapsed(VIEW_RESET.railFolded);
+    setFocusedArea(VIEW_RESET.focusedArea);
+    setStatusCollapsed(VIEW_RESET.statusMinimized);
+    setView(VIEW_RESET.view);
+    writeScopedPref('view', mode, VIEW_RESET.view);
+    setHideTools(VIEW_RESET.hideTools);
+    setHideLlms(VIEW_RESET.hideLlms);
+    setErrorsOnly(VIEW_RESET.errorsOnly);
+    setSessionsOpen(false);
+    setPendingLensEventId(null);
+    setExpandedTurnIds(new Set());
+    setReplay(VIEW_RESET.replayIndex);
+    setPlaying(VIEW_RESET.playing);
+    setFocusToken(0);
+    // A fresh camera token reframes the map the way a first open does.
+    setResetToken((token) => token + 1);
+    setSettingsOpen(false);
+    setViewResetNote('View reset');
+  };
   // The tour teaches the screen, so it starts from the screen's defaults: a tour that begins on a
   // layout the reader has hacked away at points at panels that are not there.
   const startTour = () => {
@@ -1880,56 +2005,6 @@ export default function App() {
     focusWorkspaceControl();
   };
 
-  const resetView = () => {
-    // Reset the in-memory layout first; its write is then removed by the sweep below, so Reset
-    // does not leave an empty layout key behind for the preset that was on screen.
-    const resetPreset = defaultPreset(mode);
-    const empty: Overrides = { hidden: [], shown: [] };
-    prefs.reset();
-    // Interface size is not in that allow list on purpose: it is how large the page draws, not
-    // what you are looking at, so Reset View leaves the reader's chosen size alone.
-    try {
-      const keys: string[] = [];
-      for (let i = 0; i < window.localStorage.length; i += 1) {
-        const key = window.localStorage.key(i);
-        if (!key) continue;
-        if (isModePrefKey(key, mode)) keys.push(key);
-      }
-      for (const key of keys) window.localStorage.removeItem(key);
-    } catch {
-      /* storage unavailable: still reset what is on screen */
-    }
-    // The rails are part of the layout, not a separate memory: in Simple the reset preset hides
-    // both side panels, and the rails must follow it even though the visibility did not change.
-    choosePreset(resetPreset);
-    setCompact(defaultCompact(mode, embedded));
-    writeModeCompact(mode, defaultCompact(mode, embedded));
-    setLeftCollapsed(!isVisible('chats', resetPreset, empty));
-    setRightCollapsed(!isVisible('inspector', resetPreset, empty));
-    setShowTitles(true);
-    setFollowNewest(false);
-    setTheme('console');
-    setAccent('teal');
-    setLinkView(false);
-    window.dispatchEvent(new Event('omni:privacy'));
-    setShowContext(true);
-    setStatusCollapsedState(false);
-    setDefaultView('graph');
-    setView('graph');
-    setHideTools(false);
-    setHideLlms(false);
-    setErrorsOnly(false);
-    setSessionsOpen(false);
-    setSelectedNodeId(null);
-    setPendingLensEventId(null);
-    setExpandedTurnIds(new Set());
-    setReplay(null);
-    setPlaying(false);
-    setRailMode('details');
-    setFocusToken(0);
-    setResetToken((token) => token + 1);
-    setSettingsOpen(false);
-  };
   /** Reset from the header: retire the sheet that held the control before resetting the view. */
   const resetFromHeader = () => {
     closeWorkspace(true);
@@ -2228,7 +2303,7 @@ export default function App() {
           type="button"
           className="icon-button"
           onClick={resetFromHeader}
-          title="Reset view: put the panels, zoom, filters and view back the way they started. Nothing is deleted."
+          title="Reset view: clear the selected step, close the details panel and put the map, filters and panels back. Your recording, settings and theme are left alone."
           aria-label="Reset view"
         >
           ↺
@@ -2277,9 +2352,9 @@ export default function App() {
           type="button"
           className="chip reset-view-chip"
           onClick={resetFromHeader}
-          title="Reset View: back to how Omniscience first opens. Recordings are not touched."
+          title="Reset view: clear the selected step, close the details panel and put the map, filters and panels back. Your recording, settings and theme are left alone."
         >
-          <span aria-hidden="true">↺</span> Reset View
+          <span aria-hidden="true">↺</span> Reset view
         </button>
       ) : null}
       <button
@@ -2349,6 +2424,12 @@ export default function App() {
           <button type="button" className="pnt-x" onClick={() => { setStopNote(null); setLastFlag(null); }} aria-label="Dismiss">
             ✕
           </button>
+        </div>
+      ) : null}
+      {/* Reset view is one click with no dialog, so the click has to say what it did. */}
+      {viewResetNote ? (
+        <div className="view-reset-note" role="status">
+          {viewResetNote}
         </div>
       ) : null}
       <HelpPanel
@@ -2492,6 +2573,23 @@ export default function App() {
               <div className="workspace-actions" role="group" aria-label="Workspace actions">
                 {headerActions}
               </div>
+              {/* The ↺ icon in the row above is the only reset a narrow header has, and an icon
+                  is not a word. This is the same action, labelled, with one line saying what it
+                  does and what it leaves alone. */}
+              <div className="workspace-reset" role="group" aria-label="Reset">
+                <button
+                  type="button"
+                  className="workspace-reset-button"
+                  onClick={resetFromHeader}
+                  title="Reset view: clear the selected step, close the details panel and put the map, filters and panels back. Your recording, settings and theme are left alone."
+                >
+                  <span aria-hidden="true">↺</span> Reset view
+                </button>
+                <p className="workspace-reset-line">
+                  Clears the selected step and closes the details panel. Your recording, settings
+                  and theme stay as they are.
+                </p>
+              </div>
             </div>
           ) : null
         ) : (
@@ -2508,7 +2606,7 @@ export default function App() {
       />
 
       <main
-        className={`workspace ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''}`}
+        className={`workspace ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''}${detailsWorkspaceClass(detailsRail)}`}
       >
         <div
           className={`rail-backdrop ${sessionsOpen ? 'is-open' : ''}`}
@@ -2660,8 +2758,8 @@ export default function App() {
                 <MenuItem onSelect={openPanels} hint="Show, hide and resize panels; switch Simple, Standard, Everything.">
                   Panels…
                 </MenuItem>
-                <MenuItem onSelect={resetFromHeader} hint="Back to how Omniscience first opens. Recordings are not touched.">
-                  ↺ Reset View
+                <MenuItem onSelect={resetFromHeader} hint="Clear the selected step, close the details panel and put the map, filters and panels back. Settings and the recording are left alone.">
+                  ↺ Reset view
                 </MenuItem>
               </MenuButton>
               {exportNote ? <span className="export-note" role="status">{exportNote}</span> : null}
@@ -2990,8 +3088,10 @@ export default function App() {
           {view === 'graph' && prefs.visible('legend') ? <Legend /> : null}
         </section>
 
-        {!rightCollapsed ? (
-            <div className="rail-scrim" aria-hidden="true" onClick={() => setInspectorShown(false)} />
+        {detailsRail ? (
+          <>
+          {!rightCollapsed ? (
+            <div className="rail-scrim" aria-hidden="true" onClick={closeDetails} />
           ) : null}
           <aside
           className={`rail-right ${selectedNode ? 'has-selection' : ''} ${rightCollapsed ? 'is-collapsed' : ''} ${railMode === 'follow' ? 'is-mini' : ''}${focusedArea === 'details' ? ' is-area-focused' : ''}`}
@@ -3053,21 +3153,13 @@ export default function App() {
               type="button"
               className="rail-collapse"
               aria-label="Hide details"
-              onClick={() => setInspectorShown(false)}
+              onClick={() => setRightCollapsed(true)}
             >
               ›
             </button>
-            {/* The chevron above is a 20 px "›" in a corner: at drawer widths it reads as "expand".
-                This one is a plain X with a 40 px target, and it only appears when the rail is a
-                drawer. */}
-            <button
-              type="button"
-              className="rail-close"
-              aria-label="Close details"
-              onClick={() => setInspectorShown(false)}
-            >
-              ✕
-            </button>
+            {/* The × that closes the panel lives in the Inspector's head (aria-label "Close
+                details"), at every width. There used to be a second, drawer-only ✕ here; two
+                close buttons with one name is one too many. */}
             {railMode === 'details' ? (
               <>
                 <div className="rail-tabs" role="tablist" aria-label="Details">
@@ -3105,7 +3197,7 @@ export default function App() {
                       onSelectEvent={onSelectEvent}
                     />
                   ) : selectedNode ? (
-                    <Inspector node={selectedNode} onClose={() => setSelectedNodeId(null)} />
+                    <Inspector node={selectedNode} onClose={closeDetails} />
                   ) : (
                     <SlowestList nodes={fullGraph.nodes} onSelect={selectNodeDeep} />
                   )}
@@ -3114,6 +3206,8 @@ export default function App() {
             ) : null}
           </div>
         </aside>
+          </>
+        ) : null}
       </main>
 
       {/* What the page is honest about: every recorded fact up to this moment is included,

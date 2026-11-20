@@ -4,6 +4,8 @@
     ".rail-expand[aria-label='Show conversation list']": "Show the chat list again.",
     ".rail-collapse[aria-label='Hide details']": "Fold the details panel to a thin strip. Bring it back with the strip, or from Panels.",
     ".rail-expand[aria-label='Show details']": "Show the details panel: Inspect, Warnings and Why.",
+    ".rail-right .inspector-close": "Close the details panel. Escape does the same, and so does a click on empty map space.",
+    ".workspace-reset-button": "Reset view: clear the selected step, close the details panel and put the map, camera, filters and panels back. Your recording, settings and theme are not touched.",
     ".session-filter select, .rail-left select": "Choose which chats are listed, how they are sorted, and how they are grouped.",
     ".fp-toggle": "Fold or unfold this failure: what happened, why, and what to do next.",
     ".fp-nav button": "Step to the previous or next failure in this chat.",
@@ -28,7 +30,7 @@
         { "name": "Telemetry", "what": "The build (click to copy it for a bug report), the number of loaded events, and lost records the recorder had to skip. Shown in Standard and Everything; turn it on in any preset from Panels." },
         { "name": "Follow Newest", "what": "Jump to whichever chat is working right now and keep its newest step in view." },
         { "name": "All Chats / This Chat Only", "what": "Show the list of every recorded chat, or only the one you are reading." },
-        { "name": "Reset view (↺)", "what": "Put view, zoom, filters and panels back the way Omniscience first opens. Recordings are never touched." },
+        { "name": "Reset view (↺)", "what": "Clear the selected step, close the details panel, unfold the status card and put the map, camera, filters and panels back to the defaults of the preset you are in (without switching presets). The recording, the Settings switches and your theme are left alone, and it says \"View reset\" when it is done." },
         { "name": "Maximize (⛶)", "what": "Full screen; Esc leaves." },
         { "name": "Mini Panel", "what": "A small frame on the right with only what you chose to watch." },
         { "name": "Workspace (⌘)", "what": "On a laptop, tablet or phone this opens the same secondary controls at full size: Follow Newest, Mini Panel, Panels, Reset, Tour, map style, Settings and Help. Every action stays present; nothing is removed to make room." },
@@ -70,7 +72,8 @@
     {
       "title": "The details panel",
       "items": [
-        { "name": "Inspect", "what": "The selected step's timing, tokens and data; with nothing selected, the longest steps. Selecting a step opens this tab." },
+        { "name": "Inspect", "what": "The selected step's timing, tokens and data. Selecting a step opens this tab and the panel." },
+        { "name": "Close (×)", "what": "Close the details panel. Escape does the same, and so does a click on empty map space. With nothing selected the panel is not on the page at all — the map keeps the room, with no empty frame where the panel was." },
         { "name": "Warnings", "what": "Patterns worth a look in this chat, grouped by kind with a count. Select one to highlight it on the map." },
         { "name": "Why", "what": "Why the run failed, read from its recorded failures." }
       ]
@@ -78,8 +81,8 @@
     {
       "title": "Presets",
       "items": [
-        { "name": "Simple", "what": "One thing at a time: the map, the status band and the token chart. Chat list and details fold to the edges. The default." },
-        { "name": "Standard", "what": "Chat list, map and the details panel side by side, with the telemetry in the header." },
+        { "name": "Simple", "what": "One thing at a time: the map, the status band and the token chart. Selecting a step opens the details panel over the map, and closing it gives the room back. The default." },
+        { "name": "Standard", "what": "Chat list and map side by side, with the details panel beside them whenever a step is selected, and the telemetry in the header." },
         { "name": "Everything", "what": "Every panel open, including the Briefing, the map key and the telemetry." }
       ]
     },

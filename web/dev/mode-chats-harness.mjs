@@ -419,15 +419,15 @@ try {
     check(store['omni.mode'] === 'web', 'a marker-pinned page overwrote the browser choice');
     check(store['omni.preset'] === 'everything', 'the web preset was lost after the marker load');
 
-    // Reset View restores this mode only. The browser's saved layout, and the remembered mode,
-    // must survive a reset performed in the docked pane.
+    // Reset View restores the layout of the preset on screen, and this mode only. The browser's
+    // saved layout, the remembered mode and the Hermes preset itself must survive it.
     await resetView(page);
     store = await storageOf(page);
     check(store['omni.preset'] === 'everything', 'Reset View erased the web preset');
     check(store['omni.layout.everything'] === webLayout, 'Reset View erased the web layout');
     check(store['omni.mode'] === 'web', 'Reset View erased the remembered mode');
-    check(store['omni.hermes.preset'] === 'simple', 'Reset View did not restore Hermes Simple');
-    check(await appHas(page, 'preset-simple'), 'Reset View did not show Hermes Simple');
+    check(store['omni.hermes.preset'] === 'standard', 'Reset View changed the Hermes preset');
+    check(await appHas(page, 'preset-standard'), 'Reset View changed the preset on screen');
 
     console.log('PASS web settings preserved, Hermes isolated, marker > memory, reloads hold');
     await context.close();
@@ -651,7 +651,7 @@ try {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // 11. Reset View in the docked pane clears only this mode's view keys.
+  // 11. Reset View in the docked pane puts this mode's layout back and leaves its look alone.
   // ---------------------------------------------------------------------------------------------
   {
     const kept = {
@@ -690,13 +690,15 @@ try {
     for (const [key, value] of Object.entries(kept)) {
       check(store[key] === value, `Reset View erased or changed ${key}`);
     }
-    check(store['omni.hermes.theme'] === undefined, 'Reset View kept the Hermes theme');
-    check(store['omni.hermes.view'] === undefined, 'Reset View kept the Hermes view');
-    check(store['omni.hermes.showTitles'] === undefined, 'Reset View kept the Hermes title toggle');
+    // Reset view is about where you are looking, not how the page is configured: the look, the
+    // switches and the chosen view survive it, and only the layout is forgotten.
+    check(store['omni.hermes.theme'] === 'paper', 'Reset View changed the Hermes theme');
+    check(store['omni.hermes.view'] === 'graph', `Reset View did not return to the map (${store['omni.hermes.view']})`);
+    check(store['omni.hermes.showTitles'] === '0', 'Reset View changed the Hermes title toggle');
     check(store['omni.hermes.panel.context-lane.h'] === undefined, 'Reset View kept Hermes panel geometry');
     const layout = await storedLayout(page, 'omni.hermes.layout.simple');
     check(layout === null, 'Reset View left a Hermes panel override behind');
-    check((await themeOf(page)) === 'console', 'Reset View did not return Hermes to Console');
+    check((await themeOf(page)) === 'paper', 'Reset View did not keep the Hermes theme');
     check(
       store['omni.privacyAlerts'] === 'off',
       'Reset View turned privacy alerts back on',
@@ -709,7 +711,7 @@ try {
     const webView = (await page.locator('.view-switch .chip.is-active').innerText()).trim();
     check(webView === 'Tokens', `the preserved browser view did not apply (${webView})`);
 
-    console.log('PASS reset scope: Hermes keys cleared, browser theme/view/privacy/session keys kept');
+    console.log('PASS reset scope: Hermes layout cleared, its look and the browser keys kept');
     await context.close();
   }
 
@@ -732,15 +734,17 @@ try {
       await page.locator('.rail-left').evaluate((el) => el.classList.contains('is-collapsed')),
       'Reset View opened the chat list while Simple hides it',
     );
+    // The details rail is a detail view now: with nothing selected it is not on the page at all,
+    // so there is no column to fold and no empty frame where it was.
     check(
-      await page.locator('.rail-right').evaluate((el) => el.classList.contains('is-collapsed')),
-      'Reset View opened the inspector while Simple hides it',
+      (await page.locator('.rail-right').count()) === 0,
+      'Reset View left a details rail on the page with nothing selected',
     );
     check(
       await page
         .locator('.workspace')
-        .evaluate((el) => el.classList.contains('left-collapsed') && el.classList.contains('right-collapsed')),
-      'Reset View left the workspace rails inconsistent with the layout',
+        .evaluate((el) => el.classList.contains('left-collapsed') && el.classList.contains('no-details')),
+      'Reset View left the workspace reserving a column for the closed details panel',
     );
     check((await expanded(page)) === 'false', 'Chats reports open while the list is collapsed');
 
@@ -754,7 +758,7 @@ try {
     const layout = await storedLayout(page, 'omni.hermes.layout.simple');
     check(layout?.shown?.includes('chats') === true, 'opening Chats did not store the panel choice');
 
-    console.log('PASS Simple reset: both rails stay collapsed, Chats label and action agree');
+    console.log('PASS Simple reset: chat list folded, details panel gone, Chats label and action agree');
     await context.close();
   }
 

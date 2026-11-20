@@ -321,9 +321,10 @@ export function SettingsPanel({ open, settings, onChange, onOpenPrivacy, onReset
         <section>
           <h3>Lost your place?</h3>
           <p className="sp-muted">
-            Folded panels, an odd zoom, filters left on, a view you no longer want. This puts everything back the
-            way it was the first time you opened Omniscience. It only changes what you see; nothing is deleted from
-            the recording.
+            Folded panels, an odd zoom, filters left on, a step open that you are done with. This clears
+            the selected step, closes the details panel, un-minimizes the status card and puts the map,
+            filters and panels back to the defaults of the preset you are in. It changes only what you see:
+            the recording, the switches above and your theme are left alone.
           </p>
           <button type="button" className="sp-reset" onClick={onResetView}>
             Reset view

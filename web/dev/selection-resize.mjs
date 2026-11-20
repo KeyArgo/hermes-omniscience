@@ -26,8 +26,8 @@ await page.waitForTimeout(2500);
 const info = () => page.evaluate(() => {
   const vp = document.querySelector('.react-flow__viewport')?.style.transform;
   const shell = document.querySelector('.graph-shell')?.getBoundingClientRect();
-  const sel = document.querySelector('.react-flow__node.selected') || document.querySelector('[data-id="__X__"]');
-  return { vp, shellW: shell && Math.round(shell.width), rail: getComputedStyle(document.querySelector('.rail-right')).display };
+  const rail = document.querySelector('.rail-right');
+  return { vp, shellW: shell && Math.round(shell.width), rail: rail ? getComputedStyle(rail).display : 'no rail' };
 });
 const sb = await page.locator('.graph-shell').boundingBox();
 await page.mouse.move(sb.x+100, sb.y+sb.height/2); await page.mouse.down(); await page.mouse.move(sb.x+400, sb.y+sb.height/2-120, {steps:10}); await page.mouse.up();

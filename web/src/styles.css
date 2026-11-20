@@ -1139,10 +1139,14 @@ pre.attrs {
   gap: 8px;
 }
 
+/* The panel's one way out, at every width. It used to be display:none above 700 px — the widths
+   where the rail is a column — so selecting a step left only a 20 px "›" in the corner, which
+   reads as "expand" rather than "close". */
 .inspector-close {
-  display: none;
-  width: 22px;
-  height: 22px;
+  display: inline-flex;
+  flex: none;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line-2);
@@ -1156,6 +1160,11 @@ pre.attrs {
 
 .inspector-close:hover {
   color: var(--text);
+}
+
+.inspector-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 700px) {
@@ -1255,8 +1264,12 @@ pre.attrs {
     max-height: calc(55vh - 40px);
   }
 
+  /* The drawer is a finger target, not a corner chevron: give the × the size a thumb expects. */
   .inspector-close {
     display: inline-flex;
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
   }
 }
 
@@ -2400,6 +2413,23 @@ table.kv.friendly td {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 220px;
+}
+
+/* Reset view is one click with no dialog: this is the receipt. Same corner as the privacy note,
+   above the replay bar, and it leaves on its own. */
+.view-reset-note {
+  position: fixed;
+  left: 16px;
+  bottom: 58px;
+  z-index: 96;
+  padding: 6px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+  box-shadow: var(--shadow-float, 0 8px 24px rgb(0 0 0 / .45));
+  pointer-events: none;
 }
 
 /* An open tab that outlived an update: one line, one button, no modal. */

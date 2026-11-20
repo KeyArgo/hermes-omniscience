@@ -15,6 +15,20 @@ try {
   if (!stage || stage.width < 1850 || stage.height < 1000) throw new Error('expanded stage does not fill pane: '+JSON.stringify(stage));
   await page.keyboard.press('Escape');
   if (await page.locator('.stage.is-area-focused').count()) throw new Error('Escape did not restore stage');
+  // The details panel is a detail view: it is only on the page once a step is selected.
+  const target = await page.evaluate(() => {
+    for (const el of document.querySelectorAll('.graph-surface .react-flow__node')) {
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2, y = r.top + r.height / 2;
+      if (r.width < 24 || r.height < 24 || x < 40 || y < 40 || x > innerWidth - 40 || y > innerHeight - 40) continue;
+      const hit = document.elementFromPoint(x, y);
+      if (hit?.closest('.react-flow__node') === el) return { x: Math.round(x), y: Math.round(y) };
+    }
+    return null;
+  });
+  if (!target) throw new Error('no selectable node on the map');
+  await page.mouse.click(target.x, target.y);
+  await page.waitForTimeout(700);
   const showDetails = page.getByRole('button', {name:'Show details'});
   if (await showDetails.isVisible()) await showDetails.click();
   await page.getByRole('button', {name:'Expand details'}).click();

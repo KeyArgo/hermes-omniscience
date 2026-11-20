@@ -137,6 +137,33 @@ share of the ceiling, and — where a compaction has happened — the size it pe
 Regenerate the picture with `python3 scripts/window-map.py <screenshot.png> docs/img/window-map.png`
 after a layout change, or it will describe an old window.
 
+## The details panel
+
+Click any box on the map — or any step in the lists and charts — and the details panel opens on the
+right: what that step was, how long it took, its tokens and whether it succeeded, plus the
+**Warnings** and **Why** tabs for the whole chat. Below 900 px it arrives as a drawer over the map
+instead of a column.
+
+Close it with the **×** in its head (or with the **›** in its corner, which folds it to a thin strip
+while the step stays selected), with **Esc**, or by clicking empty space on the map. Closing it also
+clears the selection, so it cannot come back on its own: with nothing selected there is no right-hand
+frame at all and the map keeps the width. **↺ reset view** closes it as well.
+
+## Getting lost? Reset view
+
+**↺ Reset view** — in the header, in the ⌘ **Workspace** sheet, in **Settings** and in the **Actions**
+menu — puts the view back the way this mode starts:
+
+- it clears the selected step, which closes the details panel and the mini panel;
+- it un-minimizes the status card and leaves the full-screen "Expand details" view;
+- it brings the map to its default camera, returns to live replay and clears the filters;
+- it puts the panel layout back to the defaults of the preset you are in (and of that mode only:
+  the docked Hermes pane and the browser keep their own layout). It does not switch presets.
+
+It says **View reset** when it is done, and it changes only what you are looking at: the recording is
+never touched, and neither are the Settings switches (compact text, chat titles, Follow newest,
+default view, the context strip, Interface size) or the theme. Turn those back from **Settings**.
+
 ## The mini panel, and where the per-chat context strip lives
 
 The **mini panel** is the `⬒ mini panel` chip in the toolbar. It opens a right-hand column beside the
@@ -368,7 +395,8 @@ apply to every chat you open and are remembered on this computer only.
 
 Settings → **Look** switches the whole viewer between **Console** (deep space, cyan and violet, a
 faint technical grid; the default) and **Paper** (warm graphite and brass). Same data, same layout,
-nothing hidden — it is only a change of face, and Reset view puts it back.
+nothing hidden — it is only a change of face, and Settings → **Look** switches it back. Reset view
+leaves the look alone.
 
 ### Interface size
 
@@ -437,9 +465,11 @@ compaction shows the size before and after, how much context went away, and how 
 the next call has to process that whole context fresh.
 
 Panels with a **⤢** button open front and centre for close reading, which is what you want on a
-laptop; **Esc** closes. **↺ reset view** in the header (and in Settings) puts the panels, zoom,
-filters and view back to how they started — it never touches the recording, and it leaves your
-chosen **Interface size** alone.
+laptop; **Esc** closes. **↺ reset view** — in the header, in the ⌘ **Workspace** sheet, in **Settings**
+and in **Actions** — clears the selected step (so the details panel closes), puts the panels, zoom,
+filters and layout back to the defaults of the preset you are in, and says **View reset**. It never
+touches the recording, the Settings switches or the theme, and it leaves your chosen **Interface size**
+alone.
 
 ### Follow frame
 

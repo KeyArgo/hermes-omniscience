@@ -45,8 +45,8 @@ export function Inspector({ node, onClose }: { node: GNode | null; onClose?: () 
               type="button"
               className="inspector-close"
               onClick={onClose}
-              title="Close the inspector"
-              aria-label="Close the inspector"
+              title="Close details (Esc)"
+              aria-label="Close details"
             >
               ×
             </button>
@@ -80,8 +80,8 @@ export function Inspector({ node, onClose }: { node: GNode | null; onClose?: () 
               type="button"
               className="inspector-close"
               onClick={onClose}
-              title="Close the inspector"
-              aria-label="Close the inspector"
+              title="Close details (Esc)"
+              aria-label="Close details"
             >
               ×
             </button>

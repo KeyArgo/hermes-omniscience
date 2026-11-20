@@ -1,7 +1,7 @@
 # Omniscience — a guide to the screen
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4de50ec
-> **Revised:** 2026-11-17 · **Body hash:** 82b27fcb
+> **Applies to:** Omniscience 1.0.0 · written at commit a456bf7
+> **Revised:** 2026-11-19 · **Body hash:** 168fe390
 
 
 Generated from `web/src/help/guide.json` by `web/scripts/gen-ui-guide.mjs`. The same text
@@ -16,7 +16,7 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 - **Telemetry** — The build (click to copy it for a bug report), the number of loaded events, and lost records the recorder had to skip. Shown in Standard and Everything; turn it on in any preset from Panels.
 - **Follow Newest** — Jump to whichever chat is working right now and keep its newest step in view.
 - **All Chats / This Chat Only** — Show the list of every recorded chat, or only the one you are reading.
-- **Reset view (↺)** — Put view, zoom, filters and panels back the way Omniscience first opens. Recordings are never touched.
+- **Reset view (↺)** — Clear the selected step, close the details panel, unfold the status card and put the map, camera, filters and panels back to the defaults of the preset you are in (without switching presets). The recording, the Settings switches and your theme are left alone, and it says "View reset" when it is done.
 - **Maximize (⛶)** — Full screen; Esc leaves.
 - **Mini Panel** — A small frame on the right with only what you chose to watch.
 - **Workspace (⌘)** — On a laptop, tablet or phone this opens the same secondary controls at full size: Follow Newest, Mini Panel, Panels, Reset, Tour, map style, Settings and Help. Every action stays present; nothing is removed to make room.
@@ -50,14 +50,15 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 
 ## The details panel
 
-- **Inspect** — The selected step's timing, tokens and data; with nothing selected, the longest steps. Selecting a step opens this tab.
+- **Inspect** — The selected step's timing, tokens and data. Selecting a step opens this tab and the panel.
+- **Close (×)** — Close the details panel. Escape does the same, and so does a click on empty map space. With nothing selected the panel is not on the page at all — the map keeps the room, with no empty frame where the panel was.
 - **Warnings** — Patterns worth a look in this chat, grouped by kind with a count. Select one to highlight it on the map.
 - **Why** — Why the run failed, read from its recorded failures.
 
 ## Presets
 
-- **Simple** — One thing at a time: the map, the status band and the token chart. Chat list and details fold to the edges. The default.
-- **Standard** — Chat list, map and the details panel side by side, with the telemetry in the header.
+- **Simple** — One thing at a time: the map, the status band and the token chart. Selecting a step opens the details panel over the map, and closing it gives the room back. The default.
+- **Standard** — Chat list and map side by side, with the details panel beside them whenever a step is selected, and the telemetry in the header.
 - **Everything** — Every panel open, including the Briefing, the map key and the telemetry.
 
 ## Getting started

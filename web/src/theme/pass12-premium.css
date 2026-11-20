@@ -662,6 +662,49 @@ select.chip {
   min-width: 0;
 }
 
+/* Reset view, spelled out. The sheet's row of icons above carries the same action, but an icon
+   is not a word, and this is the control a reader reaches for when a panel will not close. */
+.workspace-reset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.workspace-reset-button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.workspace-reset-button:hover {
+  border-color: var(--accent);
+}
+
+.workspace-reset-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.workspace-reset-line {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
 .workspace-sheet .telemetry {
   padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
@@ -1952,6 +1995,39 @@ button.ctx-strip-cost:hover {
 
   .brand-sub {
     display: none;
+  }
+}
+
+/* No details rail: nothing is selected and the mini panel is off, so there is no third column to
+   reserve. Without these rules the grid kept its 340–360 px track and drew an empty frame where
+   the panel had been — which is exactly what "the panel never goes away" looked like. They come
+   after the grid rules above so they win at equal specificity, and they restate each breakpoint
+   because the track widths differ per width. */
+.workspace.no-details {
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+.workspace.no-details.left-collapsed {
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+
+@media (max-width: 1179px) {
+  .workspace.no-details {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .workspace.no-details.left-collapsed {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace.no-details {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+
+  .workspace.no-details.left-collapsed {
+    grid-template-columns: 48px minmax(0, 1fr);
   }
 }
 
