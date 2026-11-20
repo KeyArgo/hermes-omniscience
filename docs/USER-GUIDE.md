@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit a456bf7
-> **Revised:** 2026-11-19 · **Body hash:** 4072ea72
+> **Applies to:** Omniscience 1.0.0 · written at commit 64f11ae
+> **Revised:** 2026-11-20 · **Body hash:** 5f97f606
+
 
 
 
