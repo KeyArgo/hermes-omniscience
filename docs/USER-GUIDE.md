@@ -426,6 +426,27 @@ all — no server, no page — while recording carries on exactly as before. On 
 means the viewer starts only when you open the Omniscience pane, and it closes itself after ten
 quiet minutes with no requests and no open live socket. The next pane open starts it again.
 
+### The repeated-failure pop-up
+
+When the same tool fails three times in a row, Omniscience posts one short pop-up in the chat
+naming the tool, how many times it failed, and the likely cause — a bad path, a missing program,
+a permission — and points at **Omniscience › Concerns** for the details:
+
+```
+⚠ Omniscience: terminal failed 3 times in a row — the command fails for a reason a retry does
+not change: a bad path, a missing program or a permission. See Omniscience › Concerns.
+```
+
+The pop-up is deliberately quiet: at most one per tool per chat every 30 minutes, so a new turn
+that hits the same broken tool does not repeat the warning. While a turn is still running, further
+failures update the existing message in place (the count climbs) instead of posting another.
+
+Turn it off in Hermes Settings → Omniscience → **Pop-up when a tool keeps failing** (on by
+default). Off means no failure pop-up at all — recording and the Concerns page carry on exactly
+as before, and the turn summary still lists failures. The switch is the `failure_alerts` setting
+in `prefs.json`, takes effect on the next turn, and is separate from `OMNISCIENCE_NOTICES`, which
+governs all live notices.
+
 ### The turn summary in your chat
 
 Omniscience posts a short summary at the end of each turn, so you never have to open the viewer to
@@ -511,7 +532,9 @@ While you wait, Omniscience can show one line in the chat for:
 - a provider error
 - a tool failing 3 times in a row
 
-The line is edited in place instead of repeated. Turn notices off with `OMNISCIENCE_NOTICES=0`.
+The line is edited in place instead of repeated. The repeated-failure pop-up additionally waits
+30 minutes before the same tool may speak again in the same chat, and has its own switch
+(**Pop-up when a tool keeps failing**, above). Turn all notices off with `OMNISCIENCE_NOTICES=0`.
 
 ## Privacy
 

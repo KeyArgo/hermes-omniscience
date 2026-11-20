@@ -9,11 +9,13 @@ File format (all keys optional; unknown keys are preserved but ignored):
     {
       "version": 1,
       "digest": {"enabled": true, "detail": "standard"},
-      "viewer": "on"
+      "viewer": "on",
+      "failure_alerts": true
     }
 
 ``detail`` is one of ``brief``, ``standard`` or ``full``. ``viewer`` is ``on`` or ``off``: off
-means the viewer does not run at all; recording carries on.
+means the viewer does not run at all; recording carries on. ``failure_alerts`` is true or
+false: false silences the repeated-failure pop-up; recording carries on.
 """
 
 from __future__ import annotations
@@ -32,11 +34,13 @@ __all__ = [
     "defaults",
     "digest_enabled",
     "detail_level",
+    "failure_alerts_enabled",
     "load",
     "normalize",
     "path_for",
     "save",
     "set_digest",
+    "set_failure_alerts",
     "set_viewer",
     "viewer_enabled",
 ]
@@ -48,11 +52,13 @@ VIEWER_MODES = ("on", "off")
 
 
 def defaults() -> dict:
-    """The shipped defaults: a turn summary in the chat, standard detail, the viewer on."""
+    """The shipped defaults: a turn summary in the chat, standard detail, the viewer on,
+    failure pop-ups on."""
     return {
         "version": 1,
         "digest": {"enabled": True, "detail": DEFAULT_DETAIL},
         "viewer": "on",
+        "failure_alerts": True,
     }
 
 
@@ -90,6 +96,10 @@ def normalize(raw: Any) -> dict:
         out["viewer"] = "on" if viewer else "off"
     elif isinstance(viewer, str) and viewer.strip().lower() in VIEWER_MODES:
         out["viewer"] = viewer.strip().lower()
+
+    alerts = raw.get("failure_alerts")
+    if isinstance(alerts, bool):
+        out["failure_alerts"] = alerts
     return out
 
 
@@ -170,4 +180,20 @@ def set_viewer(prefs: dict, enabled: bool) -> dict:
     """Return a new prefs dict with the viewer switch set (normalized)."""
     out = normalize(prefs)
     out["viewer"] = "on" if enabled else "off"
+    return out
+
+
+def failure_alerts_enabled(prefs: dict) -> bool:
+    """The repeated-failure pop-up is on by default; only an explicit false turns it off."""
+    alerts = prefs.get("failure_alerts") if isinstance(prefs, dict) else None
+    if isinstance(alerts, bool):
+        return alerts
+    return True
+
+
+def set_failure_alerts(prefs: dict, enabled: bool) -> dict:
+    """Return a new prefs dict with the failure pop-up switch set (normalized)."""
+    out = normalize(prefs)
+    if isinstance(enabled, bool):
+        out["failure_alerts"] = enabled
     return out

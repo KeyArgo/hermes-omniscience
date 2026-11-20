@@ -2,7 +2,8 @@
 
 Read-only health endpoint over the plugin's event database (see docs/DECISIONS.md D4:
 ``<HERMES_HOME>/plugin-data/omniscience/events.db``), plus the owner's viewer on/off switch
-(``/viewer/mode``), which writes ``prefs.json`` but never the recording (D2). Asking for the viewer
+(``/viewer/mode``) and failure pop-up switch (``/alerts/mode``), which write ``prefs.json`` but
+never the recording (D2). Asking for the viewer
 link also restarts the viewer when it is down (see ``_ensure_viewer``); ``POST /viewer/restart``
 stops it first and starts it again, the reset that does not quit Hermes. Starting a process writes
 nothing to the recording.
@@ -280,3 +281,40 @@ async def set_viewer_mode(payload: dict = Body(...)) -> dict:
     if not isinstance(enabled, bool):
         raise HTTPException(status_code=400, detail="enabled must be true or false")
     return await asyncio.to_thread(_set_viewer_mode_locked, enabled)
+
+
+def _failure_alerts_enabled() -> bool:
+    """The owner's pop-up switch. An unreadable settings file reads as the default (on)."""
+    try:
+        prefs_mod = _prefs()
+        return prefs_mod.failure_alerts_enabled(prefs_mod.load(prefs_mod.path_for(str(_db_path()))))
+    except Exception:  # never let settings trouble silence a warning the owner expects
+        log.debug("omniscience: could not read the failure-alert preference", exc_info=True)
+        return True
+
+
+def _alerts_mode_locked() -> dict:
+    return {"enabled": _failure_alerts_enabled()}
+
+
+@router.get("/alerts/mode")
+async def alerts_mode() -> dict:
+    """The owner's on/off switch for repeated-failure pop-ups (off: recording continues)."""
+    return await asyncio.to_thread(_alerts_mode_locked)
+
+
+def _set_alerts_mode_locked(enabled: bool) -> dict:
+    """Save the switch. The answer is read back from disk, so a save that did not land is not
+    reported as a change. Nothing else moves: recording and the Concerns page carry on."""
+    prefs_mod = _prefs()
+    path = prefs_mod.path_for(str(_db_path()))
+    prefs_mod.save(path, prefs_mod.set_failure_alerts(prefs_mod.load(path), enabled))
+    return {"enabled": prefs_mod.failure_alerts_enabled(prefs_mod.load(path))}
+
+
+@router.post("/alerts/mode")
+async def set_alerts_mode(payload: dict = Body(...)) -> dict:
+    enabled = payload.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(status_code=400, detail="enabled must be true or false")
+    return await asyncio.to_thread(_set_alerts_mode_locked, enabled)

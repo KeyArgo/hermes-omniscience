@@ -522,6 +522,135 @@ describe("the owner's viewer switch", () => {
   });
 });
 
+describe("the owner's failure-alert switch", () => {
+  // Same walk as the viewer-switch block: the settings page is React, so the fake jsx tree is
+  // rendered by calling each component function, enough to reach the control's onChange.
+  function render(node) {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.t === "function") return render(node.t(node.p || {}));
+    const children = node.p?.children;
+    if (!children) return node;
+    const list = Array.isArray(children) ? children : [children];
+    return { ...node, p: { ...node.p, children: list.map(render) } };
+  }
+
+  function find(node, match) {
+    if (!node || typeof node !== "object") return null;
+    if (match(node)) return node;
+    const children = node.p?.children;
+    const list = Array.isArray(children) ? children : [];
+    for (const child of list) {
+      const hit = find(child, match);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  const LABEL = "Pop-up when a tool keeps failing";
+  const alertLabel = tree => find(tree, node => node.t === "label" && (node.p.children || []).includes(LABEL));
+
+  function settingsCtx(mode = true) {
+    const pages = [];
+    const rest = vi.fn(async (path, options) => {
+      if (path === "/alerts/mode") return { enabled: options?.body ? options.body.enabled : mode };
+      if (path === "/viewer/mode") return { enabled: true };
+      return { token: "k" };
+    });
+    const ctx = {
+      register: () => () => {},
+      registerSettingsPage: page => {
+        pages.push(page);
+        return () => {};
+      },
+      rest,
+    };
+    return { ctx, pages, rest };
+  }
+
+  it("reads the mode and posts the switch when the settings checkbox changes", async () => {
+    const mod = await loadPlugin();
+    const { ctx, pages, rest } = settingsCtx(true);
+    mod.default.register(ctx);
+
+    const tree = render(pages[0].render());
+    const label = alertLabel(tree);
+    expect(label).toBeTruthy();
+    const input = label.p.children[0];
+    expect(input.t).toBe("input");
+    expect(input.p.checked).toBe(true);
+
+    input.p.onChange({ target: { checked: false } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(rest).toHaveBeenCalledWith("/alerts/mode", { method: "POST", body: { enabled: false } });
+  });
+
+  // A stateful useState, like the version-chip block, so the value the effect fetched is
+  // visible on the next render pass.
+  function hookStore() {
+    const slots = [];
+    let i = 0;
+    return {
+      begin() { i = 0; },
+      useState: init => {
+        const idx = i++;
+        if (!(idx in slots)) slots[idx] = typeof init === "function" ? init() : init;
+        return [slots[idx], v => { slots[idx] = typeof v === "function" ? v(slots[idx]) : v; }];
+      },
+    };
+  }
+
+  function statefulSetup(restImpl) {
+    const effects = [];
+    const hooks = hookStore();
+    const reactMock = {
+      useEffect: fn => { effects.push(fn); },
+      useMemo: fn => fn(),
+      useRef: () => ({ current: null }),
+      useState: hooks.useState,
+    };
+    return loadPlugin(effects, reactMock).then(mod => {
+      const pages = [];
+      const rest = vi.fn(restImpl);
+      const ctx = {
+        register: () => () => {},
+        registerSettingsPage: page => { pages.push(page); return () => {}; },
+        rest,
+        storage: { get: () => true, set: vi.fn() },
+      };
+      mod.default.register(ctx);
+      const renderTree = () => { hooks.begin(); return render(pages[0].render()); };
+      renderTree();   // first pass: collects the components' effects
+      return { rest, effects, renderTree };
+    });
+  }
+
+  it("shows off when the stored switch is off", async () => {
+    const s = await statefulSetup(async path => (path === "/alerts/mode" ? { enabled: false } : { token: "k" }));
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const label = alertLabel(s.renderTree());
+    expect(label).toBeTruthy();
+    expect(label.p.children[0].p.checked).toBe(false);
+  });
+
+  it("does not look saved when the save fails", async () => {
+    const s = await statefulSetup(async (path, options) => {
+      if (path !== "/alerts/mode") return { token: "k" };
+      if (options?.method === "POST") throw new Error("dashboard unreachable");
+      return { enabled: true };
+    });
+    s.effects.forEach(fn => fn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const input = alertLabel(s.renderTree()).p.children[0];
+    expect(input.p.checked).toBe(true);
+
+    input.p.onChange({ target: { checked: false } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // The backend never answered, so the checkbox must not keep the unsaved state.
+    expect(alertLabel(s.renderTree()).p.children[0].p.checked).toBe(true);
+  });
+});
+
 describe("waking the viewer when a pane is looked at again", () => {
   it("asks for the link once on return, never while hidden, and not twice in quick succession", async () => {
     const mod = await loadPlugin();

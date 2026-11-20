@@ -104,11 +104,17 @@ def test_the_viewer_copy_behaves_identically(tmp_path):
         {"viewer": "nonsense"},
         {"viewer": False},
         {"digest": {"enabled": False}, "viewer": "OFF"},
+        {"failure_alerts": False},
+        {"failure_alerts": True},
+        {"failure_alerts": "nonsense"},
+        {"digest": {"enabled": False}, "failure_alerts": False},
     ]
     for case in cases:
         assert prefs.normalize(case) == other.normalize(case)
         assert prefs.viewer_enabled(case) == other.viewer_enabled(case)
         assert prefs.set_viewer(case, False) == other.set_viewer(case, False)
+        assert prefs.failure_alerts_enabled(case) == other.failure_alerts_enabled(case)
+        assert prefs.set_failure_alerts(case, False) == other.set_failure_alerts(case, False)
 
     path_plugin = str(tmp_path / "a.json")
     path_viewer = str(tmp_path / "b.json")
@@ -153,3 +159,35 @@ def test_set_viewer_round_trips_and_never_mutates_its_input(tmp_path):
     assert prefs.save(path, off) is True
     assert prefs.viewer_enabled(prefs.load(path)) is False
     assert prefs.digest_enabled(prefs.load(path)) is True  # the other setting is untouched
+
+
+def test_failure_alerts_are_on_by_default():
+    assert prefs.defaults()["failure_alerts"] is True
+    assert prefs.failure_alerts_enabled(prefs.defaults()) is True
+
+
+def test_failure_alerts_normalize_like_the_other_switches():
+    assert prefs.normalize({"failure_alerts": False})["failure_alerts"] is False
+    assert prefs.normalize({"failure_alerts": True})["failure_alerts"] is True
+    assert prefs.normalize({"failure_alerts": "nonsense"})["failure_alerts"] is True
+    assert prefs.normalize({"failure_alerts": None})["failure_alerts"] is True
+
+
+def test_only_false_means_off():
+    assert prefs.failure_alerts_enabled({"failure_alerts": False}) is False
+    assert prefs.failure_alerts_enabled({"failure_alerts": True}) is True
+    assert prefs.failure_alerts_enabled({}) is True
+    assert prefs.failure_alerts_enabled(None) is True
+
+
+def test_set_failure_alerts_round_trips_and_never_mutates_its_input(tmp_path):
+    before = prefs.defaults()
+    off = prefs.set_failure_alerts(before, False)
+    assert off["failure_alerts"] is False
+    assert before["failure_alerts"] is True
+    path = str(tmp_path / "prefs.json")
+    assert prefs.save(path, off) is True
+    loaded = prefs.load(path)
+    assert prefs.failure_alerts_enabled(loaded) is False
+    assert prefs.digest_enabled(loaded) is True  # the other settings are untouched
+    assert prefs.viewer_enabled(loaded) is True

@@ -33,6 +33,9 @@ _MAX_PROVIDERS = 256
 _MAX_NEW_MESSAGES_PER_TURN = 5
 _SLOW_TTFB_S = 60.0
 _TOOL_FAIL_THRESHOLD = 3
+# A repeated-failure pop-up may speak at most once per session per tool in this window;
+# the per-turn state alone would let every new turn post the same warning again.
+_TOOL_FAIL_COOLDOWN_S = 30 * 60
 
 
 def _int_or_none(value: Any) -> Optional[int]:
@@ -169,6 +172,10 @@ class Notices:
 
         # session_id -> _TurnState (LRU, capped)
         self._sessions: "OrderedDict[str, _TurnState]" = OrderedDict()
+        # session_id -> {tool_name: when the last failure pop-up was posted}. Outlives the
+        # per-turn state so a new turn does not repeat a warning the chat already had;
+        # LRU-capped like _sessions.
+        self._tool_fail_alerted: "OrderedDict[str, dict[str, float]]" = OrderedDict()
         # session_id -> platform, learned from turn.start (the only observed event that
         # carries it). The platform filter needs it on *every* event in the session, not
         # just the one that reports it, or a notice posted on a later event (a rate limit,
@@ -300,7 +307,7 @@ class Notices:
         elif kind == "llm.response":
             self._handle_llm_response(state, attrs, api_request_id, link, session_id)
         elif kind == "tool.end":
-            self._handle_tool_end(state, attrs, status, link)
+            self._handle_tool_end(state, attrs, status, session_id)
         elif kind == "skill.event":
             name = attrs.get("skill_name")
             if isinstance(name, str) and name:
@@ -439,7 +446,7 @@ class Notices:
         state: _TurnState,
         attrs: dict,
         status: Any,
-        link: str,
+        session_id: str,
     ) -> None:
         tool_name = attrs.get("tool_name")
         if not tool_name:
@@ -462,22 +469,48 @@ class Notices:
             state.tool_fail_counts[tool_name] = count
 
             if count >= _TOOL_FAIL_THRESHOLD:
+                # The owner's switch: off means no pop-up at all. Recording above is untouched.
+                if not self._failure_alerts_on():
+                    return
                 hint = _TOOL_FAIL_HINTS.get(tool_name, _GENERIC_FAIL_HINT)
                 text = (
                     f"⚠ Omniscience: {plain_name(tool_name)} failed "
-                    f"{count} times in a row — {hint}. Details: {link}"
+                    f"{count} times in a row — {hint}. See Omniscience › Concerns."
                 )
-                if tool_name not in state.tool_fail_notified:
-                    state.tool_fail_notified.add(tool_name)
-                    handle = self._post_new(state, text)
-                    state.tool_fail_handles[tool_name] = handle
-                else:
+                if tool_name in state.tool_fail_notified:
+                    # Same turn: keep editing the message that is already there.
                     self._edit_existing(
                         state.tool_fail_handles.get(tool_name), text
                     )
+                    return
+                now = self._clock()
+                last = self._tool_fail_alerted.get(session_id, {}).get(tool_name)
+                if last is not None and now - last < _TOOL_FAIL_COOLDOWN_S:
+                    # The chat heard about this tool recently; a new turn is not news.
+                    return
+                state.tool_fail_notified.add(tool_name)
+                handle = self._post_new(state, text)
+                state.tool_fail_handles[tool_name] = handle
+                if handle is not None:
+                    self._remember_tool_alert(session_id, tool_name, now)
         else:
             # Success resets the consecutive-failure counter.
             state.tool_fail_counts[tool_name] = 0
+
+    def _remember_tool_alert(self, session_id: str, tool_name: str, now: float) -> None:
+        """Note when a session last had a failure pop-up for a tool (LRU, capped)."""
+        tools = self._tool_fail_alerted.get(session_id)
+        if tools is None:
+            tools = {}
+            self._tool_fail_alerted[session_id] = tools
+        # Entries whose cooldown has run out can suppress nothing; drop them so a long-lived
+        # session does not accumulate one slot per tool it ever failed.
+        for name in [n for n, at in tools.items() if now - at >= _TOOL_FAIL_COOLDOWN_S]:
+            del tools[name]
+        tools[tool_name] = now
+        self._tool_fail_alerted.move_to_end(session_id)
+        while len(self._tool_fail_alerted) > _MAX_SESSIONS:
+            self._tool_fail_alerted.popitem(last=False)
 
     # ------------------------------------------------------------------
     # End-of-turn summary
@@ -508,6 +541,12 @@ class Notices:
     def _digest_on(self) -> bool:
         try:
             return prefs_mod.digest_enabled(self._current_prefs())
+        except Exception:
+            return True
+
+    def _failure_alerts_on(self) -> bool:
+        try:
+            return prefs_mod.failure_alerts_enabled(self._current_prefs())
         except Exception:
             return True
 

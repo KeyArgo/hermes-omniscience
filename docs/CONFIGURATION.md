@@ -1,7 +1,8 @@
 # Configuration
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 4386e6d
-> **Revised:** 2026-11-18 · **Body hash:** 0a7d94f2
+> **Applies to:** Omniscience 1.0.0 · written at commit 6fe8aad
+> **Revised:** 2026-11-19 · **Body hash:** 6e3332e2
+
 
 
 
@@ -47,7 +48,8 @@ the Settings panel agree.
     "enabled": true,
     "detail": "standard"
   },
-  "viewer": "on"
+  "viewer": "on",
+  "failure_alerts": true
 }
 ```
 
@@ -56,6 +58,7 @@ the Settings panel agree.
 | `digest.enabled` | `true` / `false` | Whether the turn summary is posted in chat. |
 | `digest.detail` | `brief`, `standard`, `full` | How much the summary says. |
 | `viewer` | `on` / `off` | Whether the viewer may run. Off: recording continues; the viewer does not run. Anything but `off` (including an unknown value) reads as on. |
+| `failure_alerts` | `true` / `false` | Whether a pop-up is posted when a tool keeps failing (three failures in a row). At most one pop-up per tool per chat per 30 minutes. Off: no failure pop-up; recording and the Concerns page continue. Only an explicit `false` turns it off. |
 
 Unknown keys are preserved but ignored. A missing or broken file falls back to the defaults above.
 
@@ -88,6 +91,11 @@ text, titles, panel layout) and the shared digest setting through `POST /api/v1/
 preferences stay in the browser; only the digest setting is stored beside the recording. **Reset
 view** clears local layout keys but deliberately keeps the tour-seen flag and the privacy-alert
 choice.
+
+The Hermes desktop settings page (Settings → Omniscience) holds the two owner switches that live
+in `prefs.json`: **Run the Omniscience viewer** (`viewer`, through the dashboard's `/viewer/mode`)
+and **Pop-up when a tool keeps failing** (`failure_alerts`, through `/alerts/mode`). Both take
+effect on the next turn, no restart.
 
 ## Related
 

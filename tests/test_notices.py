@@ -527,6 +527,158 @@ def test_provider_error_once():
     assert len(ctx.posted) == 1
 
 
+# ---------------------------------------------------------------------------
+# Repeated-failure pop-up: one per session per tool per 30 minutes, owner switch
+# ---------------------------------------------------------------------------
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _fail(n, sid, tid, tool="terminal", i=0):
+    n.observe(
+        "post_tool_call",
+        {
+            "session_id": sid,
+            "turn_id": tid,
+            "tool_name": tool,
+            "tool_call_id": f"tc{i}",
+            "duration_ms": 10,
+            "error": "boom",
+        },
+    )
+
+
+def _quiet_digest():
+    # These tests count failure pop-ups only; the turn summary would add posts of its own.
+    return lambda: {"digest": False}
+
+
+def test_the_next_turns_failures_do_not_post_a_new_toast():
+    clock = _Clock()
+    ctx, n = _make_notices(clock=clock, prefs_reader=_quiet_digest())
+    sid = "s1"
+
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": "t1"})
+    for i in range(3):
+        _fail(n, sid, "t1", i=i)
+    assert len(ctx.posted) == 1
+    n.observe("post_llm_call", {"session_id": sid, "turn_id": "t1"})
+
+    # A brand-new turn with three more failures: the chat already heard about this tool.
+    clock.now += 60
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": "t2"})
+    for i in range(3):
+        _fail(n, sid, "t2", i=i)
+    assert len(ctx.posted) == 1
+    n.observe("post_llm_call", {"session_id": sid, "turn_id": "t2"})
+
+
+def test_the_toast_returns_once_thirty_minutes_have_passed():
+    clock = _Clock()
+    ctx, n = _make_notices(clock=clock, prefs_reader=_quiet_digest())
+    sid = "s1"
+
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": "t1"})
+    for i in range(3):
+        _fail(n, sid, "t1", i=i)
+    assert len(ctx.posted) == 1
+    n.observe("post_llm_call", {"session_id": sid, "turn_id": "t1"})
+
+    # One second short of the cooldown: still quiet.
+    clock.now += 30 * 60 - 1
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": "t2"})
+    for i in range(3):
+        _fail(n, sid, "t2", i=i)
+    assert len(ctx.posted) == 1
+    n.observe("post_llm_call", {"session_id": sid, "turn_id": "t2"})
+
+    # One more second and the same failures may speak again.
+    clock.now += 1
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": "t3"})
+    for i in range(3):
+        _fail(n, sid, "t3", i=i)
+    assert len(ctx.posted) == 2
+    assert "3 times" in ctx.posted[1]
+
+
+def test_the_cooldown_is_per_tool_and_per_chat():
+    clock = _Clock()
+    ctx, n = _make_notices(clock=clock, prefs_reader=_quiet_digest())
+
+    n.observe("pre_llm_call", {"session_id": "s1", "turn_id": "t1"})
+    for i in range(3):
+        _fail(n, "s1", "t1", i=i)
+    n.observe("post_llm_call", {"session_id": "s1", "turn_id": "t1"})
+    assert len(ctx.posted) == 1
+
+    # The same tool stays quiet on the next turn...
+    clock.now += 60
+    n.observe("pre_llm_call", {"session_id": "s1", "turn_id": "t2"})
+    for i in range(3):
+        _fail(n, "s1", "t2", i=i)
+    assert len(ctx.posted) == 1
+    # ...but a different tool in the same chat still speaks...
+    for i in range(3):
+        _fail(n, "s1", "t2", tool="read_file", i=i)
+    assert len(ctx.posted) == 2
+    n.observe("post_llm_call", {"session_id": "s1", "turn_id": "t2"})
+    # ...and so does the same tool in a different chat.
+    n.observe("pre_llm_call", {"session_id": "s2", "turn_id": "t1"})
+    for i in range(3):
+        _fail(n, "s2", "t1", i=i)
+    assert len(ctx.posted) == 3
+
+
+def test_failure_alerts_off_silences_the_toast_but_not_the_recording():
+    ctx, n = _make_notices(
+        prefs_reader=lambda: {
+            "digest": {"enabled": True, "detail": "brief"},
+            "failure_alerts": False,
+        }
+    )
+    sid, tid = "s1", "t1"
+
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": tid})
+    for i in range(4):
+        _fail(n, sid, tid, i=i)
+    assert ctx.posted == []  # no pop-up at all, not even an edit
+
+    # Recording is unchanged: the turn summary still names every failure.
+    n.observe("post_llm_call", {"session_id": sid, "turn_id": tid})
+    assert len(ctx.posted) == 1
+    assert "4 failures" in ctx.posted[0]
+    assert "terminal" in ctx.posted[0]
+
+
+def test_the_failure_toast_points_at_concerns_not_a_link():
+    ctx, n = _make_notices()
+    sid, tid = "s1", "t1"
+
+    n.observe("pre_llm_call", {"session_id": sid, "turn_id": tid})
+    for i in range(3):
+        _fail(n, sid, tid, i=i)
+    assert len(ctx.posted) == 1
+    text = ctx.posted[0]
+    assert "http" not in text
+    assert "See Omniscience › Concerns." in text
+
+
+def test_the_alert_memory_is_bounded():
+    ctx, n = _make_notices(prefs_reader=_quiet_digest())
+    for s in range(70):
+        sid = f"s{s}"
+        n.observe("pre_llm_call", {"session_id": sid, "turn_id": "t1"})
+        for i in range(3):
+            _fail(n, sid, "t1", i=i)
+        n.observe("post_llm_call", {"session_id": sid, "turn_id": "t1"})
+    assert len(ctx.posted) == 70
+    assert len(n._tool_fail_alerted) <= 64
+
+
 def test_edits_before_the_post_lands_are_applied_not_reposted():
     # Production posts on a background thread: the handle is not known yet when the next
     # rate limit arrives. The second error must edit the first notice, not post a new one.

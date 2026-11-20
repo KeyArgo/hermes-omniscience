@@ -173,6 +173,7 @@ function RoomSettings() {
     ] }),
     jsx(ViewerSwitch, { key: 'viewer' }),
     jsx(RestartViewerButton, { key: 'restart' }),
+    jsx(AlertsSwitch, { key: 'alerts' }),
   ] })
 }
 
@@ -328,6 +329,40 @@ function ViewerSwitch() {
     ] }),
     jsx('p', { key: 'hint', style: { margin: 0, opacity: 0.7, fontSize: 12 },
       children: 'Off: recording continues; the viewer does not run.' }),
+  ] })
+}
+
+// The owner's pop-up switch for repeated tool failures. Same prefs.json the recorder reads:
+// off means no failure pop-up at all, while recording and the Concerns page carry on.
+function AlertsSwitch() {
+  const [enabled, setEnabled] = useState(true)
+  useEffect(() => {
+    let alive = true
+    if (!CTX?.rest) return () => { alive = false }
+    Promise.resolve(CTX.rest('/alerts/mode'))
+      .then(answer => {
+        if (alive && answer && typeof answer.enabled === 'boolean') setEnabled(answer.enabled)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const change = event => {
+    const next = event.target.checked
+    setEnabled(next)
+    Promise.resolve(CTX?.rest?.('/alerts/mode', { method: 'POST', body: { enabled: next } }))
+      .then(answer => {
+        // The backend answers from what is on disk; a save that did not land must not look saved.
+        if (answer && typeof answer.enabled === 'boolean') setEnabled(answer.enabled)
+      })
+      .catch(() => setEnabled(!next))
+  }
+  return jsx('div', { style: { display: 'grid', gap: 4 }, children: [
+    jsx('label', { key: 'label', style: { display: 'flex', gap: 8 }, children: [
+      jsx('input', { key: 'input', type: 'checkbox', checked: enabled, onChange: change }),
+      'Pop-up when a tool keeps failing',
+    ] }),
+    jsx('p', { key: 'hint', style: { margin: 0, opacity: 0.7, fontSize: 12 },
+      children: 'Off: no failure pop-up; recording and the Concerns page continue.' }),
   ] })
 }
 
