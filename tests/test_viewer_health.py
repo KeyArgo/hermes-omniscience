@@ -474,23 +474,28 @@ def test_a_mac_peak_reads_as_megabytes_not_kilobytes(monkeypatch):
     The reader divided by 1024 once and called it MB, so on macOS a 512 MB process logged
     ``peak_mb=524288.0`` — a number that makes every macOS health line a false alarm.
     """
-    import resource
+    import types
 
     from omniscience_viewer import health as health_mod
+
+    # A stand-in module: Windows has no ``resource``, and the reader imports it by name.
+    resource = types.ModuleType("resource")
+    resource.RUSAGE_SELF = 0
+    monkeypatch.setitem(sys.modules, "resource", resource)
 
     class Usage:
         def __init__(self, peak: int) -> None:
             self.ru_maxrss = peak
 
     monkeypatch.setattr(health_mod.sys, "platform", "darwin")
-    monkeypatch.setattr(resource, "getrusage", lambda *args: Usage(512 * 1024 * 1024))
+    monkeypatch.setattr(resource, "getrusage", lambda *args: Usage(512 * 1024 * 1024), raising=False)
     rss, peak = health_mod.read_memory_mb()
     assert rss is None  # no stdlib source for it on these platforms
     assert peak == pytest.approx(512.0), peak
 
     # A BSD reports the same peak in kB, and must land on the same number.
     monkeypatch.setattr(health_mod.sys, "platform", "freebsd14")
-    monkeypatch.setattr(resource, "getrusage", lambda *args: Usage(512 * 1024))
+    monkeypatch.setattr(resource, "getrusage", lambda *args: Usage(512 * 1024), raising=False)
     assert health_mod.read_memory_mb() == (None, pytest.approx(512.0))
 
 
