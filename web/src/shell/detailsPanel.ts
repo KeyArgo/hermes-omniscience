@@ -11,8 +11,17 @@
 
 export type RailMode = 'details' | 'follow';
 
-/** Where every closing path lands: nothing selected, and the rail folded away with it. */
-export const DETAILS_CLOSED = { selectedNodeId: null, railFolded: true } as const;
+/**
+ * Where every closing path lands: nothing selected, and the rail folded away with it. The mode
+ * goes back to details too — the mini panel (`railMode: 'follow'`) keeps the rail on screen with
+ * nothing selected, so a close that forgot the mode left it "shown": Escape became a no-op and
+ * the desktop `‹ Details` strip unmounted the rail instead of opening it.
+ */
+export const DETAILS_CLOSED = {
+  selectedNodeId: null,
+  railMode: 'details',
+  railFolded: true,
+} as const;
 
 /**
  * Is the details rail on screen? Only a selected step or the mini panel gives it something to
@@ -39,12 +48,18 @@ export interface DetailsEscapeContext {
   tourActive: boolean;
   /** The caret is in a field; Escape belongs to what is being typed. */
   typing: boolean;
+  /** "Expand details" or "Expand view" is on: Escape restores the drawn layout first. */
+  areaFocused: boolean;
 }
 
 /**
  * Escape closes the details panel — and only the details panel. The innermost layer wins: a
- * dialog, a menu, the tour or a text field handles Escape itself, and a handler that already
- * consumed the key (event.defaultPrevented) is not overruled.
+ * dialog, a menu, the tour, an expanded area or a text field handles Escape itself, and a handler
+ * that already consumed the key (event.defaultPrevented) is not overruled.
+ *
+ * The expanded area matters most: this listener is registered before the area handler, so a key
+ * it took would close the panel and leave the area expanded over an empty page. Declining here
+ * lets the area collapse, and the next Escape (no area focused) closes the panel.
  */
 export function escapeClosesDetails(
   event: Pick<KeyboardEvent, 'key' | 'defaultPrevented'>,
@@ -54,7 +69,28 @@ export function escapeClosesDetails(
   if (event.key !== 'Escape' || event.defaultPrevented) return false;
   if (!hasSelection) return false;
   if (context.anyDialogOpen || context.menuOpen || context.tourActive) return false;
+  if (context.areaFocused) return false;
   return !context.typing;
+}
+
+/**
+ * Has the selected step left the graph? True only for a step that was drawn and is now gone —
+ * a filter (Hide tool steps, Errors only) or the replay slider moving back past it. The panel
+ * closes with it, because at 700 px and below the drawer hides without a selection while its
+ * scrim stays and covers the page.
+ *
+ * `seenInGraph` is the id the graph last held. A step that has not appeared yet is still
+ * arriving (the graph is rebuilt in a worker, and expanding a turn re-draws it), so it is not a
+ * step that went away.
+ */
+export function selectionLeftGraph(
+  selectedNodeId: string | null,
+  nodeIds: readonly string[],
+  seenInGraph: string | null,
+): boolean {
+  if (selectedNodeId === null) return false;
+  if (nodeIds.includes(selectedNodeId)) return false;
+  return seenInGraph === selectedNodeId;
 }
 
 /** Is the focused element a text field, so Escape means "leave what I am typing"? */

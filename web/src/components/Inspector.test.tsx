@@ -43,24 +43,19 @@ function node(): GNode {
 }
 
 describe('the details panel head', () => {
-  it('carries a close control named "Close details"', () => {
-    const html = renderToStaticMarkup(<Inspector node={node()} onClose={() => {}} />);
-    expect(html).toContain('aria-label="Close details"');
-    expect(html).toContain('title="Close details (Esc)"');
-  });
-
-  it('is a real button, so it is reachable with Tab and fires on Enter and Space', () => {
-    const html = renderToStaticMarkup(<Inspector node={node()} onClose={() => {}} />);
-    const button = html.match(/<button[^>]*aria-label="Close details"[^>]*>/)?.[0] ?? '';
-    expect(button).toContain('type="button"');
-    expect(button).toContain('class="inspector-close"');
-    // Not disabled, not hidden: nothing about the control depends on the width it is drawn at.
-    expect(button).not.toContain('disabled');
-    expect(button).not.toContain('hidden');
-  });
-
-  it('offers no close control when the panel owns no close action', () => {
+  it('paints no close control of its own: the rail owns the one ×', () => {
+    // The panel is only one of three things the rail can show (Inspect, Warnings, Why, and the
+    // mini panel). A close button in this head is absent on every other one, and at 701–900 px
+    // the rail's collapse chevron is hidden, which left the drawer with no way out. The single
+    // close control lives on the rail (`shell/RailClose.tsx`) so it is the same one everywhere.
     const html = renderToStaticMarkup(<Inspector node={node()} />);
     expect(html).not.toContain('Close details');
+    expect(html).not.toContain('inspector-close');
+  });
+
+  it('still names the step it is showing', () => {
+    const html = renderToStaticMarkup(<Inspector node={node()} />);
+    expect(html).toContain('inspector');
+    expect(html).toContain('gpt-5');
   });
 });

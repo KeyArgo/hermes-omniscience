@@ -168,6 +168,11 @@ def _preview_of(content: str) -> str | None:
     if not isinstance(content, str) or not content.strip():
         return None
     stripped = content.lstrip(' \t\r\n')
+    if stripped.startswith(NOISE):
+        # An out-of-band marker, a pasted block or a task notification is scaffolding the user
+        # never typed. ``_clean()`` has always refused these, and Hermes' preview never paints
+        # one; the plain branch below used to, which named a chat "[OUT-OF-BAND USER MESSAGE, ...".
+        return None
     if stripped.startswith(SUMMARY_PREFIXES):
         _, marker, remainder = content.partition(SUMMARY_END)
         if not marker or not remainder.strip():
@@ -329,11 +334,16 @@ def labels_for(session_ids: list[str], state_db: str | os.PathLike | None = None
             # Nothing Hermes' preview query would paint. That is a row it deliberately skips — a
             # compaction summary with no message after it, which is how a chat came to be named
             # "[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were ..." — so the fallback
-            # must not paint it raw. A session with no name keeps its id, as Hermes shows nothing.
+            # must not paint it raw. A merged carrier (header + delimiter + summary) whose prior
+            # half is empty is the same kind of row and would otherwise read
+            # "[PRIOR CONTEXT — for reference only; not a new message] ...". A session with no
+            # name keeps its id, as Hermes shows nothing.
             for content in messages:
                 if not isinstance(content, str):
                     continue
                 if content.lstrip(' \t\r\n').startswith(SUMMARY_PREFIXES):
+                    continue
+                if MERGED_DELIMITER in content:
                     continue
                 label = _clean(content)
                 if label:

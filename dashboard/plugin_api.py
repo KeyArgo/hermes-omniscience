@@ -18,6 +18,7 @@ import importlib.util
 import logging
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException
@@ -34,6 +35,14 @@ log = logging.getLogger(__name__)
 
 PLUGIN_NAME = "omniscience"
 DEFAULT_VIEWER_URL = "http://127.0.0.1:8797"
+
+# Both switch endpoints read prefs.json, change one key and write the whole file back, and both
+# run off the event loop (``asyncio.to_thread``). Without a lock two toggles at once read the same
+# pre-state and the second write drops the first: turn the viewer off and alerts off together and
+# one of them is silently back on. One module-level lock serialises the cycles — they write the
+# same file, so one lock is the whole point. It is not held for reads alone: a read is one
+# open+parse, and the file is replaced atomically.
+_PREFS_LOCK = threading.Lock()
 
 
 def _db_path() -> Path:
@@ -276,13 +285,16 @@ def _set_viewer_mode_locked(enabled: bool) -> dict:
     """Save the switch, and stop the viewer on the way off.
 
     The answer is read back from disk, so a save that did not land is not reported as a change.
+    The read-modify-write runs under ``_PREFS_LOCK`` so a concurrent alerts toggle cannot drop it.
     """
     prefs_mod = _prefs()
     path = prefs_mod.path_for(str(_db_path()))
-    prefs_mod.save(path, prefs_mod.set_viewer(prefs_mod.load(path), enabled))
+    with _PREFS_LOCK:
+        prefs_mod.save(path, prefs_mod.set_viewer(prefs_mod.load(path), enabled))
+        saved = {"enabled": prefs_mod.viewer_enabled(prefs_mod.load(path))}
     if not enabled:
         _stop_viewer()
-    return {"enabled": prefs_mod.viewer_enabled(prefs_mod.load(path))}
+    return saved
 
 
 @router.post("/viewer/mode")
@@ -315,11 +327,13 @@ async def alerts_mode() -> dict:
 
 def _set_alerts_mode_locked(enabled: bool) -> dict:
     """Save the switch. The answer is read back from disk, so a save that did not land is not
-    reported as a change. Nothing else moves: recording and the Concerns page carry on."""
+    reported as a change. Nothing else moves: recording and the Concerns page carry on. The
+    read-modify-write runs under ``_PREFS_LOCK``, the same lock ``/viewer/mode`` takes."""
     prefs_mod = _prefs()
     path = prefs_mod.path_for(str(_db_path()))
-    prefs_mod.save(path, prefs_mod.set_failure_alerts(prefs_mod.load(path), enabled))
-    return {"enabled": prefs_mod.failure_alerts_enabled(prefs_mod.load(path))}
+    with _PREFS_LOCK:
+        prefs_mod.save(path, prefs_mod.set_failure_alerts(prefs_mod.load(path), enabled))
+        return {"enabled": prefs_mod.failure_alerts_enabled(prefs_mod.load(path))}
 
 
 @router.post("/alerts/mode")

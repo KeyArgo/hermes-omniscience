@@ -26,7 +26,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true }).cat
 const panel = () => {
   const rail = document.querySelector('.rail-right');
   const workspace = document.querySelector('.workspace');
-  const close = rail?.querySelector('.inspector-close') ?? null;
+  const close = rail?.querySelector('.rail-close') ?? null;
   const box = close ? close.getBoundingClientRect() : null;
   const style = close ? getComputedStyle(close) : null;
   return {
@@ -161,6 +161,55 @@ for (const width of [400, 1280]) {
   const afterCross = await page.evaluate(panel);
   check(`${width} the × closes the panel`, afterCross.rail === null, String(afterCross.rail));
 
+  // 4b. The same × on every tab, and in the mini panel: it used to live in the Inspector head,
+  // so Warnings, Why and the mini panel had no close control at all.
+  await openPanel();
+  for (const tab of ['Warnings', 'Why', 'Inspect']) {
+    const clicked = await page.evaluate((name) => {
+      const button = [...document.querySelectorAll('.rail-tab')]
+        .find((candidate) => candidate.textContent?.startsWith(name));
+      if (!button) return false;
+      button.click();
+      return true;
+    }, tab);
+    await page.waitForTimeout(250);
+    const onTab = await page.evaluate(panel);
+    check(`${width} the ${tab} tab: a visible × named "Close details"`,
+      clicked && onTab.closeLabel === 'Close details' && onTab.closeVisible,
+      JSON.stringify({ clicked, label: onTab.closeLabel, visible: onTab.closeVisible }));
+  }
+  const beforeTabClose = await page.evaluate(panel);
+  if (beforeTabClose.closeBox) await page.mouse.click(beforeTabClose.closeBox.x, beforeTabClose.closeBox.y);
+  await page.waitForTimeout(500);
+  const afterTabClose = await page.evaluate(panel);
+  check(`${width} that × closes the panel from any tab`, afterTabClose.rail === null, String(afterTabClose.rail));
+
+  // 4c. The mini panel (railMode "follow") is the fourth thing the rail shows, and its mode kept
+  // the rail "shown" after a close, which made Escape a no-op. The chip lives in the ⌘ Workspace
+  // sheet at laptop widths, so open it, switch the panel on, and put the sheet away.
+  if (width >= 1000) {
+    const openedMini = await page.evaluate(async () => {
+      document.querySelector('.workspace-toggle')?.click();
+      await new Promise((r) => setTimeout(r, 250));
+      const chip = document.querySelector('.mini-chip');
+      if (!chip) return false;
+      chip.click();
+      await new Promise((r) => setTimeout(r, 250));
+      document.querySelector('.workspace-close')?.click();
+      return true;
+    });
+    await page.waitForTimeout(700);
+    const mini = await page.evaluate(panel);
+    check(`${width} the mini panel draws the same ×`,
+      openedMini && mini.closeLabel === 'Close details' && mini.closeVisible,
+      JSON.stringify({ chip: openedMini, rail: mini.rail, label: mini.closeLabel }));
+    if (mini.closeBox) await page.mouse.click(mini.closeBox.x, mini.closeBox.y);
+    await page.waitForTimeout(700);
+    const afterMini = await page.evaluate(panel);
+    check(`${width} the mini panel's × closes it, and the rail with it`,
+      afterMini.rail === null, String(afterMini.rail));
+  }
+
   // 5. Clicking empty map space (or, at drawer widths, the page behind the drawer) closes it.
   const forEmpty = await openPanel();
   const beforeEmpty = await page.evaluate(panel);
@@ -195,6 +244,30 @@ for (const width of [400, 1280]) {
     !!forReset && beforeReset.selected && afterReset.rail === null,
     JSON.stringify({ before: beforeReset.rail, after: afterReset.rail }));
   check(`${width} Reset view says "View reset"`, afterReset.note === 'View reset', JSON.stringify(afterReset.note));
+
+  // 4d. Escape leaves an expanded area first, then closes the panel on the next press. The
+  // details listener is registered before the area's, so it must decline the key while one is on.
+  await openPanel();
+  const expanded = await page.evaluate(() => {
+    // Two controls share this class: the stage's "Expand view" and the rail's "Expand details".
+    const button = document.querySelector('.rail-right .area-focus-button');
+    if (!button) return false;
+    button.click();
+    return true;
+  });
+  await page.waitForTimeout(500);
+  const focusedArea = await page.evaluate(panel);
+  check(`${width} "Expand details" lifts the rail over the page`,
+    expanded && String(focusedArea.rail).includes('is-area-focused'), String(focusedArea.rail));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  const left = await page.evaluate(panel);
+  check(`${width} the first Escape leaves the expanded area, panel still open`,
+    left.rail !== null && !String(left.rail).includes('is-area-focused'), String(left.rail));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  const closedBySecond = await page.evaluate(panel);
+  check(`${width} the second Escape closes the panel`, closedBySecond.rail === null, String(closedBySecond.rail));
 
   await page.screenshot({ path: `${OUT}/panel-${width}.png` });
   check(`${width} no page errors`, errors.length === 0, errors.join(' | '));

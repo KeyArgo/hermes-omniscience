@@ -34,23 +34,18 @@ const EVENT_FIELDS = [
   'status',
 ] as const;
 
-export function Inspector({ node, onClose }: { node: GNode | null; onClose?: () => void }) {
+/**
+ * The selected step, in plain words.
+ *
+ * No close control of its own: the rail draws one × for every tab and mode
+ * (`shell/RailClose.tsx`), so this panel is only ever the body of that rail.
+ */
+export function Inspector({ node }: { node: GNode | null }) {
   if (!node) {
     return (
       <div className="inspector">
         <div className="rail-head">
           <span>inspector</span>
-          {onClose ? (
-            <button
-              type="button"
-              className="inspector-close"
-              onClick={onClose}
-              title="Close details (Esc)"
-              aria-label="Close details"
-            >
-              ×
-            </button>
-          ) : null}
         </div>
         <div className="inspector-empty">
           Click any box on the map to see, in plain words, what happened there — what it was, how
@@ -75,17 +70,6 @@ export function Inspector({ node, onClose }: { node: GNode | null; onClose?: () 
           >
             {node.status}
           </span>
-          {onClose ? (
-            <button
-              type="button"
-              className="inspector-close"
-              onClick={onClose}
-              title="Close details (Esc)"
-              aria-label="Close details"
-            >
-              ×
-            </button>
-          ) : null}
         </span>
       </div>
       <div className="inspector-scroll">

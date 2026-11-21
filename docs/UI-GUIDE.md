@@ -1,7 +1,7 @@
 # Omniscience — a guide to the screen
 
-> **Applies to:** Omniscience 1.0.0 · written at commit a456bf7
-> **Revised:** 2026-11-19 · **Body hash:** 168fe390
+> **Applies to:** Omniscience 1.0.0 · written at commit 14336b6
+> **Revised:** 2026-11-20 · **Body hash:** 0de555be
 
 
 Generated from `web/src/help/guide.json` by `web/scripts/gen-ui-guide.mjs`. The same text
@@ -51,7 +51,7 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 ## The details panel
 
 - **Inspect** — The selected step's timing, tokens and data. Selecting a step opens this tab and the panel.
-- **Close (×)** — Close the details panel. Escape does the same, and so does a click on empty map space. With nothing selected the panel is not on the page at all — the map keeps the room, with no empty frame where the panel was.
+- **Close (×)** — Close the details panel. The × sits at the top of the panel on every tab — Inspect, Warnings, Why and the Mini Panel — so it is always in the same place, and Escape does the same, as does a click on empty map space. When "Expand details" or "Expand view" has lifted the panel over the page, Escape first puts the layout back and the next Escape closes the panel. With nothing selected the panel is not on the page at all — the map keeps the room, with no empty frame where the panel was. A step that leaves the map (Hide tool steps, Errors only, or replay moved back before it) takes the panel with it.
 - **Warnings** — Patterns worth a look in this chat, grouped by kind with a count. Select one to highlight it on the map.
 - **Why** — Why the run failed, read from its recorded failures.
 
@@ -69,7 +69,7 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 ## Keyboard
 
 - **Tab / Shift+Tab** — move between controls; every control shows a blue focus ring and its tooltip.
-- **Esc** — close a menu, the Panels sheet, a focused panel, the tour or a tooltip.
+- **Esc** — close a menu, the Panels sheet, a focused panel, the details panel, the tour or a tooltip. With **Expand details** or **Expand view** on, the first Esc restores the ordinary layout and the next one closes the panel.
 - **↑ ↓ Home End** — move inside an open menu; on a panel's resize bar, change its height.
 - **← →** — previous / next stop while the tour is open.
 - **1 – 5** — List, Map, Time, Tokens, Usage.

@@ -17,7 +17,7 @@ export function renderGuide(g) {
   }
   out.push('## Keyboard', '',
     '- **Tab / Shift+Tab** — move between controls; every control shows a blue focus ring and its tooltip.',
-    '- **Esc** — close a menu, the Panels sheet, a focused panel, the tour or a tooltip.',
+    '- **Esc** — close a menu, the Panels sheet, a focused panel, the details panel, the tour or a tooltip. With **Expand details** or **Expand view** on, the first Esc restores the ordinary layout and the next one closes the panel.',
     '- **↑ ↓ Home End** — move inside an open menu; on a panel\'s resize bar, change its height.',
     '- **← →** — previous / next stop while the tour is open.',
     '- **1 – 5** — List, Map, Time, Tokens, Usage.',

@@ -337,3 +337,16 @@ The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](ht
   truncated with `...`). On that store the viewer and Hermes now agree on all 495 named chats; 342
   disagreed before. `tests/test_labels.py` pins each rule, and the title is read live, so a rename
   shows on the next refresh.
+- **One close button on the details panel, and Escape that knows what it is closing.** The `×` lived
+  in the Inspector's head, so switching to Warnings or Why, or opening the mini panel, removed the only
+  way out of the drawer (and 701–900 px hides the collapse chevron as well); it now sits at the top of
+  the rail on every tab and mode. Escape while **Expand details** or **Expand view** is lifted restores
+  the layout first and closes the panel on the second press; closing from the mini panel returns the
+  rail to details instead of leaving it stuck "shown" with a dead Escape; and a selected step that
+  leaves the map (Hide tool steps, Errors only, replay scrubbed back before it) closes the panel with
+  it rather than leaving a scrim over a page with no drawer in it. Chat names skip out-of-band and
+  task-notification rows and merged compaction carriers; the two settings switches share one lock, so
+  turning both off at once keeps both off; and a stop that finds no pid file no longer clears the start
+  stamp of a start still in flight. `web/src/shell/detailsPanel.test.ts`,
+  `web/src/shell/RailClose.test.tsx`, `tests/test_labels.py`, `tests/test_prefs_concurrency.py` and
+  `tests/test_viewer_launcher.py` keep it that way.

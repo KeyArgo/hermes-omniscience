@@ -1265,7 +1265,8 @@ pre.attrs {
   }
 
   /* The drawer is a finger target, not a corner chevron: give the × the size a thumb expects. */
-  .inspector-close {
+  .inspector-close,
+  .rail-close {
     display: inline-flex;
     width: 44px;
     height: 44px;
@@ -2076,6 +2077,35 @@ table.kv.friendly td {
   flex-direction: column;
   min-height: 0;
   flex: 1;
+}
+
+/* The rail's own close control: one × for whatever the rail is showing (Inspect, Warnings, Why,
+   the mini panel), at every width. It replaced the Inspector's own button, which disappeared with
+   the panel on every other tab and left the drawer with no way out between 701 and 900 px, where
+   the collapse chevron is hidden. It is the first child of the rail body, aligned to the end, and
+   inset from the right edge so it never sits under the collapse chevron, which owns that corner
+   above 900 px and again at 700 px and below (the drawer's fold). */
+.rail-close {
+  align-self: flex-end;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin: 6px 34px 0 10px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: #0b121a;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.rail-close:hover,
+.rail-close:focus-visible {
+  color: var(--cyan);
+  border-color: var(--cyan);
 }
 
 /* ---- grid columns: four combos at default width ---- */

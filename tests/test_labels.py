@@ -147,6 +147,89 @@ def test_a_summary_with_no_message_after_it_is_not_the_name(tmp_path):
     assert labels.labels_for(['a', 'b'], str(db)) == {}
 
 
+def test_noise_rows_are_never_the_chat_name(tmp_path):
+    """An out-of-band marker or a task notification is scaffolding, not what the user said.
+
+    ``_clean()`` has always refused these prefixes, but a row that no longer went through it —
+    ``_preview_of()``'s plain branch — named the chat ``[OUT-OF-BAND USER MESSAGE, ...]`` or
+    ``<task-notification> …``.
+    """
+    db = tmp_path / 'state.db'
+    noise = [
+        '[OUT-OF-BAND USER MESSAGE]\nThe user sent this while the agent was working: look at the tests',
+        '<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>',
+        '<command-name>/help</command-name>',
+    ]
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, '
+                     'timestamp real)')
+        for index, content in enumerate(noise):
+            sid = f's{index}'
+            conn.execute('insert into sessions values (?, ?)', (sid, None))
+            conn.execute('insert into messages values (?, ?, ?, ?)', (sid, 'user', content, 1))
+
+    assert labels.labels_for([f's{index}' for index in range(len(noise))], str(db)) == {}
+
+
+def test_noise_before_a_real_message_names_the_chat_after_the_message(tmp_path):
+    """The skip is per row: a chat whose first row is noise is named by the next real message."""
+    db = tmp_path / 'state.db'
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, '
+                     'timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.executemany('insert into messages values (?, ?, ?, ?)', [
+            ('a', 'user', '<task-notification>done</task-notification>', 1),
+            ('a', 'user', 'Where did the time go?', 2),
+        ])
+    assert labels.labels_for(['a'], str(db)) == {'a': 'Where did the time go?'}
+
+
+def test_a_merged_carrier_with_no_prior_message_is_not_the_name(tmp_path):
+    """``[PRIOR CONTEXT — …]`` is a carrier too, even when nothing precedes it.
+
+    ``_preview_of()`` returns nothing for a merged carrier whose prior half is empty, so the
+    fallback ran ``_clean()`` on the raw row and named the chat after the header.
+    """
+    db = tmp_path / 'state.db'
+    merged = (
+        '[PRIOR CONTEXT — for reference only; not a new message]\n'
+        '\n'
+        '[END OF PRIOR CONTEXT — COMPACTION SUMMARY BELOW]\n'
+        '\n'
+        '[CONTEXT SUMMARY]: earlier turns were summarised here.'
+    )
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, '
+                     'timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', merged, 1))
+    assert labels.labels_for(['a'], str(db)) == {}
+
+
+def test_a_merged_carrier_still_names_the_chat_after_the_prior_message(tmp_path):
+    """The merged form's name is the message the user typed before the compaction."""
+    db = tmp_path / 'state.db'
+    merged = (
+        '[PRIOR CONTEXT — for reference only; not a new message]\n'
+        'Fix the label leak\n'
+        '\n'
+        '[END OF PRIOR CONTEXT — COMPACTION SUMMARY BELOW]\n'
+        '\n'
+        '[CONTEXT SUMMARY]: earlier turns were summarised here.'
+    )
+    with sqlite3.connect(db) as conn:
+        conn.execute('create table sessions (id text, title text)')
+        conn.execute('create table messages (session_id text, role text, content text, '
+                     'timestamp real)')
+        conn.execute('insert into sessions values (?, ?)', ('a', None))
+        conn.execute('insert into messages values (?, ?, ?, ?)', ('a', 'user', merged, 1))
+    assert labels.labels_for(['a'], str(db)) == {'a': 'Fix the label leak'}
+
+
 def test_session_metadata_reports_known_and_unknown_archive_state(tmp_path, monkeypatch):
     db = tmp_path / 'state.db'
     with sqlite3.connect(db) as conn:

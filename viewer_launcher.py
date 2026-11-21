@@ -225,7 +225,7 @@ def _pid_running(pid: int) -> bool:
 
 
 def _clear_start_stamp(log_dir: str) -> None:
-    """Forget the last start attempt: the viewer is being stopped on purpose.
+    """Forget the last start attempt: the viewer it started has been verified stopped.
 
     ``viewer.last-start`` exists so a crashing viewer is not relaunched by every Hermes process
     that loads the plugin. It is written before the spawn, so it also records starts that
@@ -233,6 +233,10 @@ def _clear_start_stamp(log_dir: str) -> None:
     off and on again) then found the stamp younger than a minute and refused to start, leaving
     the viewer down with "a start was attempted less than a minute ago". Nothing is being
     backed off from once the viewer has been stopped, so the stamp goes with it.
+
+    Only called once a stop is verified — a dead pid, a pid file naming something else, or a
+    signal this launcher sent to the viewer it started. A missing pid file is a start still in
+    flight and keeps its stamp (see ``stop_viewer``).
     """
     try:
         os.unlink(os.path.join(log_dir, "viewer.last-start"))
@@ -257,8 +261,11 @@ def stop_viewer(log_dir: str) -> dict:
     try:
         raw = Path(path).read_text(encoding="utf-8").strip()
     except OSError:
-        # Nothing this launcher started is recorded, so nothing is running under its name.
-        _clear_start_stamp(log_dir)
+        # Nothing this launcher started is recorded. That is not proof the viewer is down: a start
+        # writes ``viewer.last-start`` before it spawns and ``viewer.pid`` after, so a stop that
+        # arrives in between finds a fresh stamp and no pid. Clearing the stamp here let the next
+        # ``ensure_viewer`` spend the retry pause on nothing and spawn a second viewer beside the
+        # first. The stamp is left to the start it belongs to, and to a stop that can verify one.
         result["reason"] = "no viewer pid"
         return result
     try:

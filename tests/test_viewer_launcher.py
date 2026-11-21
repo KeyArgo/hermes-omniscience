@@ -243,6 +243,23 @@ def test_stop_viewer_without_a_pid_file_says_so(tmp_path):
     assert launcher.stop_viewer(str(tmp_path))["reason"] == "no viewer pid"
 
 
+def test_a_stop_with_no_pid_file_leaves_the_start_stamp_alone(tmp_path):
+    """A start may be in flight: the stamp is written before the spawn, the pid after it.
+
+    Clearing the stamp there let a concurrent ``ensure_viewer`` start a second viewer while the
+    first child was still coming up — two viewers, or a retry pause that was lifted by a stop
+    that stopped nothing.
+    """
+    from omniscience import viewer_launcher as launcher
+
+    stamp = tmp_path / "viewer.last-start"
+    stamp.write_text(str(int(time.time())), encoding="utf-8")
+
+    result = launcher.stop_viewer(str(tmp_path))
+    assert result["reason"] == "no viewer pid"
+    assert stamp.exists(), "an in-flight start lost its stamp"
+
+
 def test_stop_viewer_signals_the_viewer_and_waits_for_it_to_go(tmp_path, monkeypatch):
     """With a verified viewer cmdline the launcher sends SIGTERM once and records the exit."""
     from omniscience import viewer_launcher as launcher
@@ -344,6 +361,9 @@ def test_a_stop_clears_the_start_stamp_so_a_restart_can_start(tmp_path, monkeypa
     too. The retry pause then answered the restart with "a start was attempted less than a
     minute ago" — the viewer stayed down for up to a minute after the owner pressed Restart
     viewer (or switched the viewer off and on again) within a minute of a start.
+
+    The stamp goes only once the stop is verified: the viewer's own pid, and its command line
+    naming ``omniscience_viewer``. A stop that found no pid file is a start still in flight.
     """
     from omniscience import viewer_launcher as launcher
 
@@ -351,16 +371,26 @@ def test_a_stop_clears_the_start_stamp_so_a_restart_can_start(tmp_path, monkeypa
     db.write_bytes(b"")
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    # A start a moment ago: any successful start writes this.
+    # A start a moment ago: any successful start writes this, and the pid it spawned follows.
     (log_dir / "viewer.last-start").write_text(str(int(time.time())), encoding="utf-8")
+    with open(launcher.pid_path(str(log_dir)), "w", encoding="utf-8") as fh:
+        fh.write("4242")
     _dead_port_env(monkeypatch)
+
+    # The viewer is alive when checked, gone on the first wait: the stop is verified.
+    checks = iter([True, False])
+    monkeypatch.setattr(launcher, "_pid_running", lambda pid: next(checks, False))
+    monkeypatch.setattr(
+        launcher, "_pid_cmdline", lambda pid: "python3 -m omniscience_viewer --db x"
+    )
+    monkeypatch.setattr(launcher.os, "kill", lambda pid, sig: None)
 
     def no_spawn(*args, **kwargs):
         raise OSError("no spawn in tests")
 
     monkeypatch.setattr(launcher.subprocess, "Popen", no_spawn)
 
-    assert launcher.stop_viewer(str(log_dir))["stopped"] is False
+    assert launcher.stop_viewer(str(log_dir)) == {"stopped": True, "reason": "stopped"}
     assert not (log_dir / "viewer.last-start").exists()
 
     result = launcher.ensure_viewer(str(db), log_dir=str(log_dir), autostart=True)

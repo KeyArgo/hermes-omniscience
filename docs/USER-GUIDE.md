@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 64f11ae
-> **Revised:** 2026-11-20 · **Body hash:** 5f97f606
+> **Applies to:** Omniscience 1.0.0 · written at commit 14336b6
+> **Revised:** 2026-11-20 · **Body hash:** 3d63ad3f
+
 
 
 
@@ -145,10 +146,14 @@ right: what that step was, how long it took, its tokens and whether it succeeded
 **Warnings** and **Why** tabs for the whole chat. Below 900 px it arrives as a drawer over the map
 instead of a column.
 
-Close it with the **×** in its head (or with the **›** in its corner, which folds it to a thin strip
-while the step stays selected), with **Esc**, or by clicking empty space on the map. Closing it also
-clears the selection, so it cannot come back on its own: with nothing selected there is no right-hand
-frame at all and the map keeps the width. **↺ reset view** closes it as well.
+Close it with the **×** at the top of the panel — the same control on the **Inspect**, **Warnings** and
+**Why** tabs and in the **mini panel** — with **Esc**, or by clicking empty space on the map. The **›**
+in its corner folds it to a thin strip while the step stays selected. Closing it also clears the
+selection, so it cannot come back on its own: with nothing selected there is no right-hand frame at
+all and the map keeps the width. If **Expand details** or **Expand view** has lifted the panel over the
+page, **Esc** first restores the ordinary layout and the next **Esc** closes the panel. A selected
+step that leaves the map — **Hide tool steps**, **Errors only**, or replay moved back before it —
+closes the panel with it. **↺ reset view** closes it as well.
 
 ## Getting lost? Reset view
 
@@ -169,7 +174,8 @@ default view, the context strip, Interface size) or the theme. Turn those back f
 
 The **mini panel** is the `⬒ mini panel` chip in the toolbar. It opens a right-hand column beside the
 map; in a window narrower than 1100px it slides in as a drawer against the right edge, so it is
-reachable at any width. Pressing the chip again closes it.
+reachable at any width. Pressing the chip again — or the panel's **×**, **Esc**, or a click on empty
+map space — closes it, and the rail goes back to the ordinary details mode.
 
 At the top of that panel sits the **context strip** for the chat you have open, and only that chat:
 

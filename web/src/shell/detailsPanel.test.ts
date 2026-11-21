@@ -5,10 +5,17 @@ import {
   detailsWorkspaceClass,
   escapeClosesDetails,
   isTypingTarget,
+  selectionLeftGraph,
 } from './detailsPanel';
 
 const escape = { key: 'Escape', defaultPrevented: false };
-const quiet = { anyDialogOpen: false, menuOpen: false, tourActive: false, typing: false };
+const quiet = {
+  anyDialogOpen: false,
+  menuOpen: false,
+  tourActive: false,
+  typing: false,
+  areaFocused: false,
+};
 
 describe('the details rail is only there while it has something to show', () => {
   it('is drawn for a selected step, and gone when nothing is selected', () => {
@@ -50,6 +57,36 @@ describe('closing the details panel', () => {
     expect(escapeClosesDetails(escape, { ...quiet, tourActive: true }, true)).toBe(false);
     expect(escapeClosesDetails(escape, { ...quiet, typing: true }, true)).toBe(false);
     expect(escapeClosesDetails({ key: 'Escape', defaultPrevented: true }, quiet, true)).toBe(false);
+  });
+
+  it('leaves an expanded area first, and closes the panel only on the next Escape', () => {
+    // "Expand details" / "Expand view" puts the panel (or the stage) over the rest of the page.
+    // Escape there means "come back to the drawn layout" — the details listener runs first, so
+    // without this it wiped the selection and left the area expanded over an empty page.
+    expect(escapeClosesDetails(escape, { ...quiet, areaFocused: true }, true)).toBe(false);
+    // The second Escape finds no expanded area and closes the panel as it always did.
+    expect(escapeClosesDetails(escape, quiet, true)).toBe(true);
+  });
+
+  it('closing from the mini panel closes it, rather than leaving the rail in mini mode', () => {
+    // `railMode === 'follow'` keeps the rail on screen with nothing selected, so a close that
+    // forgot the mode left it "shown": Escape was a no-op and the ‹ Details strip unmounted it.
+    expect(DETAILS_CLOSED.railMode).toBe('details');
+    expect(detailsRailShown(DETAILS_CLOSED.selectedNodeId, DETAILS_CLOSED.railMode)).toBe(false);
+  });
+
+  it('closes a selection the graph no longer holds, but not one still arriving', () => {
+    const ids = ['llm:a', 'tool:b'];
+    // Still on the map: nothing to do.
+    expect(selectionLeftGraph('llm:a', ids, 'llm:a')).toBe(false);
+    // Selected before the re-run that will draw it (a collapsed group, a new chat): an expanded
+    // turn belongs to no node until the worker replies, so a selection that was never there is
+    // not a selection that "went away".
+    expect(selectionLeftGraph('llm:a', ['tool:b'], null)).toBe(false);
+    // It was drawn and then left — a filter, Errors only, or the replay slider moved back past
+    // it. At 700 px the drawer hides while its scrim stays, so the panel must close with it.
+    expect(selectionLeftGraph('llm:a', ['tool:b'], 'llm:a')).toBe(true);
+    expect(selectionLeftGraph(null, ['tool:b'], 'llm:a')).toBe(false);
   });
 });
 

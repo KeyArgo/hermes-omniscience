@@ -101,8 +101,10 @@ import {
   detailsWorkspaceClass,
   escapeClosesDetails,
   isTypingTarget,
+  selectionLeftGraph,
   type RailMode,
 } from './shell/detailsPanel';
+import { RailClose } from './shell/RailClose';
 import { VIEW_RESET, isResetPanelKey, resetStorageKeys } from './shell/viewReset';
 import { PrefScopeProvider } from './shell/prefScope';
 import {
@@ -1670,20 +1672,26 @@ export default function App() {
 
   /**
    * Closing the details panel ends the selection, and the rail goes with it. Every closing path
-   * — the × in the panel head, Escape, a click on empty map space, Reset view — ends here, which
-   * is what stops any of them leaving the frame behind.
+   * — the × on the rail, Escape, a click on empty map space, Reset view — ends here, which is
+   * what stops any of them leaving the frame behind. The mode returns to details as well: the
+   * mini panel keeps the rail on screen with nothing selected, so a close that left `follow` in
+   * place kept the rail "shown" and made the next Escape a no-op.
    */
   const closeDetails = useCallback(() => {
     setSelectedNodeId(DETAILS_CLOSED.selectedNodeId);
+    setRailMode(DETAILS_CLOSED.railMode);
+    writeScopedPref('railMode', mode, DETAILS_CLOSED.railMode);
     setSelectedEventId(null);
     setPendingLensEventId(null);
     setRightCollapsed(DETAILS_CLOSED.railFolded);
     // "Expand details" draws the rail over the whole stage; closing the panel must leave it too.
     setFocusedArea((area) => (area === 'details' ? null : area));
-  }, []);
+  }, [mode]);
 
-  // Escape closes the panel only while it is the innermost layer: a dialog, a menu, the tour or a
-  // text field owns Escape before the panel does.
+  // Escape closes the panel only while it is the innermost layer: a dialog, a menu, the tour, an
+  // expanded area or a text field owns Escape before the panel does. An expanded area comes
+  // first of all — its listener is registered after this one, so a key taken here would close the
+  // panel and leave the area expanded over an empty page.
   useEffect(() => {
     if (!detailsRail) return;
     const onKey = (event: KeyboardEvent) => {
@@ -1693,6 +1701,7 @@ export default function App() {
         menuOpen: document.querySelector('[role="menu"]') !== null,
         tourActive,
         typing: isTypingTarget(document.activeElement),
+        areaFocused: focusedArea !== null,
       };
       if (!escapeClosesDetails(event, context, detailsRail)) return;
       event.preventDefault();
@@ -1709,8 +1718,32 @@ export default function App() {
     insightOpen,
     workspaceOpen,
     tourActive,
+    focusedArea,
     closeDetails,
   ]);
+
+  /**
+   * A selected step that leaves the graph closes the panel with it. Filters (Hide tool steps,
+   * Errors only) and the replay slider rebuild the graph without it, and at 700 px and below the
+   * drawer hides while its scrim stays mounted — a page that looks blocked with no drawer in it.
+   * `seenInGraph` is what keeps this from firing on a step that is still arriving: expanding a
+   * turn re-draws the graph in a worker, so the new selection is not in the old node list yet.
+   */
+  const selectionSeenInGraph = useRef<string | null>(null);
+  const baseGraphNodeIds = useMemo(() => baseGraph.nodes.map((node) => node.id), [baseGraph.nodes]);
+  useEffect(() => {
+    if (selectedNodeId === null) {
+      selectionSeenInGraph.current = null;
+      return;
+    }
+    if (baseGraphNodeIds.includes(selectedNodeId)) {
+      selectionSeenInGraph.current = selectedNodeId;
+      return;
+    }
+    if (!selectionLeftGraph(selectedNodeId, baseGraphNodeIds, selectionSeenInGraph.current)) return;
+    selectionSeenInGraph.current = null;
+    closeDetails();
+  }, [selectedNodeId, baseGraphNodeIds, closeDetails]);
 
   const expandTurn = useCallback((turnId: string) => {
     setExpandedTurnIds((previous) => new Set(previous).add(turnId));
@@ -3114,6 +3147,10 @@ export default function App() {
             </button>
           ) : null}
           <div className="rail-content">
+            {/* The one way out of this rail, whichever tab or mode it is showing: the Inspector
+                used to own the only ×, so Warnings, Why and the mini panel had none, and at
+                701–900 px the collapse chevron is hidden. It sits ahead of every branch below. */}
+            <RailClose onClose={closeDetails} />
             {/* Below 900 px this drawer covers the status card, so a selected failure carries its
                 own way to the next one. */}
             {selectedEventId && failureEventIds.includes(selectedEventId) ? (
@@ -3197,7 +3234,7 @@ export default function App() {
                       onSelectEvent={onSelectEvent}
                     />
                   ) : selectedNode ? (
-                    <Inspector node={selectedNode} onClose={closeDetails} />
+                    <Inspector node={selectedNode} />
                   ) : (
                     <SlowestList nodes={fullGraph.nodes} onSelect={selectNodeDeep} />
                   )}
