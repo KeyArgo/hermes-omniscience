@@ -226,4 +226,7 @@ def test_token_path_resolves_symlinked_directories(tmp_path):
     link = tmp_path / "link"
     link.symlink_to(real, target_is_directory=True)
 
-    assert token_path(str(link / "events.db")) == str(real / "viewer-token")
+    # normcase: on Windows the resolved path can differ from tmp_path in letter case only.
+    assert os.path.normcase(token_path(str(link / "events.db"))) == os.path.normcase(
+        str(real / "viewer-token")
+    )

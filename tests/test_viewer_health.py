@@ -452,7 +452,10 @@ def test_windows_memory_reads_as_numbers_not_question_marks():
     rss, peak = health_mod._memory_from_windows()
     assert isinstance(rss, float) and rss > 0, (rss, peak)
     assert isinstance(peak, float) and peak >= rss, (rss, peak)
-    assert health_mod.read_memory_mb() == (rss, peak)
+    # A second live read, so the working set may have moved by a page or two in between.
+    again_rss, again_peak = health_mod.read_memory_mb()
+    assert again_rss == pytest.approx(rss, abs=16), ((rss, peak), (again_rss, again_peak))
+    assert again_peak >= peak, ((rss, peak), (again_rss, again_peak))
 
 
 def test_the_windows_call_declares_its_argument_types():

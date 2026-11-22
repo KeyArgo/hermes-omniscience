@@ -384,6 +384,10 @@ def test_a_stop_clears_the_start_stamp_so_a_restart_can_start(tmp_path, monkeypa
         launcher, "_pid_cmdline", lambda pid: "python3 -m omniscience_viewer --db x"
     )
     monkeypatch.setattr(launcher.os, "kill", lambda pid, sig: None)
+    # Windows stops with taskkill, which goes through ``subprocess.run`` (and so ``Popen``).
+    monkeypatch.setattr(
+        launcher.subprocess, "run", lambda *a, **k: launcher.subprocess.CompletedProcess(a, 0)
+    )
 
     def no_spawn(*args, **kwargs):
         raise OSError("no spawn in tests")

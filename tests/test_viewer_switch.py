@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -127,7 +128,8 @@ def test_the_pane_does_not_start_the_viewer_when_the_switch_is_off(api, tmp_path
     assert fake.calls == []
     assert body["viewer"] == {"running": False, "reason": "off"}
     # A viewer started before the switch was turned off must not outlive it.
-    assert fake.stop_calls == [str(db.parent)]
+    # normcase: Windows may spell the same temp folder with a different case once resolved.
+    assert [os.path.normcase(c) for c in fake.stop_calls] == [os.path.normcase(str(db.parent))]
 
 
 def test_the_pane_starts_the_viewer_when_the_switch_is_on(api, tmp_path, monkeypatch):
