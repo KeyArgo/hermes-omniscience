@@ -10,12 +10,15 @@ File format (all keys optional; unknown keys are preserved but ignored):
       "version": 1,
       "digest": {"enabled": true, "detail": "standard"},
       "viewer": "on",
-      "failure_alerts": true
+      "failure_alerts": true,
+      "keep_days": 30
     }
 
 ``detail`` is one of ``brief``, ``standard`` or ``full``. ``viewer`` is ``on`` or ``off``: off
 means the viewer does not run at all; recording carries on. ``failure_alerts`` is true or
-false: false silences the repeated-failure pop-up; recording carries on.
+false: false silences the repeated-failure pop-up; recording carries on. ``keep_days`` is how
+long step detail is kept before it is rolled into daily totals and deleted: 7, 30 or 90 days,
+or 0 for ever.
 """
 
 from __future__ import annotations
@@ -29,18 +32,22 @@ from typing import Any
 log = logging.getLogger("omniscience")
 
 __all__ = [
+    "DEFAULT_KEEP_DAYS",
     "DETAIL_LEVELS",
+    "KEEP_DAYS_CHOICES",
     "PREF_FILE_NAME",
     "defaults",
     "digest_enabled",
     "detail_level",
     "failure_alerts_enabled",
+    "keep_days",
     "load",
     "normalize",
     "path_for",
     "save",
     "set_digest",
     "set_failure_alerts",
+    "set_keep_days",
     "set_viewer",
     "viewer_enabled",
 ]
@@ -49,16 +56,21 @@ PREF_FILE_NAME = "prefs.json"
 DETAIL_LEVELS = ("brief", "standard", "full")
 DEFAULT_DETAIL = "standard"
 VIEWER_MODES = ("on", "off")
+# 0 means "keep for ever": no automatic cleanup, which is what an owner who wants the whole
+# history selects. Anything else is a number of days.
+KEEP_DAYS_CHOICES = (7, 30, 90, 0)
+DEFAULT_KEEP_DAYS = 30
 
 
 def defaults() -> dict:
     """The shipped defaults: a turn summary in the chat, standard detail, the viewer on,
-    failure pop-ups on."""
+    failure pop-ups on, and step detail kept for 30 days."""
     return {
         "version": 1,
         "digest": {"enabled": True, "detail": DEFAULT_DETAIL},
         "viewer": "on",
         "failure_alerts": True,
+        "keep_days": DEFAULT_KEEP_DAYS,
     }
 
 
@@ -100,6 +112,12 @@ def normalize(raw: Any) -> dict:
     alerts = raw.get("failure_alerts")
     if isinstance(alerts, bool):
         out["failure_alerts"] = alerts
+
+    days = raw.get("keep_days")
+    if isinstance(days, str) and days.strip().isdigit():
+        days = int(days.strip())
+    if isinstance(days, int) and not isinstance(days, bool) and days in KEEP_DAYS_CHOICES:
+        out["keep_days"] = days
     return out
 
 
@@ -196,4 +214,23 @@ def set_failure_alerts(prefs: dict, enabled: bool) -> dict:
     out = normalize(prefs)
     if isinstance(enabled, bool):
         out["failure_alerts"] = enabled
+    return out
+
+
+def keep_days(prefs: dict) -> int:
+    """How many days of step detail to keep; 0 means for ever. Junk reads as the default."""
+    days = prefs.get("keep_days") if isinstance(prefs, dict) else None
+    if isinstance(days, bool):
+        return DEFAULT_KEEP_DAYS
+    if isinstance(days, int) and days in KEEP_DAYS_CHOICES:
+        return days
+    return DEFAULT_KEEP_DAYS
+
+
+def set_keep_days(prefs: dict, days: int) -> dict:
+    """Return a new prefs dict with the retention window set. Only the offered values are
+    accepted; anything else leaves the current setting alone."""
+    out = normalize(prefs)
+    if isinstance(days, int) and not isinstance(days, bool) and days in KEEP_DAYS_CHOICES:
+        out["keep_days"] = days
     return out

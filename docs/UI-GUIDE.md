@@ -1,7 +1,7 @@
 # Omniscience — a guide to the screen
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 14336b6
-> **Revised:** 2026-11-20 · **Body hash:** 0de555be
+> **Applies to:** Omniscience 1.0.0 · written at commit 1996df4
+> **Revised:** 2026-11-23 · **Body hash:** 51f56e95
 
 
 Generated from `web/src/help/guide.json` by `web/scripts/gen-ui-guide.mjs`. The same text
@@ -21,7 +21,7 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 - **Mini Panel** — A small frame on the right with only what you chose to watch.
 - **Workspace (⌘)** — On a laptop, tablet or phone this opens the same secondary controls at full size: Follow Newest, Mini Panel, Panels, Reset, Tour, map style, Settings and Help. Every action stays present; nothing is removed to make room.
 - **Panels** — Show, hide and resize every panel, switch between Simple, Standard and Everything, and reset the layout.
-- **Settings (⚙)** — Interface size (100%, 90% or 80% — how large the whole page draws), default view, compact text, chat titles, the theme (dark or Paper), recording and privacy.
+- **Settings (⚙)** — Interface size (100%, 90% or 80% — how large the whole page draws), default view, compact text, chat titles, the theme (dark or Paper), recording and privacy. Hermes Settings → Omniscience also holds how long step history is kept and the Clean up now button.
 - **Help** — What Am I Looking At? explains every box and colour; Take the Tour walks five stops in about 30 seconds.
 
 ## The toolbar
@@ -54,6 +54,12 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 - **Close (×)** — Close the details panel. The × sits at the top of the panel on every tab — Inspect, Warnings, Why and the Mini Panel — so it is always in the same place, and Escape does the same, as does a click on empty map space. When "Expand details" or "Expand view" has lifted the panel over the page, Escape first puts the layout back and the next Escape closes the panel. With nothing selected the panel is not on the page at all — the map keeps the room, with no empty frame where the panel was. A step that leaves the map (Hide tool steps, Errors only, or replay moved back before it) takes the panel with it.
 - **Warnings** — Patterns worth a look in this chat, grouped by kind with a count. Select one to highlight it on the map.
 - **Why** — Why the run failed, read from its recorded failures.
+
+## The Privacy record
+
+- **When and why** — Each Privacy row shows the exact local date and time it ran and a plain sentence saying why it is listed — browser, desktop, wide file sweep, network call or MCP server — plus the host, file count or server name when the metadata has one. Nothing is hover-only.
+- **Open the exact step** — Click anywhere on a Privacy row, or Tab to it and press Enter, to switch to the map with the details panel on that recorded step. The chat link and the Flag button still do their own job without opening the step.
+- **Flag** — Write a file with the action, the chat, the steps around it and both clock times. A flagged chat is never removed by the history cleanup.
 
 ## Presets
 

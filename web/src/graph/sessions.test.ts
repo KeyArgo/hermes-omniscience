@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionMeta } from '../types';
 import {
+  CHAT_WINDOWS,
   chatWindowCounts,
   inChatWindow,
   sortChats,
@@ -135,6 +136,20 @@ describe('chat window', () => {
     expect(withinChatWindow(rows, 'hour', NOW).map((c) => c.id)).toEqual(['now', 'twenty-min']);
   });
 
+  it('the last 24 hours rolls back from now, not from local midnight', () => {
+    // Eighteen hours ago was yesterday, but it is still inside a rolling day. That is the point
+    // of the window: it answers "what did I work on today" on a night shift too.
+    expect(withinChatWindow(rows, 'day', NOW).map((c) => c.id)).toEqual([
+      'now', 'twenty-min', 'two-hours', 'six-hours', 'yesterday',
+    ]);
+  });
+
+  it('the rolling day has a hard edge at 24 hours', () => {
+    expect(inChatWindow(chat('just-inside', NOW - 86400 + 60), 'day', NOW)).toBe(true);
+    expect(inChatWindow(chat('just-outside', NOW - 86400), 'day', NOW)).toBe(false);
+    expect(inChatWindow(chat('future', NOW + 300), 'day', NOW)).toBe(false);
+  });
+
   it('today keeps everything since local midnight and no further back', () => {
     expect(withinChatWindow(rows, 'today', NOW).map((c) => c.id)).toEqual([
       'now', 'twenty-min', 'two-hours', 'six-hours',
@@ -159,7 +174,13 @@ describe('chat window', () => {
   });
 
   it('counts what each window would show so an empty hour can offer the next step', () => {
-    expect(chatWindowCounts(rows, NOW)).toEqual({ hour: 2, today: 4, all: 6 });
+    expect(chatWindowCounts(rows, NOW)).toEqual({ hour: 2, day: 5, today: 4, all: 6 });
+  });
+
+  it('offers the windows in widening order', () => {
+    expect(CHAT_WINDOWS.map((option) => option.label)).toEqual([
+      'Last hour', 'Last 24 hours', 'Today', 'All chats',
+    ]);
   });
 
   it('the window belongs to "biggest context now" and to no other ranking', () => {

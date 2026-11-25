@@ -108,6 +108,14 @@ def test_the_viewer_copy_behaves_identically(tmp_path):
         {"failure_alerts": True},
         {"failure_alerts": "nonsense"},
         {"digest": {"enabled": False}, "failure_alerts": False},
+        {"keep_days": 7},
+        {"keep_days": 90},
+        {"keep_days": 0},
+        {"keep_days": 12},
+        {"keep_days": "30"},
+        {"keep_days": True},
+        {"keep_days": None},
+        {"keep_days": 30, "failure_alerts": False},
     ]
     for case in cases:
         assert prefs.normalize(case) == other.normalize(case)
@@ -115,6 +123,8 @@ def test_the_viewer_copy_behaves_identically(tmp_path):
         assert prefs.set_viewer(case, False) == other.set_viewer(case, False)
         assert prefs.failure_alerts_enabled(case) == other.failure_alerts_enabled(case)
         assert prefs.set_failure_alerts(case, False) == other.set_failure_alerts(case, False)
+        assert prefs.keep_days(case) == other.keep_days(case)
+        assert prefs.set_keep_days(case, 90) == other.set_keep_days(case, 90)
 
     path_plugin = str(tmp_path / "a.json")
     path_viewer = str(tmp_path / "b.json")
@@ -191,3 +201,29 @@ def test_set_failure_alerts_round_trips_and_never_mutates_its_input(tmp_path):
     assert prefs.failure_alerts_enabled(loaded) is False
     assert prefs.digest_enabled(loaded) is True  # the other settings are untouched
     assert prefs.viewer_enabled(loaded) is True
+
+
+def test_step_history_is_kept_for_30_days_by_default():
+    assert prefs.defaults()["keep_days"] == 30
+    assert prefs.keep_days(prefs.defaults()) == 30
+
+
+def test_only_the_offered_retention_windows_are_accepted():
+    for days in prefs.KEEP_DAYS_CHOICES:
+        assert prefs.normalize({"keep_days": days})["keep_days"] == days
+    # A hand-edited or older file must not turn into "delete everything" or "keep everything".
+    for junk in (1, 6, 31, 365, -1, True, False, None, "nonsense", [], {}):
+        assert prefs.normalize({"keep_days": junk})["keep_days"] == prefs.DEFAULT_KEEP_DAYS
+    assert prefs.normalize({"keep_days": "90"})["keep_days"] == 90
+
+
+def test_set_keep_days_round_trips_and_never_mutates_its_input(tmp_path):
+    before = prefs.defaults()
+    changed = prefs.set_keep_days(before, 7)
+    assert changed["keep_days"] == 7
+    assert before["keep_days"] == 30
+    path = str(tmp_path / "prefs.json")
+    assert prefs.save(path, changed) is True
+    assert prefs.keep_days(prefs.load(path)) == 7
+    # An unsupported value leaves the saved choice alone rather than silently wrapping it.
+    assert prefs.set_keep_days(changed, 12)["keep_days"] == 7

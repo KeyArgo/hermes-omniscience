@@ -1,7 +1,8 @@
 # Architecture
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
-> **Revised:** 2026-11-13 · **Body hash:** b4cf2536
+> **Applies to:** Omniscience 1.0.0 · written at commit 1996df4
+> **Revised:** 2026-11-23 · **Body hash:** 60131e1c
+
 
 
 
@@ -82,8 +83,15 @@ SQLite table `events`:
 | `status` | TEXT NULL | `ok`, `error`, `blocked`, `cancelled`, `completed`, `interrupted`, `failed` |
 | `attrs` | TEXT (JSON) | Kind-specific sanitized metadata |
 
-Indexes: `(session_id, rowid)`, `(kind)`, `(turn_id)`. Table `meta(key, value)` stores the schema
-version and creation time.
+Indexes: `(session_id, rowid)`, `(kind)`, `(turn_id)`, `(ts)`. Table `meta(key, value)` stores the
+schema version and creation time.
+
+Two small tables survive the deletion of old steps (see `cleanup.py`): `daily_totals(day, model,
+provider, calls, aux_calls, errors, prompt/fresh/cache-read/cache-write/output/reasoning tokens,
+cost)` and `daily_tools(day, tool, calls, failures)`. Each chunk is rolled up and deleted in one
+transaction, so no step is counted twice; the viewer's Usage page reads them for days whose event
+rows are no longer there. A chat named by a `privacy-flags/` dossier (and its parent/helper links)
+is never rolled up or deleted.
 
 ### Kinds
 

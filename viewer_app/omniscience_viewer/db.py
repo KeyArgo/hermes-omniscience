@@ -503,7 +503,10 @@ def _fold_session_rows(state: dict, rows, purged) -> None:
             # Recorded before the two checks below skip the row: a gateway marker counts
             # whether or not it carries a session, and whether or not that session was purged.
             dropped.append(session_id)
-        if session_id is None:
+        if not session_id:
+            # A blank id is not a chat. Events written before a session id was known (or by a
+            # surface that never had one) used to appear as a permanent "running" chat with 817
+            # steps and no name; they are still recorded, but they belong to no row in the list.
             continue
         if session_id in purged or (parent_session_id and parent_session_id in purged):
             # Deleted or archived in Hermes: an archived chat's rows are still here, and a

@@ -441,3 +441,76 @@ def test_a_drop_to_a_small_context_is_still_a_compaction():
     rows = [call(NOW - 20, "s1", 300_000), call(NOW - 10, "s1", 800)]
     out = U.summarise(rows, days=1, now=NOW)
     assert out["context"]["compactions"], "a 300k -> 800 drop is the clearest compaction there is"
+
+
+def test_rolled_days_keep_a_long_range_from_dropping_to_zero():
+    """Cleanup deletes old steps; their rolled-up day totals must still answer the page."""
+    now = 1_800_000_000
+    day = U.day_key(now - 20 * 86400)
+    out = U.summarise(
+        [], days=90, now=now,
+        rolled=[{"day": day, "model": "m1", "provider": "p1", "calls": 3, "aux_calls": 1,
+                 "errors": 1, "prompt": 1500, "fresh": 900, "cache_read": 600,
+                 "cache_write": 0, "output": 120, "reasoning": 10, "cost": 0.5}],
+        rolled_tools=[{"day": day, "tool": "grep", "calls": 4, "failures": 1}],
+    )
+    assert out["totals"]["calls"] == 3
+    assert out["totals"]["aux_calls"] == 1
+    assert out["totals"]["errors"] == 1
+    assert out["totals"]["prompt"] == 1500
+    assert out["totals"]["cache_read"] == 600
+    assert out["totals"]["output"] == 120
+    assert out["totals"]["tool_calls"] == 4
+    # Cost comes from Hermes' per-session estimates, never from the roll-up: counting both would
+    # double a cleaned-up day's cost.
+    assert out["totals"]["cost"] == 0
+    bucket = next(row for row in out["daily"] if row["day"] == day)
+    assert (bucket["calls"], bucket["prompt"], bucket["cost"]) == (3, 1500, 0)
+    model = next(row for row in out["models"] if row["model"] == "m1")
+    assert (model["calls"], model["prompt"], model["errors"]) == (3, 1500, 1)
+    assert out["daily_models"] == [{"day": day, "model": "m1", "prompt": 1500,
+                                    "output": 120, "calls": 3}]
+
+
+def test_rolled_days_outside_the_window_are_left_out():
+    now = 1_800_000_000
+    old = U.day_key(now - 120 * 86400)
+    recent = U.day_key(now - 2 * 86400)
+    rows = [
+        {"day": old, "model": "m1", "calls": 9, "prompt": 9000, "output": 900},
+        {"day": recent, "model": "m1", "calls": 1, "prompt": 100, "output": 10},
+    ]
+    out = U.summarise([], days=90, now=now, rolled=rows)
+    assert out["totals"]["calls"] == 1
+    assert out["totals"]["prompt"] == 100
+    assert [row["day"] for row in out["daily"]] == [recent]
+
+
+def test_build_usage_reads_the_daily_totals_table(tmp_path):
+    import sqlite3
+
+    now = 1_800_000_000
+    day = U.day_key(now - 20 * 86400)
+    db = tmp_path / "events.db"
+    con = sqlite3.connect(db)
+    con.execute(
+        "CREATE TABLE events (ts REAL, kind TEXT, session_id TEXT, parent_session_id TEXT,"
+        " status TEXT, attrs TEXT)"
+    )
+    con.execute("CREATE TABLE daily_totals (day TEXT, model TEXT, provider TEXT, calls INTEGER,"
+                " aux_calls INTEGER, errors INTEGER, prompt_tokens INTEGER, fresh_tokens INTEGER,"
+                " cache_read_tokens INTEGER, cache_write_tokens INTEGER, output_tokens INTEGER,"
+                " reasoning_tokens INTEGER, cost REAL)")
+    con.execute("INSERT INTO daily_totals VALUES (?, 'm1', 'p1', 2, 0, 0, 800, 500, 300, 0, 40, 0, NULL)",
+                (day,))
+    con.execute("CREATE TABLE daily_tools (day TEXT, tool TEXT, calls INTEGER, failures INTEGER)")
+    con.execute("INSERT INTO daily_tools VALUES (?, 'grep', 3, 0)", (day,))
+    con.commit()
+    con.close()
+
+    out = U.build_usage(str(db), days=90, now=now, include_imported=False)
+
+    assert out["totals"]["calls"] == 2
+    assert out["totals"]["prompt"] == 800
+    assert out["totals"]["tool_calls"] == 3
+    assert next(row for row in out["daily"] if row["day"] == day)["prompt"] == 800

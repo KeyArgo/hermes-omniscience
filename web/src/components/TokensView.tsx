@@ -44,7 +44,7 @@ function readTokensSort(): ChatSortKey {
 function readTokensWindow(): ChatWindow {
   try {
     const raw = window.localStorage.getItem(TOKENS_WINDOW_KEY);
-    if (raw === 'hour' || raw === 'today' || raw === 'all') return raw;
+    if (raw === 'hour' || raw === 'day' || raw === 'today' || raw === 'all') return raw;
   } catch {
     // ignore
   }
@@ -560,19 +560,21 @@ export function TokensView({
           {sortedChats.length === 0 && (
             <p className="tk-empty">
               {chatWindow === 'hour'
-                ? `No chats ran in the last hour. ${windowCounts.today} ran today, ${windowCounts.all} are recorded.`
-                : chatWindow === 'today'
-                  ? `Nothing ran today yet. ${windowCounts.all} chats are recorded in total.`
-                  : 'No chats recorded yet.'}
+                ? `No chats ran in the last hour. ${windowCounts.day} ran in the last 24 hours, ${windowCounts.today} today, ${windowCounts.all} are recorded.`
+                : chatWindow === 'day'
+                  ? `No chats ran in the last 24 hours. ${windowCounts.today} ran today, ${windowCounts.all} are recorded.`
+                  : chatWindow === 'today'
+                    ? `Nothing ran today yet. ${windowCounts.all} chats are recorded in total.`
+                    : 'No chats recorded yet.'}
               {windowApplies && chatWindow !== 'all' && windowCounts.all > 0 && (
                 <>
                   {' '}
                   <button
                     type="button"
                     className="tk-empty-action"
-                    onClick={() => changeChatWindow(chatWindow === 'hour' ? 'today' : 'all')}
+                    onClick={() => changeChatWindow(chatWindow === 'today' ? 'all' : 'today')}
                   >
-                    {chatWindow === 'hour' ? 'Show today' : 'Show all chats'}
+                    {chatWindow === 'today' ? 'Show all chats' : 'Show today'}
                   </button>
                 </>
               )}

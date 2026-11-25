@@ -174,6 +174,7 @@ function RoomSettings() {
     jsx(ViewerSwitch, { key: 'viewer' }),
     jsx(RestartViewerButton, { key: 'restart' }),
     jsx(AlertsSwitch, { key: 'alerts' }),
+    jsx(KeepHistoryControl, { key: 'history' }),
   ] })
 }
 
@@ -363,6 +364,103 @@ function AlertsSwitch() {
     ] }),
     jsx('p', { key: 'hint', style: { margin: 0, opacity: 0.7, fontSize: 12 },
       children: 'Off: no failure pop-up; recording and the Concerns page continue.' }),
+  ] })
+}
+
+// How long step detail is kept, and the button that runs the same roll-up/delete pass the
+// recorder performs once a day. Totals survive; only the step rows go, so Usage over a long
+// range still answers. The answer to the button is the recording size before and after.
+function cleanBytes(bytes) {
+  if (!Number.isFinite(bytes)) return ''
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  if (bytes >= 1024) return Math.round(bytes / 1024) + ' KB'
+  return Math.max(0, Math.round(bytes)) + ' B'
+}
+
+function KeepHistoryControl() {
+  const [days, setDays] = useState(30)
+  const [choices, setChoices] = useState([7, 30, 90, 0])
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  useEffect(() => {
+    let alive = true
+    if (!CTX?.rest) return () => { alive = false }
+    Promise.resolve(CTX.rest('/history/keep'))
+      .then(answer => {
+        if (!alive || !answer) return
+        if (typeof answer.days === 'number') setDays(answer.days)
+        if (Array.isArray(answer.choices) && answer.choices.length) setChoices(answer.choices)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const change = event => {
+    const next = Number(event.target.value)
+    const previous = days
+    setDays(next)
+    setNote('')
+    Promise.resolve(CTX?.rest?.('/history/keep', { method: 'POST', body: { days: next } }))
+      .then(answer => {
+        // The backend answers from what is on disk; a save that did not land must not look saved.
+        if (answer && typeof answer.days === 'number') setDays(answer.days)
+        else setDays(previous)
+      })
+      .catch(() => setDays(previous))
+  }
+  const cleanNow = () => {
+    setBusy(true)
+    setNote('')
+    Promise.resolve(CTX?.rest?.('/cleanup/run', { method: 'POST' }))
+      .then(answer => {
+        setBusy(false)
+        if (answer && answer.ok === false) {
+          setNote('Cleanup stopped early: ' + (answer.error || 'the recording was busy') +
+            '. It will be tried again later; nothing was lost.')
+        } else if (answer && answer.skipped === 'forever') {
+          setNote('Keeping everything: the window is Forever.')
+        } else if (answer && answer.skipped === 'nothing old') {
+          setNote('Nothing older than ' + answer.keep_days + ' days to remove yet.')
+        } else if (answer && typeof answer.before_bytes === 'number') {
+          const removed = Number(answer.deleted) || 0
+          setNote(removed + ' old steps removed. ' + cleanBytes(answer.before_bytes) +
+            ' → ' + cleanBytes(answer.after_bytes) + '.')
+        } else {
+          setNote('The backend did not answer; nothing is known to have changed.')
+        }
+      })
+      .catch(() => {
+        setBusy(false)
+        setNote('Could not clean up. See viewer.log in the Omniscience data folder.')
+      })
+  }
+  return jsx('div', { style: { display: 'grid', gap: 6 }, children: [
+    jsx('label', { key: 'label', style: { display: 'grid', gap: 4 }, children: [
+      'Keep step history for:',
+      jsx('select', {
+        key: 'select',
+        value: days,
+        onChange: change,
+        style: { justifySelf: 'start', padding: '4px 8px' },
+        children: choices.map(value => jsx('option', {
+          key: String(value),
+          value,
+          children: value === 0 ? 'Forever' : value + ' days',
+        })),
+      }),
+    ] }),
+    jsx('p', { key: 'hint', style: { margin: 0, opacity: 0.7, fontSize: 12 },
+      children: 'Totals are kept; only step detail goes. Older steps are counted into daily totals ' +
+        'before they are removed, so Usage still answers for the period. A chat you have flagged ' +
+        'on the Privacy page is never touched, and /omni forget works exactly as before.' }),
+    jsx('button', {
+      key: 'clean',
+      type: 'button',
+      disabled: busy,
+      onClick: cleanNow,
+      style: { padding: '6px 14px', cursor: 'pointer', justifySelf: 'start' },
+      children: busy ? 'Cleaning up…' : 'Clean up now',
+    }),
+    note ? jsx('p', { key: 'note', style: { margin: 0, opacity: 0.7, fontSize: 12 }, children: note }) : null,
   ] })
 }
 

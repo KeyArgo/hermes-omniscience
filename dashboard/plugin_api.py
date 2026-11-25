@@ -44,6 +44,10 @@ DEFAULT_VIEWER_URL = "http://127.0.0.1:8797"
 # open+parse, and the file is replaced atomically.
 _PREFS_LOCK = threading.Lock()
 
+# One cleanup pass at a time. It is long (a first pass on a 200 MB recording takes a while) and
+# the button may be pressed twice, or while the recorder's own daily pass runs.
+_CLEANUP_LOCK = threading.Lock()
+
 
 def _db_path() -> Path:
     """Resolve the event DB path exactly as the recorder/launcher do: OMNISCIENCE_DB wins."""
@@ -147,6 +151,23 @@ def _prefs():
         spec.loader.exec_module(module)
         _PREFS = module
     return _PREFS
+
+
+_CLEANUP = None
+
+
+def _cleanup():
+    """The plugin's cleanup.py, beside this folder: the same pass the recorder runs once a day."""
+    global _CLEANUP
+    if _CLEANUP is None:
+        path = Path(__file__).resolve().parents[1] / "cleanup.py"
+        spec = importlib.util.spec_from_file_location("omniscience_dashboard_cleanup", path)
+        if not spec or not spec.loader:
+            raise ImportError(f"cannot load {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _CLEANUP = module
+    return _CLEANUP
 
 
 _VERSION_STAMP = None
@@ -342,3 +363,64 @@ async def set_alerts_mode(payload: dict = Body(...)) -> dict:
     if not isinstance(enabled, bool):
         raise HTTPException(status_code=400, detail="enabled must be true or false")
     return await asyncio.to_thread(_set_alerts_mode_locked, enabled)
+
+
+def _history_keep_locked() -> dict:
+    """How long step detail is kept, and the values the settings page may offer."""
+    prefs_mod = _prefs()
+    path = prefs_mod.path_for(str(_db_path()))
+    return {
+        "days": prefs_mod.keep_days(prefs_mod.load(path)),
+        "choices": list(prefs_mod.KEEP_DAYS_CHOICES),
+    }
+
+
+@router.get("/history/keep")
+async def history_keep() -> dict:
+    """The retention window: 7, 30 or 90 days, or 0 for ever."""
+    return await asyncio.to_thread(_history_keep_locked)
+
+
+def _set_history_keep_locked(days: int) -> dict:
+    """Save the window. The answer is read back from disk, so a save that did not land is not
+    reported as a change. The read-modify-write runs under ``_PREFS_LOCK``, like the switches."""
+    prefs_mod = _prefs()
+    path = prefs_mod.path_for(str(_db_path()))
+    with _PREFS_LOCK:
+        prefs_mod.save(path, prefs_mod.set_keep_days(prefs_mod.load(path), days))
+        saved = prefs_mod.keep_days(prefs_mod.load(path))
+    return {"days": saved, "choices": list(prefs_mod.KEEP_DAYS_CHOICES)}
+
+
+@router.post("/history/keep")
+async def set_history_keep(payload: dict = Body(...)) -> dict:
+    days = payload.get("days")
+    if isinstance(days, bool) or not isinstance(days, int):
+        raise HTTPException(status_code=400, detail="days must be 7, 30, 90 or 0")
+    choices = list(_prefs().KEEP_DAYS_CHOICES)
+    if days not in choices:
+        raise HTTPException(status_code=400, detail="days must be 7, 30, 90 or 0")
+    return await asyncio.to_thread(_set_history_keep_locked, days)
+
+
+def _cleanup_now_locked() -> dict:
+    """Roll up and delete what is older than the saved window, and report both sizes.
+
+    This is the button, so it runs even when the recorder's own daily pass is not due; it uses
+    the saved window and never a number supplied by the request. A second click while one pass
+    runs waits for it rather than starting a competing delete.
+    """
+    prefs_mod = _prefs()
+    path = prefs_mod.path_for(str(_db_path()))
+    days = prefs_mod.keep_days(prefs_mod.load(path))
+    cleanup_mod = _cleanup()
+    with _CLEANUP_LOCK:
+        result = cleanup_mod.run_history_cleanup(str(_db_path()), days)
+    result["days_kept"] = days
+    return result
+
+
+@router.post("/cleanup/run")
+async def cleanup_run() -> dict:
+    """Run the history cleanup now: totals stay, step detail older than the window goes."""
+    return await asyncio.to_thread(_cleanup_now_locked)

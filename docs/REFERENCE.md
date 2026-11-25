@@ -1,7 +1,8 @@
 # Reference
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
-> **Revised:** 2026-11-13 · **Body hash:** 49ecab5d
+> **Applies to:** Omniscience 1.0.0 · written at commit 1996df4
+> **Revised:** 2026-11-23 · **Body hash:** 980e5bdf
+
 
 
 
@@ -114,6 +115,9 @@ flags, usage-source state and the optional brake request.
 |---|---|---|
 | GET | `/api/plugins/omniscience/health` | `{ok, events, last_ts, db_path, viewer_url}` |
 | GET | `/api/plugins/omniscience/viewer` | `{viewer_url, token}` for the desktop page |
+| GET | `/api/plugins/omniscience/history/keep` | `{days, choices}` — the saved retention window |
+| POST | `/api/plugins/omniscience/history/keep` | Body `{days}`, one of 7/30/90/0; returns the saved value |
+| POST | `/api/plugins/omniscience/cleanup/run` | Runs the roll-up/delete pass now; `{ok, deleted, days, before_bytes, after_bytes, vacuum, days_kept}` |
 
 ## Slash command and CLI
 

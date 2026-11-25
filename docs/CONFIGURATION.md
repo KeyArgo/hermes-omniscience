@@ -1,7 +1,8 @@
 # Configuration
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 6fe8aad
-> **Revised:** 2026-11-19 · **Body hash:** 6e3332e2
+> **Applies to:** Omniscience 1.0.0 · written at commit 1996df4
+> **Revised:** 2026-11-23 · **Body hash:** 8cddf32c
+
 
 
 
@@ -49,7 +50,8 @@ the Settings panel agree.
     "detail": "standard"
   },
   "viewer": "on",
-  "failure_alerts": true
+  "failure_alerts": true,
+  "keep_days": 30
 }
 ```
 
@@ -59,6 +61,7 @@ the Settings panel agree.
 | `digest.detail` | `brief`, `standard`, `full` | How much the summary says. |
 | `viewer` | `on` / `off` | Whether the viewer may run. Off: recording continues; the viewer does not run. Anything but `off` (including an unknown value) reads as on. |
 | `failure_alerts` | `true` / `false` | Whether a pop-up is posted when a tool keeps failing (three failures in a row). At most one pop-up per tool per chat per 30 minutes. Off: no failure pop-up; recording and the Concerns page continue. Only an explicit `false` turns it off. |
+| `keep_days` | `7`, `30`, `90`, `0` | How long step detail is kept before it is rolled into the daily totals and deleted. `0` means forever (no automatic cleanup). Anything not in that list reads as `30`. |
 
 Unknown keys are preserved but ignored. A missing or broken file falls back to the defaults above.
 
@@ -72,6 +75,7 @@ All of these sit next to the resolved event database, normally under
 | `events.db` | plugin writer | The recording (SQLite WAL, mode `0600` where the platform supports it). |
 | `events.db-wal`, `events.db-shm` | SQLite | Write-ahead log and shared-memory files. |
 | `prefs.json` | plugin and viewer | The shared settings above. |
+| `history-cleanup.stamp` | plugin cleanup | When the last roll-up/delete pass finished. The pass runs at most once per 24 h; a busy database leaves the gate open for a retry. |
 | `viewer-token` | viewer | Per-install key for `/api` requests, mode `0600`. Reused only while it is private to the current user. |
 | `usage.db` | viewer | Token rows imported from other harnesses, if you switch a source on. |
 | `viewer.log` | launcher | Viewer output. Created `0600`. |

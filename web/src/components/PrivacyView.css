@@ -59,6 +59,13 @@
 }
 .pv-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .pv-table tr.is-high td:first-child { box-shadow: inset 2px 0 0 #3d7bff; }
+.pv-table tr.is-clickable { cursor: pointer; }
+.pv-table tr.is-clickable:hover td { background: rgba(255, 255, 255, 0.03); }
+.pv-table tr.is-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pv-when { white-space: nowrap; }
+.pv-at { display: block; font-family: var(--font-mono); font-size: 11.5px; color: var(--text); }
+.pv-ago { display: block; font-size: 11px; color: var(--dim); }
+.pv-why { max-width: 42ch; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .pv-tool { font-family: var(--font-mono); color: var(--muted); }
 
 .pv-link {
