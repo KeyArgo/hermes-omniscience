@@ -211,3 +211,40 @@ def test_unflag_route(tmp_path):
     assert client.get("/api/v1/privacy/flags").json()["flags"] == []
     assert client.post("/api/v1/privacy/unflag", json={"file": flag}).status_code == 404
     assert client.post("/api/v1/privacy/unflag", json={"file": "../events.db"}).status_code == 400
+
+
+def test_each_run_says_why_it_is_listed_and_what_it_touched(tmp_path):
+    db = build(tmp_path)
+    runs = {run["tool"]: run for run in privacy.list_runs(db, days=1)}
+
+    assert runs["browser_exec"]["why"] == privacy.WHY["browser"]
+    assert runs["mcp__fs__read"]["why"] == privacy.WHY["mcp"]
+    # What it touched is metadata only: a server name, a file count, a host.
+    assert runs["mcp__fs__read"]["touched"] == "server fs"
+    assert runs["grep"]["touched"] == "40 files"
+    assert runs["web_search"]["touched"] is None
+    # The exact local clock time travels with the row, not only "how long ago".
+    assert runs["browser_exec"]["at"]
+    assert len(runs["browser_exec"]["at"]) == 19  # YYYY-MM-DD HH:MM:SS
+
+
+def test_a_url_is_reduced_to_its_host_and_never_to_its_path(tmp_path):
+    db = tmp_path / "events.db"
+    con = sqlite3.connect(db)
+    con.execute(
+        "CREATE TABLE events (event_id TEXT, ts REAL, kind TEXT, session_id TEXT,"
+        " turn_id TEXT, status TEXT, attrs TEXT)"
+    )
+    con.execute(
+        "INSERT INTO events VALUES ('e1', ?, 'tool.end', 's1', 't1', 'ok', ?)",
+        (time.time(), json.dumps({
+            "tool_name": "browser_exec",
+            "url": "https://example.com/clients/acme?token=secret",
+        })),
+    )
+    con.commit()
+    con.close()
+
+    run = privacy.list_runs(str(db), days=1)[0]
+    assert run["touched"] == "example.com"
+    assert "secret" not in (run["touched"] or "")

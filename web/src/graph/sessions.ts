@@ -90,15 +90,17 @@ export function sortChats(chats: SessionMeta[], sort: ChatSortKey): SessionMeta[
 }
 
 /** Which chats the Tokens list is willing to show at once. */
-export type ChatWindow = 'hour' | 'today' | 'all';
+export type ChatWindow = 'hour' | 'day' | 'today' | 'all';
 
 export const CHAT_WINDOWS: { value: ChatWindow; label: string }[] = [
   { value: 'hour', label: 'Last hour' },
+  { value: 'day', label: 'Last 24 hours' },
   { value: 'today', label: 'Today' },
   { value: 'all', label: 'All chats' },
 ];
 
 export const CHAT_HOUR_S = 3600;
+export const CHAT_DAY_S = 86400;
 
 function startOfLocalDay(nowSeconds: number): number {
   const d = new Date(nowSeconds * 1000);
@@ -120,6 +122,7 @@ export function inChatWindow(
   if (window === 'all') return true;
   if (at <= 0) return false;
   if (window === 'today') return at >= startOfLocalDay(nowSeconds) && at <= nowSeconds + 60;
+  if (window === 'day') return nowSeconds - at < CHAT_DAY_S && at <= nowSeconds + 60;
   return nowSeconds - at < CHAT_HOUR_S && at <= nowSeconds + 60;
 }
 
@@ -155,7 +158,7 @@ export function chatWindowCounts(
   chats: SessionMeta[],
   nowSeconds: number,
 ): Record<ChatWindow, number> {
-  const counts: Record<ChatWindow, number> = { hour: 0, today: 0, all: 0 };
+  const counts: Record<ChatWindow, number> = { hour: 0, day: 0, today: 0, all: 0 };
   for (const chat of chats) {
     for (const option of CHAT_WINDOWS) {
       if (inChatWindow(chat, option.value, nowSeconds)) counts[option.value] += 1;

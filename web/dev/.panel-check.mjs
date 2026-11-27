@@ -269,6 +269,68 @@ for (const width of [400, 1280]) {
   const closedBySecond = await page.evaluate(panel);
   check(`${width} the second Escape closes the panel`, closedBySecond.rail === null, String(closedBySecond.rail));
 
+  // 7. The Privacy record: the row itself says when and why, and clicking it opens that exact
+  // step — the map with the details panel on the recorded event, not just the chat.
+  const privacyPage = await ctx.newPage();
+  const privacyErrors = [];
+  privacyPage.on('pageerror', (e) => privacyErrors.push(`${width}: ${e}`));
+  await privacyPage.goto(`${BASE}/dev/premium-harness.html?risk=1`);
+  await privacyPage.waitForSelector('.chats-toggle', { timeout: 15000 });
+  const privacyNotNow = privacyPage.getByRole('button', { name: 'Not Now' });
+  if (await privacyNotNow.count()) await privacyNotNow.click();
+  await privacyPage.waitForTimeout(900);
+  const switched = await privacyPage.evaluate(() => {
+    const button = [...document.querySelectorAll('.view-switch .chip')]
+      .find((el) => (el.textContent ?? '').trim() === 'Privacy');
+    if (!button) return false;
+    button.click();
+    return true;
+  });
+  await privacyPage.waitForTimeout(900);
+  const privacyRow = await privacyPage.evaluate(() => {
+    const tr = document.querySelector('.pv-table tbody tr');
+    if (!tr) return null;
+    const rect = tr.getBoundingClientRect();
+    return {
+      text: tr.textContent ?? '',
+      eventId: tr.getAttribute('data-event-id'),
+      clickable: tr.classList.contains('is-clickable'),
+      tabIndex: tr.getAttribute('tabindex'),
+      visible: rect.width > 0 && rect.height > 0,
+    };
+  });
+  check(`${width} the Privacy view lists a run to inspect`, switched && !!privacyRow, String(switched));
+  check(`${width} the Privacy row shows the exact local date and time`,
+    !!privacyRow && /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(privacyRow.text),
+    privacyRow?.text.slice(0, 140));
+  check(`${width} the Privacy row says why it is listed, in words`,
+    !!privacyRow && privacyRow.text.includes('It used this computer'), privacyRow?.text.slice(0, 180));
+  check(`${width} the Privacy row is a visible click target, not hover-only`,
+    !!privacyRow && privacyRow.visible && privacyRow.clickable && privacyRow.tabIndex === '0',
+    JSON.stringify({ visible: privacyRow?.visible, clickable: privacyRow?.clickable, tab: privacyRow?.tabIndex }));
+  const rowClick = await privacyPage.evaluate(() => {
+    const tr = document.querySelector('.pv-table tbody tr');
+    if (!tr) return null;
+    const eventId = tr.getAttribute('data-event-id');
+    tr.click();
+    return eventId;
+  });
+  await privacyPage.waitForTimeout(1200);
+  const afterRowClick = await privacyPage.evaluate(() => ({
+    graph: !!document.querySelector('.react-flow'),
+    rail: document.querySelector('.rail-right')?.className ?? null,
+    inspector: document.querySelector('.rail-right .inspector')?.textContent ?? '',
+    selected: [...document.querySelectorAll('.react-flow__node.selected')].map((el) => el.getAttribute('data-id')),
+  }));
+  check(`${width} clicking a Privacy row opens the map`, !!rowClick && afterRowClick.graph, String(rowClick));
+  check(`${width} ...with the details panel on that exact step`,
+    !!afterRowClick.rail && afterRowClick.rail.includes('has-selection') &&
+      afterRowClick.inspector.toLowerCase().includes('computer'),
+    JSON.stringify({ rail: afterRowClick.rail, selected: afterRowClick.selected }));
+  check(`${width} no page errors while inspecting Privacy`, privacyErrors.length === 0, privacyErrors.join(' | '));
+  await privacyPage.screenshot({ path: `${OUT}/privacy-${width}.png` });
+  await privacyPage.close();
+
   await page.screenshot({ path: `${OUT}/panel-${width}.png` });
   check(`${width} no page errors`, errors.length === 0, errors.join(' | '));
   await ctx.close();

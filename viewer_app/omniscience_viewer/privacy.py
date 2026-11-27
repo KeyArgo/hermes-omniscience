@@ -32,6 +32,15 @@ LABELS = {
     "network": "Network call",
     "mcp": "MCP server",
 }
+# Why a run is on this page, in the reader's words rather than the classifier's. Shown in the row
+# itself (not only on hover) so nobody has to guess what "Network call" is doing in a privacy log.
+WHY = {
+    "browser": "It drove a web browser.",
+    "computer": "It used this computer's screen, mouse or keyboard.",
+    "sweep": "It read through many files in one step.",
+    "network": "It sent a request off this computer.",
+    "mcp": "It called a tool on an MCP server.",
+}
 TONE = {"browser": "high", "computer": "high", "sweep": "high", "network": "low", "mcp": "low"}
 
 
@@ -44,6 +53,49 @@ def _file_count(attrs: dict[str, Any]) -> int | None:
         value = attrs.get(key)
         if isinstance(value, list):
             return len(value)
+    return None
+
+
+def _host(value: Any) -> str | None:
+    """The host of a URL or a bare host, never the whole address (a path can carry a name)."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    from urllib.parse import urlsplit
+
+    text = value.strip()
+    if "://" in text:
+        host = urlsplit(text).hostname
+    else:
+        host = urlsplit("//" + text).hostname
+    return host or None
+
+
+def _mcp_server(tool: str, attrs: dict[str, Any]) -> str | None:
+    server = attrs.get("mcp_server")
+    if isinstance(server, str) and server.strip():
+        return server.strip()
+    # mcp__filesystem__read_file / mcp.filesystem.read_file: the server is the middle part.
+    for pattern in (r"^mcp__([^_].*?)__", r"^mcp[.:]([^.]+)[.:]"):
+        match = re.match(pattern, tool)
+        if match:
+            return match.group(1)
+    return None
+
+
+def touched(cls: str, tool: str, attrs: dict[str, Any] | None = None) -> str | None:
+    """What the step touched, from metadata only: a host, a file count, an MCP server name."""
+    attrs = attrs or {}
+    if cls == "mcp":
+        server = _mcp_server(tool, attrs)
+        return f"server {server}" if server else None
+    if cls == "sweep":
+        files = _file_count(attrs)
+        return f"{files} files" if files is not None else None
+    if cls in ("browser", "network"):
+        for key in ("url", "uri", "href", "page_url", "target_url", "host", "domain"):
+            host = _host(attrs.get(key))
+            if host:
+                return host
     return None
 
 
@@ -110,9 +162,12 @@ def list_runs(db_path: str, days: float = 7) -> list[dict[str, Any]]:
             {
                 "event_id": event_id,
                 "ts": ts,
+                "at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else None,
                 "tool": name,
                 "cls": cls,
                 "label": LABELS[cls],
+                "why": WHY[cls],
+                "touched": touched(cls, name, attrs),
                 "tone": TONE[cls],
                 "session_id": session_id,
                 "turn_id": turn_id,

@@ -235,3 +235,42 @@ def test_tail_and_before_page_without_gaps(demo_db):
     assert newest == all_rows[-3:]
     assert older == all_rows[-6:-3]
     assert events_for_root(str(demo_db), synth.ROOT, before=1, limit=3) == []
+
+
+def test_a_blank_session_id_never_becomes_a_chat(tmp_path):
+    """817 recorded steps without a session id showed up as one nameless chat, "running" for
+    a fortnight. A blank id is not a chat in any list, however many rows carry it."""
+    db = tmp_path / "blank.db"
+    now = time.time()
+    con = sqlite3.connect(db)
+    con.execute(
+        "CREATE TABLE events (rowid INTEGER PRIMARY KEY, kind TEXT, session_id TEXT,"
+        " parent_session_id TEXT, status TEXT, attrs TEXT, ts REAL, turn_id TEXT)"
+    )
+    rows = [
+        ("session.start", "real", None, "ok", "{}", now - 120),
+        ("llm.request", "real", None, None, '{"model": "m1"}', now - 110),
+        ("tool.end", None, None, "ok", '{"tool_name": "terminal"}', now - 100),
+        ("tool.end", "", None, "ok", '{"tool_name": "terminal"}', now - 90),
+        ("turn.start", None, None, None, "{}", now - 80),
+        ("tool.end", None, None, "running", '{"tool_name": "grep"}', now - 70),
+    ]
+    for kind, session, parent, status, attrs, ts in rows:
+        con.execute(
+            "INSERT INTO events (kind, session_id, parent_session_id, status, attrs, ts)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (kind, session, parent, status, attrs, ts),
+        )
+    # An older recording has no purged table; the list must still build.
+    con.commit()
+    con.close()
+
+    from omniscience_viewer import db as db_mod
+
+    rows = db_mod.list_sessions(str(db))
+    assert [row["id"] for row in rows] == ["real"]
+    checked, error = db_mod.list_sessions_checked(str(db))
+    assert error is None and [row["id"] for row in checked] == ["real"]
+
+    with _make_client(db) as client:
+        assert [row["id"] for row in client.get("/api/v1/sessions").json()] == ["real"]
