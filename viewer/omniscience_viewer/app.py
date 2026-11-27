@@ -661,10 +661,11 @@ def create_app(db_path: str, static_dir: str | None = None,
 
     @app.get("/api/v1/privacy")
     def privacy_runs(days: float = 7.0) -> dict:
-        """Every privacy-relevant tool run in the window, newest first."""
+        """Privacy matches among the newest tool steps in the window."""
         window = max(0.0, min(days, 3650.0))
         try:
-            return {"runs": privacy_mod.list_runs(db_path, window), "days": window}
+            runs, truncated = privacy_mod.scan_runs(db_path, window)
+            return {"runs": runs, "days": window, "truncated": truncated}
         except sqlite3.Error as exc:
             raise HTTPException(status_code=503, detail=f"cannot read the recording: {exc}") from exc
 

@@ -274,11 +274,13 @@ for (const width of [400, 1280]) {
   const privacyPage = await ctx.newPage();
   const privacyErrors = [];
   privacyPage.on('pageerror', (e) => privacyErrors.push(`${width}: ${e}`));
-  await privacyPage.goto(`${BASE}/dev/premium-harness.html?risk=1`);
+  await privacyPage.goto(`${BASE}/dev/premium-harness.html?session=root-1&risk=1&otherChat=1&slow=1`);
   await privacyPage.waitForSelector('.chats-toggle', { timeout: 15000 });
   const privacyNotNow = privacyPage.getByRole('button', { name: 'Not Now' });
   if (await privacyNotNow.count()) await privacyNotNow.click();
   await privacyPage.waitForTimeout(900);
+  await privacyPage.waitForFunction(() => window.__showcase.calls.some((url) =>
+    new URL(url, location.href).searchParams.get('root') === 'root-1'));
   const switched = await privacyPage.evaluate(() => {
     const button = [...document.querySelectorAll('.view-switch .chip')]
       .find((el) => (el.textContent ?? '').trim() === 'Privacy');
@@ -308,24 +310,21 @@ for (const width of [400, 1280]) {
   check(`${width} the Privacy row is a visible click target, not hover-only`,
     !!privacyRow && privacyRow.visible && privacyRow.clickable && privacyRow.tabIndex === '0',
     JSON.stringify({ visible: privacyRow?.visible, clickable: privacyRow?.clickable, tab: privacyRow?.tabIndex }));
-  const rowClick = await privacyPage.evaluate(() => {
-    const tr = document.querySelector('.pv-table tbody tr');
-    if (!tr) return null;
-    const eventId = tr.getAttribute('data-event-id');
-    tr.click();
-    return eventId;
-  });
-  await privacyPage.waitForTimeout(1200);
+  const targetRow = privacyPage.locator('tr[data-event-id="risk-step-root-2"]');
+  const rowClick = await targetRow.getAttribute('data-event-id');
+  await targetRow.locator('.pv-why').click();
+  await privacyPage.locator('.rail-right .inspector .event-ids li')
+    .filter({ hasText: /^risk-step-root-2$/ }).waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
   const afterRowClick = await privacyPage.evaluate(() => ({
     graph: !!document.querySelector('.react-flow'),
     rail: document.querySelector('.rail-right')?.className ?? null,
-    inspector: document.querySelector('.rail-right .inspector')?.textContent ?? '',
+    eventIds: [...document.querySelectorAll('.rail-right .inspector .event-ids li')].map((el) => el.textContent),
     selected: [...document.querySelectorAll('.react-flow__node.selected')].map((el) => el.getAttribute('data-id')),
   }));
   check(`${width} clicking a Privacy row opens the map`, !!rowClick && afterRowClick.graph, String(rowClick));
   check(`${width} ...with the details panel on that exact step`,
     !!afterRowClick.rail && afterRowClick.rail.includes('has-selection') &&
-      afterRowClick.inspector.toLowerCase().includes('computer'),
+      rowClick === 'risk-step-root-2' && afterRowClick.eventIds.includes(rowClick),
     JSON.stringify({ rail: afterRowClick.rail, selected: afterRowClick.selected }));
   check(`${width} no page errors while inspecting Privacy`, privacyErrors.length === 0, privacyErrors.join(' | '));
   await privacyPage.screenshot({ path: `${OUT}/privacy-${width}.png` });

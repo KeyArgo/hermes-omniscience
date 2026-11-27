@@ -481,6 +481,8 @@ def _empty_sessions_state() -> dict:
         "children": set(),
         # child session id -> parent session id (first relation wins)
         "parent_of": {},
+        "turn_owners": {},
+        "linked_turns": set(),
         # session id of every gateway-wide drop marker, in rowid order
         "dropped": [],
     }
@@ -498,15 +500,23 @@ def _fold_session_rows(state: dict, rows, purged) -> None:
     parent_of: dict[str, str] = state["parent_of"]
     dropped: list = state["dropped"]
 
+    owners = state["turn_owners"]
+    for _, _, sid, parent, _, _, _, turn in rows:
+        owner = sid if sid and sid.strip() else parent
+        if turn and owner and owner.strip():
+            if owners.setdefault(turn, owner) != owner:
+                owners[turn] = None  # A shared turn cannot identify one chat.
+
     for _rowid, kind, session_id, parent_session_id, status, raw_attrs, ts, turn_id in rows:
+        if not (session_id or "").strip():
+            session_id = parent_session_id if (parent_session_id or "").strip() else None
+            parent_session_id = None
+            if session_id is None and turn_id:
+                state["linked_turns"].add(turn_id)
+                session_id = owners.get(turn_id)
         if kind == "omni.dropped":
-            # Recorded before the two checks below skip the row: a gateway marker counts
-            # whether or not it carries a session, and whether or not that session was purged.
             dropped.append(session_id)
         if not session_id:
-            # A blank id is not a chat. Events written before a session id was known (or by a
-            # surface that never had one) used to appear as a permanent "running" chat with 817
-            # steps and no name; they are still recorded, but they belong to no row in the list.
             continue
         if session_id in purged or (parent_session_id and parent_session_id in purged):
             # Deleted or archived in Hermes: an archived chat's rows are still here, and a
@@ -836,6 +846,13 @@ def _sessions_incremental(
             # again would count them twice. A rebuild is cheap next to a wrong chat list.
             return None
         state = found["entry"][0]
+        # A later owner can resolve (or disambiguate) earlier blank rows. Replay in row order
+        # so their counts, errors and model context match a fresh read.
+        for _, _, sid, parent, _, _, _, turn in found["rows"]:
+            owner = sid if sid and sid.strip() else parent
+            if (turn in state["linked_turns"] and owner and owner.strip()
+                    and state["turn_owners"].get(turn) != owner):
+                return None
         _fold_session_rows(state, found["rows"], found["purged"])
         _SESSIONS_STATE[realpath] = (
             state,

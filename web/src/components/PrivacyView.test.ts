@@ -1,5 +1,25 @@
-import { describe, expect, it } from 'vitest';
-import { privacyWhen, privacyWhy, type PrivacyRun } from './PrivacyView';
+import { describe, expect, it, vi } from 'vitest';
+import { PrivacyStepRow, privacyWhen, privacyWhy, type PrivacyRun } from './PrivacyView';
+
+import app from '../App.tsx?raw';
+import privacy from './PrivacyView.tsx?raw';
+
+it('wires a row click to a chat-scoped request and the details selection', () => {
+  const onOpenStep = vi.fn();
+  const row = PrivacyStepRow({ run: run({ session_id: 'chat-b', event_id: 'evt-b' }), onOpenStep });
+  row.props.onClick({ target: { closest: () => null } });
+  expect(onOpenStep).toHaveBeenCalledWith('chat-b', 'evt-b');
+  expect(privacy).toContain('run={run} onOpenStep={onOpenStep}');
+  const handler = app.split('onOpenStep={(sessionId, eventId) => {')[1].split('}}')[0];
+  expect(handler).toContain('setPrivacyStep({ sessionId, eventId })');
+  expect(handler).toContain('onSelectSession(sessionId)');
+  const effect = app.split('if (!privacyStep) return;')[1];
+  expect(effect.split('}, [')[0]).toContain('selectNodeDeep(target.node)');
+  expect(effect.split('}, [')[0]).toContain('computed.input !== graphInput');
+  for (const reset of app.matchAll(/useEffect\(\(\) => \{([^]*?)\n  \}, \[selectedRoot\]\);/g)) {
+    expect(reset[1].split('useEffect(() => {').at(-1)).not.toContain('setPrivacyStep(null)');
+  }
+});
 
 function run(partial: Partial<PrivacyRun> = {}): PrivacyRun {
   return {

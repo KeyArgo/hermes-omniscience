@@ -248,3 +248,30 @@ def test_a_url_is_reduced_to_its_host_and_never_to_its_path(tmp_path):
     run = privacy.list_runs(str(db), days=1)[0]
     assert run["touched"] == "example.com"
     assert "secret" not in (run["touched"] or "")
+
+
+@pytest.mark.parametrize(("url", "expected"), [
+    ("http://[::1", None),
+    (r"\\fileserver\legal\private.pdf", None),
+    ("2001:db8::1", "2001:db8::1"),
+    ("https://name:password@[::1]:443/private?key=value", "::1"),
+    ("http://[::1%25private]", None),
+])
+def test_touched_discloses_only_a_valid_host(url, expected):
+    assert privacy.touched("network", "fetch", {"url": url}) == expected
+
+
+def test_privacy_reports_scan_limit_even_when_nothing_matches(tmp_path):
+    from omniscience_viewer.app import create_app
+
+    db = build(tmp_path)
+    with sqlite3.connect(db) as con:
+        con.execute("DELETE FROM events")
+        con.executemany("INSERT INTO events(kind, ts, attrs) VALUES ('tool.end', 1, '{}')",
+                        [()] * 5000)
+    endpoint = next(r.endpoint for r in create_app(db).routes if r.path == "/api/v1/privacy")
+    assert endpoint(days=0)["truncated"] is False
+    with sqlite3.connect(db) as con:
+        con.execute("INSERT INTO events(kind, ts, attrs) VALUES ('tool.end', 1, '{}')")
+    body = endpoint(days=0)
+    assert body["truncated"] is True and body["runs"] == []

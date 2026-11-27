@@ -274,3 +274,24 @@ def test_a_blank_session_id_never_becomes_a_chat(tmp_path):
 
     with _make_client(db) as client:
         assert [row["id"] for row in client.get("/api/v1/sessions").json()] == ["real"]
+
+
+def test_blank_rows_fold_by_parent_or_linked_turn(tmp_path):
+    from omniscience_viewer.db import list_sessions
+
+    db = tmp_path / "linked.db"
+    with sqlite3.connect(db) as con:
+        con.execute("CREATE TABLE events(kind, session_id, parent_session_id, turn_id, ts, status, attrs)")
+        con.executemany("INSERT INTO events VALUES (?, ?, ?, ?, 1, 'ok', '{}')", [
+            ("tool.end", "", None, "turn-a"),
+            ("turn.start", "a", None, "turn-a"),
+            ("tool.end", " \t", "b", None),
+            ("tool.end", " ", None, None),
+            ("session.start", "b", None, None),
+        ])
+    def counts():
+        return {r["id"]: (r["events"], r["tools"]) for r in list_sessions(str(db))}
+    assert counts() == {"a": (2, 1), "b": (2, 1)}
+    with sqlite3.connect(db) as con:
+        con.execute("INSERT INTO events VALUES ('tool.end', ' ', NULL, 'turn-a', 2, 'ok', '{}')")
+    assert counts() == {"a": (3, 2), "b": (2, 1)}

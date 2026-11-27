@@ -1,4 +1,6 @@
-import type { GNode } from './reduce';
+import type { OmniEvent } from '../types';
+import { groupMembers } from './collapse';
+import type { GNode, Graph } from './reduce';
 
 const TYPE_PRIORITY: Record<string, number> = {
   tool: 4,
@@ -29,4 +31,28 @@ export function nodeForEvent(nodes: readonly GNode[], eventId: string): GNode | 
     }
   }
   return best;
+}
+
+export function privacyStepTarget(
+  eventId: string, events: OmniEvent[], fullGraph: Graph, baseGraph: Graph, graph: Graph,
+  replaying = false,
+): { node: string } | { turn: string } | { reason: string } {
+  const node = nodeForEvent(fullGraph.nodes, eventId);
+  if (!node) {
+    if (!events.some((step) => step.event_id === eventId)) {
+      return { reason: 'This step is outside the loaded page of this chat.' };
+    }
+    return { reason: replaying ? 'This step is outside the current replay. Return to Live to see it.'
+      : 'The map has no node for this recorded step.' };
+  }
+  const group = baseGraph.nodes.find((item) =>
+    item.type === 'group' && groupMembers(baseGraph, item.id).includes(node.id));
+  if (typeof group?.data.turn_id === 'string') return { turn: group.data.turn_id };
+  if (!baseGraph.nodes.some((shown) => shown.id === node.id)) {
+    return { reason: 'This step is outside the current map window.' };
+  }
+  if (!graph.nodes.some((shown) => shown.id === node.id)) {
+    return { reason: 'The current map filters hide this step.' };
+  }
+  return { node: node.id };
 }

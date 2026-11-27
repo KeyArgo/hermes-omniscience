@@ -472,17 +472,20 @@ export function installShowcaseViewer(): ShowcaseHarness {
     events: SHOWCASE_EVENTS,
     sessions: SHOWCASE_SESSIONS,
   };
+  const riskRoot = new URLSearchParams(window.location.search).has('otherChat') ? 'root-2' : ROOT;
   // ?risk=1: a computer-use step lands as the newest step, so the privacy alert shows.
   if (new URLSearchParams(window.location.search).get('risk') === '1') {
-    const rows = harness.events[ROOT];
+    const rows = harness.events[riskRoot];
     const newest = rows[rows.length - 1];
     // The synthetic chat ends ~11 min ago, past the alert's live window, so stamp the step now.
     const step = event(newest.rowid + 1, 'tool.end', {
       ts: Math.max(newest.ts, NOW - 5),
+      session_id: riskRoot,
+      event_id: `risk-step-${riskRoot}`,
       status: 'ok',
       attrs: { tool_name: 'computer_use', duration_ms: 1200 },
     });
-    harness.events = { ...harness.events, [ROOT]: [...rows, step] };
+    harness.events = { ...harness.events, [riskRoot]: [...rows, step] };
   }
   const busyCount = Number(new URLSearchParams(window.location.search).get('busy') ?? '0');
   if (Number.isFinite(busyCount) && busyCount > 0) {
@@ -495,7 +498,7 @@ export function installShowcaseViewer(): ShowcaseHarness {
 
   // ?risk=1 also gives Privacy one run and a working flag list, so Flag and Unflag can be pressed.
   const risky = new URLSearchParams(window.location.search).get('risk') === '1';
-  const riskStep = harness.events[ROOT][harness.events[ROOT].length - 1];
+  const riskStep = harness.events[riskRoot][harness.events[riskRoot].length - 1];
   const flags: Record<string, unknown>[] = [];
   let flagSeq = 0;
   const addFlag = (sessionId: string | null, eventId: string | null) => {
@@ -575,7 +578,7 @@ export function installShowcaseViewer(): ShowcaseHarness {
         runs: [{
           event_id: riskStep.event_id, ts: riskStep.ts, at, tool: 'computer_use', cls: 'computer',
           label: 'Computer use', why: "It used this computer's screen, mouse or keyboard.",
-          touched: null, tone: 'high', session_id: ROOT, chat_title: 'Research assistant',
+          touched: null, tone: 'high', session_id: riskRoot, chat_title: harness.sessions.find((s) => s.id === riskRoot)?.label,
           turn_id: null, status: 'ok', duration_ms: 1200,
         }],
       });

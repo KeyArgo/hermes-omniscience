@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SessionMeta } from '../types';
 import {
   CHAT_WINDOWS,
+  nextChatWindow,
   chatWindowCounts,
   inChatWindow,
   sortChats,
@@ -197,4 +198,15 @@ describe('chat window', () => {
     withinChatWindow(input, 'hour', NOW);
     expect(input.map((c) => c.id)).toEqual(['a', 'b']);
   });
+});
+
+it('offers a populated window across midnight and beyond the last day', () => {
+  const now = new Date(2026, 10, 23, 0, 30).getTime() / 1000;
+  const rows = [chat('yesterday', now - 7200), chat('old', now - 172800)];
+  const counts = chatWindowCounts(rows, now);
+  expect(counts).toEqual({ hour: 0, today: 0, day: 1, all: 2 });
+  expect(nextChatWindow('hour', counts)?.value).toBe('day');
+  expect(nextChatWindow('today', counts)?.value).toBe('day');
+  expect(nextChatWindow('day', chatWindowCounts(rows.slice(1), now))?.value).toBe('all');
+  expect(nextChatWindow('hour', chatWindowCounts([], now))).toBeUndefined();
 });

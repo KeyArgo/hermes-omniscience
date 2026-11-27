@@ -166,3 +166,7 @@ export function chatWindowCounts(
   }
   return counts;
 }
+
+export function nextChatWindow(current: ChatWindow, counts: Record<ChatWindow, number>) {
+  return CHAT_WINDOWS.find(({ value }) => value !== 'hour' && value !== current && counts[value] > 0);
+}

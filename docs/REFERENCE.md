@@ -1,7 +1,8 @@
 # Reference
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 3a73de7
-> **Revised:** 2026-11-13 · **Body hash:** 49ecab5d
+> **Applies to:** Omniscience 1.0.0 · written at commit 2a315ae
+> **Revised:** 2026-11-26 · **Body hash:** e77244e6
+
 
 
 
@@ -56,7 +57,7 @@ Table `events` (`schema.py`, `store.py`):
 | `seq` | INTEGER | Monotonic per `boot_id`; a gap means loss. |
 | `ts` | REAL | Epoch seconds at hook arrival. |
 | `kind` | TEXT | One of the kinds above. |
-| `session_id` | TEXT | Session the event belongs to. |
+| `session_id` | TEXT | Session the event belongs to. In chat totals a blank ID uses its parent or uniquely linked turn. Unowned steps do not create a chat. |
 | `parent_session_id` | TEXT NULL | Lineage for helper sessions. |
 | `turn_id` | TEXT NULL | Opaque turn identifier. |
 | `api_request_id` | TEXT NULL | Opaque request identifier. |
@@ -90,7 +91,7 @@ or the `omni.<token>` WebSocket subprotocol.
 | GET | `/api/v1/usage/sources` | — | Configured and available external usage sources |
 | POST | `/api/v1/usage/sources` | `{source, enabled}` | Switch one source on or off; returns the new status |
 | GET | `/api/v1/concerns` | `days` | Grouped privacy-relevant and repeated-failure counts |
-| GET | `/api/v1/privacy` | `days` | Privacy-relevant tool runs, newest first |
+| GET | `/api/v1/privacy` | `days` | Matching runs among the newest 5,000 tool steps, with local time, reason and optional touched metadata. `truncated` means older tool steps were omitted. |
 | GET | `/api/v1/privacy/flags` | — | Dossiers already written |
 | POST | `/api/v1/privacy/flag` | `{session_id, event_id?, note?}` | Write a dossier for one action |
 | GET | `/api/v1/insight` | — | The writeup Hermes saved beside the recording (`/omni insight`), or `available: false` and the command to run |

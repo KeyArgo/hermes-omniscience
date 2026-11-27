@@ -1,7 +1,8 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 14336b6
-> **Revised:** 2026-11-20 · **Body hash:** 3d63ad3f
+> **Applies to:** Omniscience 1.0.0 · written at commit 2a315ae
+> **Revised:** 2026-11-26 · **Body hash:** dc02dfd9
+
 
 
 
@@ -307,9 +308,11 @@ conversation you have open.
 - **Tokens** — a list of chats (when it ran, calls, tool/MCP/skill/outside-call counts, cached
   vs new input, compaction count), then the selected chat in detail: a context line, any compaction,
   the totals, one bar per model call with a clock time, and a table per model. The list's window
-  (**Last hour / Today / All**) belongs to **Biggest context now** only: an hour-old chat still has
+  (**Last hour / Last 24 hours / Today / All chats**) belongs to **Biggest context now** only: an hour-old chat still has
   a large context but is not what needs attention, so it leaves that ranking. The other rankings —
   most recent, most output, most calls — are questions about history, so they show every chat.
+  Last 24 hours crosses midnight. An empty window offers a window with recorded chats and shows its count.
+  Steps with a blank session ID count toward their linked parent chat or identifiable turn. Steps without an owner stay out of the chat list.
 - **Latency** — per-provider and per-model timings, rate limits, retries, timeouts and compactions,
   with a plain reading of what they mean (see *Latency* above).
 - **Usage** — what this machine spent, across all chats, over 1 hour / 24 hours / 7 days / 30 days / everything: totals, a day-by-day calendar, tokens per
@@ -544,6 +547,15 @@ The line is edited in place instead of repeated. The repeated-failure pop-up add
 (**Pop-up when a tool keeps failing**, above). Turn all notices off with `OMNISCIENCE_NOTICES=0`.
 
 ## Privacy
+
+Each Privacy row gives the local time, elapsed time and reason the tool was listed. For MCP calls,
+the recorder can identify the server. A host or file count appears only when the recording already
+contains that metadata. The recorder does not collect URLs or file lists. Select a row to open its
+chat and inspect that step. If the page, map window, replay position or filters hide it, the viewer
+explains why. The chat name opens the chat on its own.
+
+Privacy checks the newest 5,000 tool steps in the chosen period. When more exist, the page says so.
+The counts cover matching steps among those checked.
 
 **What is kept:** metadata only — which steps happened, when, sizes, model/provider/tool names, names of tool settings, error types/codes, background model calls, skill use, and MCP server names.
 

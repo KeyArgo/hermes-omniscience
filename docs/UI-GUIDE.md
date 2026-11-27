@@ -1,7 +1,7 @@
 # Omniscience — a guide to the screen
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 14336b6
-> **Revised:** 2026-11-20 · **Body hash:** 0de555be
+> **Applies to:** Omniscience 1.0.0 · written at commit 2a315ae
+> **Revised:** 2026-11-26 · **Body hash:** 348898fe
 
 
 Generated from `web/src/help/guide.json` by `web/scripts/gen-ui-guide.mjs`. The same text
@@ -27,6 +27,8 @@ one click from coming back, and **Reset view** restores how Omniscience first op
 ## The toolbar
 
 - **List · Map · Time · Tokens · Usage** — The five main views. More Views adds Flame, Tools, Context, Helpers, Coverage and Latency.
+- **Tokens chat window** — Last 24 hours includes yesterday’s activity within the rolling window. An empty window offers one with chats and shows its count. Steps with blank session IDs count under a linked chat. Unowned steps do not appear as chats.
+- **Privacy** — Rows show when a tool ran and why it appears. The recorder can identify the MCP server. A host or file count appears only when already present in the metadata. Select a row to inspect its step in its chat. If the map cannot show it, a message explains why. Privacy checks the newest 5,000 tool steps in the period and marks a limited result.
 - **Filters** — Hide tool steps, hide model calls, or show errors only. The number on the button counts filters that are on.
 - **Writeup** — The diagnosis Hermes wrote for this recording (tokens, timings, rate limits, context growth, what to fix). Run /omni insight in Hermes to write a fresh one; the viewer reads the saved report and never calls a model itself.
 - **Actions** — Export CSV (timings, tokens, models, never message text), open Panels, or reset the view.

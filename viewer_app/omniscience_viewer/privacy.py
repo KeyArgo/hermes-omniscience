@@ -12,6 +12,7 @@ Nothing here reads or stores message text beyond what the recorder already recor
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
@@ -63,11 +64,23 @@ def _host(value: Any) -> str | None:
     from urllib.parse import urlsplit
 
     text = value.strip()
-    if "://" in text:
-        host = urlsplit(text).hostname
-    else:
-        host = urlsplit("//" + text).hostname
-    return host or None
+    if "\\" in text or any(ord(char) < 32 for char in text):
+        return None
+    try:
+        if text.count(":") > 1 and re.fullmatch(r"[0-9a-fA-F:.]+", text):
+            return str(ipaddress.IPv6Address(text))
+        parts = urlsplit(text if "://" in text or text.startswith("//") else "//" + text)
+        host = parts.hostname
+        _ = parts.port  # Reject an invalid port or unbracketed authority.
+        if not host or "%" in host:
+            return None
+        if ":" in host:
+            return str(ipaddress.IPv6Address(host))
+        if re.fullmatch(r"[a-zA-Z0-9.-]+", host):
+            return host
+    except ValueError:
+        pass
+    return None
 
 
 def _mcp_server(tool: str, attrs: dict[str, Any]) -> str | None:
@@ -133,8 +146,16 @@ def _attrs(raw: Any) -> dict[str, Any]:
     return {}
 
 
+SCAN_LIMIT = 5000
+
+
 def list_runs(db_path: str, days: float = 7) -> list[dict[str, Any]]:
-    """Every privacy-relevant tool run in the window, newest first."""
+    runs, _ = scan_runs(db_path, days)
+    return runs
+
+
+def scan_runs(db_path: str, days: float) -> tuple[list[dict[str, Any]], bool]:
+    """Classify the newest tool steps and report whether older candidates were omitted."""
     since = 0.0 if days <= 0 else time.time() - days * 86400
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
@@ -144,14 +165,14 @@ def list_runs(db_path: str, days: float = 7) -> list[dict[str, Any]]:
         turn_col = "turn_id" if "turn_id" in columns else "NULL AS turn_id"
         rows = con.execute(
             "SELECT event_id, ts, kind, session_id, "+turn_col+", status, attrs FROM events "
-            "WHERE ts >= ? AND kind LIKE 'tool%' ORDER BY ts DESC LIMIT 5000",
-            (since,),
+            "WHERE ts >= ? AND kind LIKE 'tool%' ORDER BY ts DESC, rowid DESC LIMIT ?",
+            (since, SCAN_LIMIT + 1),
         ).fetchall()
     finally:
         con.close()
 
     out: list[dict[str, Any]] = []
-    for event_id, ts, kind, session_id, turn_id, status, raw in rows:
+    for event_id, ts, kind, session_id, turn_id, status, raw in rows[:SCAN_LIMIT]:
         attrs = _attrs(raw)
         name = str(attrs.get("tool_name") or attrs.get("tool") or attrs.get("name") or "")
         cls = classify(name, attrs)
@@ -183,7 +204,7 @@ def list_runs(db_path: str, days: float = 7) -> list[dict[str, Any]]:
     titles = chat_titles(state_db, {r["session_id"] for r in out if r["session_id"]}) if state_db else {}
     for run in out:
         run["chat_title"] = titles.get(run["session_id"])
-    return out
+    return out, len(rows) > SCAN_LIMIT
 
 
 

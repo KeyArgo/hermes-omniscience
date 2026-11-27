@@ -59,7 +59,7 @@ import { VerdictHeader, levelColors, levelLabels } from './components/VerdictHea
 import { buildVerdict } from './graph/verdict';
 import { applyFilter, buildRows } from './graph/rows';
 import { replayPrefixCount } from './graph/lens';
-import { nodeForEvent } from './graph/selection';
+import { nodeForEvent, privacyStepTarget } from './graph/selection';
 import { ReplayBar, type Speed } from './components/ReplayBar';
 import { SessionList } from './components/SessionList';
 import { ChatsButton } from './components/ChatsButton';
@@ -265,7 +265,7 @@ const VIEW_TABS: [ViewMode, string, string][] = [
   ['time', 'Time', 'Time: each bar is one step, as long as it took. Shows waits, rate limits and fallbacks.'],
   ['tokens', 'Tokens', 'Tokens: how much was reused from the cache vs sent fresh, and output speed per model (helpers and background calls too).'],
   ['concerns', 'Concerns', 'Concerns: what deserves attention in the past hour, day or month — browser, desktop, wide sweeps, network, MCP — grouped and counted, with an optional written summary from your own model.'],
-  ['privacy', 'Privacy', 'Privacy: every tool run that drove a browser or this desktop, swept many files, called the network or reached an MCP server. Flag one to write a file with the action, the chat and the steps around it.'],
+  ['privacy', 'Privacy', 'Privacy: recent recorded browser, desktop, network and MCP tool steps, plus file sweeps when a file count is available. Flag one to write a file with the action, the chat and the steps around it.'],
   ['usage', 'Usage', 'Usage: what this machine spent — tokens per day and model, cache, context and cost, over the period you pick.'],
 ];
 
@@ -766,6 +766,7 @@ export default function App() {
   const [expandedTurnIds, setExpandedTurnIds] = useState<ReadonlySet<string>>(new Set());
   // A lens selection can name an event the current graph has not built yet (seeking forward
   // rebuilds the graph from the new replay prefix). Keep that id until the node appears.
+  const [privacyStep, setPrivacyStep] = useState<{ sessionId: string; eventId: string } | null>(null);
   const [pendingLensEventId, setPendingLensEventId] = useState<string | null>(null);
   // A selection waiting on the graph belongs to one chat; switching chats must not carry it over.
   useEffect(() => {
@@ -1629,30 +1630,25 @@ export default function App() {
   // Cancel obsolete computations and bound the graph before layout. Every result is tagged with
   // the chat it belongs to: a fast switch can otherwise paint the previous chat's graph under the
   // new title, and its nodes remain clickable until the worker catches up.
-  const [computed, setComputed] = useState<typeof EMPTY_COMPUTED>(EMPTY_COMPUTED);
+  const graphInput = useMemo(() => ({
+    root: selectedRoot, events: visibleEvents, expanded: [...expandedTurnIds], hideTools, hideLlms, errorsOnly,
+  }), [selectedRoot, visibleEvents, expandedTurnIds, hideTools, hideLlms, errorsOnly]);
+  const [computed, setComputed] = useState({ ...EMPTY_COMPUTED, input: null as typeof graphInput | null });
   const selectedRootRef = useRef(selectedRoot);
   selectedRootRef.current = selectedRoot;
   useEffect(() => {
-    const root = selectedRoot;
     // The Hermes sandbox has an opaque origin; a same-site worker URL is cross-origin there.
     // Vite's inline worker creates a blob in the frame's own origin instead.
     const worker = new GraphWorker();
-    worker.onmessage = (message: MessageEvent<typeof computed>) => {
+    worker.onmessage = (message: MessageEvent<typeof EMPTY_COMPUTED>) => {
       if (message.data.root !== selectedRootRef.current) return;
-      setComputed(message.data);
+      setComputed({ ...message.data, input: graphInput });
     };
     const timer = window.setTimeout(() => {
-      worker.postMessage({
-        root,
-        events: visibleEvents,
-        expanded: [...expandedTurnIds],
-        hideTools,
-        hideLlms,
-        errorsOnly,
-      });
+      worker.postMessage(graphInput);
     }, 100);
     return () => { window.clearTimeout(timer); worker.terminate(); };
-  }, [selectedRoot, visibleEvents, expandedTurnIds, hideTools, hideLlms, errorsOnly]);
+  }, [graphInput]);
   // A result for another chat is not a graph for this one, even for the one render before the
   // worker replies. This is what keeps an old chat's nodes from lingering under a new title.
   const activeComputed = computed.root === selectedRoot ? computed : EMPTY_COMPUTED;
@@ -1678,6 +1674,7 @@ export default function App() {
    * place kept the rail "shown" and made the next Escape a no-op.
    */
   const closeDetails = useCallback(() => {
+    setPrivacyStep(null);
     setSelectedNodeId(DETAILS_CLOSED.selectedNodeId);
     setRailMode(DETAILS_CLOSED.railMode);
     writeScopedPref('railMode', mode, DETAILS_CLOSED.railMode);
@@ -1763,6 +1760,7 @@ export default function App() {
    */
   const selectNodeDeep = useCallback(
     (nodeId: string | null, options?: { focus?: boolean }) => {
+      setPrivacyStep(null);
       // Any explicit node choice settles a lens selection that was waiting for the graph.
       setPendingLensEventId(null);
       if (nodeId === null) {
@@ -1850,6 +1848,31 @@ export default function App() {
     if (!node) return;
     selectNodeDeep(node.id);
   }, [pendingLensEventId, fullGraph.nodes, selectNodeDeep]);
+
+  useEffect(() => {
+    if (!privacyStep) return;
+    if (privacyStep.sessionId !== selectedRoot || view !== 'graph') {
+      setPrivacyStep(null);
+      return;
+    }
+    if (loading || computed.input !== graphInput) return;
+    const { eventId } = privacyStep;
+    const target = eventsFetchFailed ? { reason: 'The chat could not be loaded.' }
+      : privacyStepTarget(eventId, events, fullGraph, baseGraph, graph, replayIndex !== null);
+    if ('turn' in target) {
+      expandTurn(target.turn);
+      return;
+    }
+    if ('node' in target) {
+      setSelectedEventId(eventId);
+      selectNodeDeep(target.node);
+    } else {
+      setLastFlag(null);
+      setStopNote(target.reason);
+    }
+    setPrivacyStep(null);
+  }, [privacyStep, selectedRoot, view, loading, computed.input, graphInput, fullGraph, graph, baseGraph,
+    expandTurn, selectNodeDeep, eventsFetchFailed, events, replayIndex]);
 
   const failureEventIds = useMemo(
     () =>
@@ -3060,11 +3083,10 @@ export default function App() {
                   setView('graph');
                 }}
                 onOpenStep={(sessionId, eventId) => {
-                  // The row names the chat and the exact step. Switching chats rebuilds the graph;
-                  // the lens-moment path remembers the step and selects it once it is on screen.
+                  closeDetails();
+                  setPrivacyStep({ sessionId, eventId });
                   onSelectSession(sessionId);
                   setView('graph');
-                  onSelectLensMoment(eventId);
                 }}
               />
             </div>

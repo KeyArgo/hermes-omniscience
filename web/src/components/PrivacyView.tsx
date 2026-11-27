@@ -63,21 +63,49 @@ export function privacyWhy(run: PrivacyRun): string {
   return run.touched ? `${reason} Touched ${run.touched}` : reason;
 }
 
-/**
- * The permanent record of every privacy-relevant tool run — the live strip is only its newest
- * item. This is also where a wide file sweep or a network call can be flagged on its own, without
- * waiting for an alert to be on screen.
- */
+type OpenStep = (sessionId: string, eventId: string) => void;
+
+export function PrivacyStepRow({ run, onOpenStep, children }: {
+  run: PrivacyRun;
+  onOpenStep?: OpenStep;
+  children?: React.ReactNode;
+}) {
+  const canOpen = Boolean(run.session_id?.trim() && onOpenStep);
+  const open = () => {
+    if (canOpen && run.session_id) onOpenStep?.(run.session_id, run.event_id);
+  };
+  return (
+    <tr
+      className={`${run.tone === 'high' ? 'is-high' : 'is-low'}${canOpen ? ' is-clickable' : ''}`}
+      data-event-id={run.event_id}
+      tabIndex={canOpen ? 0 : undefined}
+      title={canOpen ? 'Open this step on the map, with its details' : undefined}
+      onClick={(event) => {
+        if (!(event.target as HTMLElement).closest('button')) open();
+      }}
+      onKeyDown={(event) => {
+        if (!canOpen || (event.key !== 'Enter' && event.key !== ' ')) return;
+        if ((event.target as HTMLElement).closest('button')) return;
+        event.preventDefault();
+        open();
+      }}
+    >
+      {children}
+    </tr>
+  );
+}
+
 export function PrivacyView({
   onOpenChat,
   onOpenStep,
 }: {
   onOpenChat: (sessionId: string) => void;
   /** Open one exact step: select its chat, switch to the map and put the details panel on it. */
-  onOpenStep?: (sessionId: string, eventId: string) => void;
+  onOpenStep?: OpenStep;
 }) {
   const [days, setDays] = useState(7);
   const [runs, setRuns] = useState<PrivacyRun[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [flags, setFlags] = useState<PrivacyFlag[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +117,7 @@ export function PrivacyView({
     const id = ++loadId.current;
     setLoading(true);
     setRuns([]);
+    setTruncated(false);
     setError(null);
     // Flags are optional; a slow or unavailable flags request must not hide the actual runs.
     void fetch(`${API_BASE}/privacy/flags`, { headers: { ...tokenHeaders() }, signal: AbortSignal.timeout(15000) })
@@ -101,9 +130,12 @@ export function PrivacyView({
         headers: { ...tokenHeaders() }, signal: AbortSignal.timeout(15000),
       });
       if (!runsResponse.ok) throw new Error(`the viewer answered ${runsResponse.status}`);
-      const runsBody = (await runsResponse.json()) as { runs?: PrivacyRun[] };
+      const runsBody = (await runsResponse.json()) as { runs?: PrivacyRun[]; truncated?: boolean };
       if (!Array.isArray(runsBody.runs)) throw new Error('the viewer returned an unreadable record');
-      if (id === loadId.current) setRuns(runsBody.runs);
+      if (id === loadId.current) {
+        setRuns(runsBody.runs);
+        setTruncated(runsBody.truncated === true);
+      }
     } catch (failure) {
       if (id === loadId.current) {
         // A stopped viewer is reported to the host (which restarts it) and read as a sentence,
@@ -164,16 +196,13 @@ export function PrivacyView({
   };
 
   const now = Date.now() / 1000;
-  const openRun = (run: PrivacyRun) => {
-    if (run.session_id && onOpenStep) onOpenStep(run.session_id, run.event_id);
-  };
 
   return (
     <div className="pv-root">
       <header className="pv-head">
         <h2>Privacy</h2>
         <p className="pv-sub">
-          Every tool run that drove a browser, this desktop, swept many files, called the network or reached an MCP
+          Recorded tool runs that drove a browser, this desktop, swept many files, called the network or reached an MCP
           server. The strip in the title bar is only the newest one; this is the record. Each row says when it ran and
           why it is listed. Click a row to open that exact step on the map; flag one to write a file with the action,
           the chat, the steps around it and both clock times.
@@ -200,13 +229,14 @@ export function PrivacyView({
             : ''}
           {flags.length ? ` · ${flags.length} flagged` : ''}
         </p>
+        {truncated && <p>Only the newest 5,000 tool steps in this period were checked. Older matches may be missing.</p>}
       </header>
 
       {error ? <p className="pv-error">Could not read the record: {error} <button type="button" onClick={() => { notifyViewerUnreachable(); void load(days); }}>Retry</button></p> : null}
       {note ? <p className="pv-note">{note}</p> : null}
 
       {loading || error ? null : runs.length === 0 ? (
-        <p className="pv-empty">Nothing privacy-relevant in this period. Choose a longer period to see older activity.</p>
+        <p className="pv-empty">{truncated ? 'No matches among the checked steps.' : 'Nothing privacy-relevant in this period. Choose a longer period to see older activity.'}</p>
       ) : (
         <table className="pv-table">
           <thead>
@@ -220,81 +250,62 @@ export function PrivacyView({
             </tr>
           </thead>
           <tbody>
-            {runs.map((run) => {
-              const canOpen = Boolean(run.session_id && onOpenStep);
-              return (
-                <tr
-                  key={run.event_id}
-                  className={`${run.tone === 'high' ? 'is-high' : 'is-low'}${canOpen ? ' is-clickable' : ''}`}
-                  data-event-id={run.event_id}
-                  tabIndex={canOpen ? 0 : undefined}
-                  title={canOpen ? 'Open this step on the map, with its details' : undefined}
-                  onClick={(event) => {
-                    if ((event.target as HTMLElement).closest('button')) return;
-                    openRun(run);
-                  }}
-                  onKeyDown={(event) => {
-                    if (!canOpen || (event.key !== 'Enter' && event.key !== ' ')) return;
-                    if ((event.target as HTMLElement).closest('button')) return;
-                    event.preventDefault();
-                    openRun(run);
-                  }}
-                >
-                  <td className="pv-when">
-                    <span className="pv-at">{privacyWhen(run, now).exact}</span>
-                    <span className="pv-ago">{privacyWhen(run, now).ago}</span>
-                  </td>
-                  <td className="pv-why">{privacyWhy(run)}</td>
-                  <td className="pv-tool">{run.tool}</td>
-                  <td>
-                    {run.session_id ? (
-                      <button
-                        type="button"
-                        className="pv-link"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpenChat(run.session_id as string);
-                        }}
-                      >
-                        {run.chat_title || (run.session_id as string).slice(0, 14) + "…"}
-                      </button>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{run.duration_ms === null ? '—' : `${(run.duration_ms / 1000).toFixed(1)}s`}</td>
-                  <td>
-                    {flagByEvent.has(run.event_id) ? (
-                      <button
-                        type="button"
-                        className="pv-flag is-flagged"
-                        disabled={busy === run.event_id}
-                        aria-pressed={true}
-                        title="Flagged. Press to take the flag off; its saved file is kept aside."
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void unflag(flagByEvent.get(run.event_id) as string, run.event_id);
-                        }}
-                      >
-                        {busy === run.event_id ? 'Unflagging…' : 'Unflag'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="pv-flag"
-                        disabled={busy === run.event_id || !run.session_id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void flag(run);
-                        }}
-                      >
-                        {busy === run.event_id ? 'Flagging…' : 'Flag'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {runs.map((run) => (
+              <PrivacyStepRow key={run.event_id} run={run} onOpenStep={onOpenStep}>
+                <td className="pv-when">
+                  <span className="pv-at">{privacyWhen(run, now).exact}</span>
+                  <span className="pv-ago">{privacyWhen(run, now).ago}</span>
+                </td>
+                <td className="pv-why">{privacyWhy(run)}</td>
+                <td className="pv-tool">{run.tool}</td>
+                <td>
+                  {run.session_id ? (
+                    <button
+                      type="button"
+                      className="pv-link"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenChat(run.session_id as string);
+                      }}
+                    >
+                      {run.chat_title || (run.session_id as string).slice(0, 14) + "…"}
+                    </button>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td>{run.duration_ms === null ? '—' : `${(run.duration_ms / 1000).toFixed(1)}s`}</td>
+                <td>
+                  {flagByEvent.has(run.event_id) ? (
+                    <button
+                      type="button"
+                      className="pv-flag is-flagged"
+                      disabled={busy === run.event_id}
+                      aria-pressed={true}
+                      title="Flagged. Press to take the flag off; its saved file is kept aside."
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void unflag(flagByEvent.get(run.event_id) as string, run.event_id);
+                      }}
+                    >
+                      {busy === run.event_id ? 'Unflagging…' : 'Unflag'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="pv-flag"
+                      disabled={busy === run.event_id || !run.session_id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void flag(run);
+                      }}
+                    >
+                      {busy === run.event_id ? 'Flagging…' : 'Flag'}
+                    </button>
+                  )}
+                </td>
+              </PrivacyStepRow>
+            ))}
           </tbody>
         </table>
       )}

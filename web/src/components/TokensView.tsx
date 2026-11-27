@@ -11,6 +11,7 @@ import { heatLevel, heatRange, heatSentence, HEAT_LEVELS } from "../graph/heat";
 import {
   CHAT_SORTS,
   CHAT_WINDOWS,
+  nextChatWindow,
   chatWindowCounts,
   withinChatWindow,
   windowAppliesTo,
@@ -467,6 +468,7 @@ export function TokensView({
   // can top a history ranking honestly, but it must not be presented as today's heaviest.
   // The chat you already opened is always kept, so a row cannot vanish from under its panel.
   const windowApplies = windowAppliesTo(chatSort);
+  const nextWindow = windowApplies && nextChatWindow(chatWindow, windowCounts);
   const shownChats = useMemo(
     () => (windowApplies ? withinChatWindow(chats, chatWindow, nowSeconds, rootSessionId) : chats),
     [chats, chatWindow, nowSeconds, rootSessionId, windowApplies],
@@ -566,15 +568,15 @@ export function TokensView({
                   : chatWindow === 'today'
                     ? `Nothing ran today yet. ${windowCounts.all} chats are recorded in total.`
                     : 'No chats recorded yet.'}
-              {windowApplies && chatWindow !== 'all' && windowCounts.all > 0 && (
+              {nextWindow && (
                 <>
                   {' '}
                   <button
                     type="button"
                     className="tk-empty-action"
-                    onClick={() => changeChatWindow(chatWindow === 'today' ? 'all' : 'today')}
+                    onClick={() => changeChatWindow(nextWindow.value)}
                   >
-                    {chatWindow === 'today' ? 'Show all chats' : 'Show today'}
+                    Show {nextWindow.label.toLowerCase()} ({windowCounts[nextWindow.value]})
                   </button>
                 </>
               )}

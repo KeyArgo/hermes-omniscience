@@ -26,6 +26,7 @@ First public release.
 
 The hackathon entry pins commit `baa102d` ([NousResearch/hermes-agent#154025](https://github.com/NousResearch/hermes-agent/pull/154025), tag `hackathon-submission`). 1.0.0 is the commit the catalog accepts; these changes came after the submission:
 
+- Tokens includes a rolling **Last 24 hours** and offers a populated window when the selected one is empty. Blank-ID steps count under their linked chat. Privacy rows show when a tool ran, why it was listed and available metadata, including the MCP server name. Select a row to inspect its step across chats or see why it is unavailable. The page marks results limited to the newest 5,000 tool steps.
 - **Works on macOS and Windows.** The viewer now notices that Hermes has closed on macOS and Windows as well as Linux, and the helper scripts no longer need GNU-only `readlink -m`.
 - **Windows: hashed web assets are cached.** The asset rule compared an OS path with `assets/`, so on Windows nothing was ever cached.
 - **Windows: problem bundles show your home folder as `~`.** The drive letter was replaced before the home-folder check, so a Windows home read as `<drive>/…`.
