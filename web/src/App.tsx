@@ -3059,13 +3059,6 @@ export default function App() {
                   onSelectSession(sessionId);
                   setView('graph');
                 }}
-                onOpenStep={(sessionId, eventId) => {
-                  // The row names the chat and the exact step. Switching chats rebuilds the graph;
-                  // the lens-moment path remembers the step and selects it once it is on screen.
-                  onSelectSession(sessionId);
-                  setView('graph');
-                  onSelectLensMoment(eventId);
-                }}
               />
             </div>
           ) : view === 'time' ? (

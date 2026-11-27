@@ -7,15 +7,9 @@ import './PrivacyView.css';
 export interface PrivacyRun {
   event_id: string;
   ts: number;
-  /** Exact local clock time, as the viewer recorded it. */
-  at?: string | null;
   tool: string;
   cls: string;
   label: string;
-  /** Why this class is on the page, in plain words (server-side, beside the class labels). */
-  why?: string;
-  /** Metadata only: the host of a URL, a file count, or an MCP server name. */
-  touched?: string | null;
   tone: 'high' | 'low';
   session_id: string | null;
   chat_title?: string | null;
@@ -49,33 +43,12 @@ function ago(seconds: number): string {
   return `${Math.round(seconds / 86400)} d ago`;
 }
 
-/** The row's exact local clock time, and how long ago it was. */
-export function privacyWhen(run: PrivacyRun, nowSeconds: number): { exact: string; ago: string } {
-  return {
-    exact: run.at || new Date(run.ts * 1000).toLocaleString(),
-    ago: ago(nowSeconds - run.ts),
-  };
-}
-
-/** Why this step is on the Privacy page, plus what it touched when the metadata says. */
-export function privacyWhy(run: PrivacyRun): string {
-  const reason = `${run.label}: ${run.why || 'touches this machine or the outside world.'}`;
-  return run.touched ? `${reason} Touched ${run.touched}` : reason;
-}
-
 /**
  * The permanent record of every privacy-relevant tool run — the live strip is only its newest
  * item. This is also where a wide file sweep or a network call can be flagged on its own, without
  * waiting for an alert to be on screen.
  */
-export function PrivacyView({
-  onOpenChat,
-  onOpenStep,
-}: {
-  onOpenChat: (sessionId: string) => void;
-  /** Open one exact step: select its chat, switch to the map and put the details panel on it. */
-  onOpenStep?: (sessionId: string, eventId: string) => void;
-}) {
+export function PrivacyView({ onOpenChat }: { onOpenChat: (sessionId: string) => void }) {
   const [days, setDays] = useState(7);
   const [runs, setRuns] = useState<PrivacyRun[]>([]);
   const [flags, setFlags] = useState<PrivacyFlag[]>([]);
@@ -164,9 +137,6 @@ export function PrivacyView({
   };
 
   const now = Date.now() / 1000;
-  const openRun = (run: PrivacyRun) => {
-    if (run.session_id && onOpenStep) onOpenStep(run.session_id, run.event_id);
-  };
 
   return (
     <div className="pv-root">
@@ -174,9 +144,8 @@ export function PrivacyView({
         <h2>Privacy</h2>
         <p className="pv-sub">
           Every tool run that drove a browser, this desktop, swept many files, called the network or reached an MCP
-          server. The strip in the title bar is only the newest one; this is the record. Each row says when it ran and
-          why it is listed. Click a row to open that exact step on the map; flag one to write a file with the action,
-          the chat, the steps around it and both clock times.
+          server. The strip in the title bar is only the newest one; this is the record. Flag any of them to write a
+          file with the action, the chat, the steps around it and both clock times.
         </p>
         <div className="pv-periods" role="group" aria-label="Period">
           {PERIODS.map((period) => (
@@ -212,7 +181,7 @@ export function PrivacyView({
           <thead>
             <tr>
               <th scope="col">When</th>
-              <th scope="col">Why it is listed</th>
+              <th scope="col">What</th>
               <th scope="col">Tool</th>
               <th scope="col">Chat</th>
               <th scope="col">Took</th>
@@ -220,81 +189,46 @@ export function PrivacyView({
             </tr>
           </thead>
           <tbody>
-            {runs.map((run) => {
-              const canOpen = Boolean(run.session_id && onOpenStep);
-              return (
-                <tr
-                  key={run.event_id}
-                  className={`${run.tone === 'high' ? 'is-high' : 'is-low'}${canOpen ? ' is-clickable' : ''}`}
-                  data-event-id={run.event_id}
-                  tabIndex={canOpen ? 0 : undefined}
-                  title={canOpen ? 'Open this step on the map, with its details' : undefined}
-                  onClick={(event) => {
-                    if ((event.target as HTMLElement).closest('button')) return;
-                    openRun(run);
-                  }}
-                  onKeyDown={(event) => {
-                    if (!canOpen || (event.key !== 'Enter' && event.key !== ' ')) return;
-                    if ((event.target as HTMLElement).closest('button')) return;
-                    event.preventDefault();
-                    openRun(run);
-                  }}
-                >
-                  <td className="pv-when">
-                    <span className="pv-at">{privacyWhen(run, now).exact}</span>
-                    <span className="pv-ago">{privacyWhen(run, now).ago}</span>
-                  </td>
-                  <td className="pv-why">{privacyWhy(run)}</td>
-                  <td className="pv-tool">{run.tool}</td>
-                  <td>
-                    {run.session_id ? (
-                      <button
-                        type="button"
-                        className="pv-link"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpenChat(run.session_id as string);
-                        }}
-                      >
-                        {run.chat_title || (run.session_id as string).slice(0, 14) + "…"}
-                      </button>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{run.duration_ms === null ? '—' : `${(run.duration_ms / 1000).toFixed(1)}s`}</td>
-                  <td>
-                    {flagByEvent.has(run.event_id) ? (
-                      <button
-                        type="button"
-                        className="pv-flag is-flagged"
-                        disabled={busy === run.event_id}
-                        aria-pressed={true}
-                        title="Flagged. Press to take the flag off; its saved file is kept aside."
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void unflag(flagByEvent.get(run.event_id) as string, run.event_id);
-                        }}
-                      >
-                        {busy === run.event_id ? 'Unflagging…' : 'Unflag'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="pv-flag"
-                        disabled={busy === run.event_id || !run.session_id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void flag(run);
-                        }}
-                      >
-                        {busy === run.event_id ? 'Flagging…' : 'Flag'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {runs.map((run) => (
+              <tr key={run.event_id} className={run.tone === 'high' ? 'is-high' : 'is-low'}>
+                <td title={new Date(run.ts * 1000).toLocaleString()}>{ago(now - run.ts)}</td>
+                <td>{run.label}</td>
+                <td className="pv-tool">{run.tool}</td>
+                <td>
+                  {run.session_id ? (
+                    <button type="button" className="pv-link" onClick={() => onOpenChat(run.session_id as string)}>
+                      {run.chat_title || (run.session_id as string).slice(0, 14) + "…"}
+                    </button>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td>{run.duration_ms === null ? '—' : `${(run.duration_ms / 1000).toFixed(1)}s`}</td>
+                <td>
+                  {flagByEvent.has(run.event_id) ? (
+                    <button
+                      type="button"
+                      className="pv-flag is-flagged"
+                      disabled={busy === run.event_id}
+                      aria-pressed={true}
+                      title="Flagged. Press to take the flag off; its saved file is kept aside."
+                      onClick={() => void unflag(flagByEvent.get(run.event_id) as string, run.event_id)}
+                    >
+                      {busy === run.event_id ? 'Unflagging…' : 'Unflag'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="pv-flag"
+                      disabled={busy === run.event_id || !run.session_id}
+                      onClick={() => void flag(run)}
+                    >
+                      {busy === run.event_id ? 'Flagging…' : 'Flag'}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}

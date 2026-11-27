@@ -12,7 +12,6 @@ import threading
 import time
 import uuid
 
-from .cleanup import TOTALS_DDL, cleanup_due, run_history_cleanup
 from .sanitize import normalize
 from .schema import SCHEMA_VERSION, Event, make_event_id
 
@@ -63,7 +62,7 @@ CREATE TABLE IF NOT EXISTS purged (
     ts REAL NOT NULL,
     reason TEXT
 );
-""" + TOTALS_DDL
+"""
 
 
 def _row(event: Event):
@@ -109,13 +108,6 @@ class EventStore:
 
         self._stop = threading.Event()
         self._pause = threading.Event()
-
-        # History cleanup runs on its own thread so a long first pass cannot fill the queue and
-        # cost us events. The stamp next to the database is the real 24 h gate; these fields only
-        # stop this process from asking twice a minute or starting two passes at once.
-        self._cleanup_checked = 0.0
-        self._cleanup_lock = threading.Lock()
-        self._cleanup_thread = None
 
         self._thread = threading.Thread(
             target=self._writer_loop, name="omniscience-writer", daemon=True
@@ -246,56 +238,6 @@ class EventStore:
             frontier = found - seen
             seen |= frontier
         return seen
-
-    # -- history cleanup --------------------------------------------------
-
-    # Asking the stamp file on every idle tick costs a stat four times a second; once a minute is
-    # plenty for a gate that only opens once a day.
-    CLEANUP_CHECK_S = 60.0
-
-    def maybe_cleanup_history(self, force: bool = False) -> None:
-        """Start the daily roll-up/delete pass when the stamp says it is due.
-
-        Called from the writer's startup and idle paths. The pass itself runs on its own thread:
-        rolling up and deleting a first 200 MB history takes longer than a batch write must ever
-        wait, and the queue would fill behind it. Never raises — the stamp and the sqlite errors
-        are handled inside ``cleanup``.
-        """
-        now = time.monotonic()
-        with self._cleanup_lock:
-            if not force and now - self._cleanup_checked < self.CLEANUP_CHECK_S:
-                return
-            self._cleanup_checked = now
-            if self._cleanup_thread is not None and self._cleanup_thread.is_alive():
-                return
-            try:
-                if not cleanup_due(self.db_path):
-                    return
-            except Exception:
-                log.debug("omniscience: could not read the cleanup stamp", exc_info=True)
-                return
-            thread = threading.Thread(
-                target=self._run_history_cleanup, name="omniscience-cleanup", daemon=True
-            )
-            self._cleanup_thread = thread
-            thread.start()
-
-    def _run_history_cleanup(self) -> None:
-        try:
-            from . import prefs
-
-            keep = prefs.keep_days(prefs.load(prefs.path_for(self.db_path)))
-            result = run_history_cleanup(self.db_path, keep)
-            if result.get("ok") and result.get("deleted"):
-                log.info(
-                    "omniscience: cleaned up %d old steps (%.1f MB -> %.1f MB)",
-                    result["deleted"],
-                    result.get("before_bytes", 0) / (1024 * 1024),
-                    result.get("after_bytes", 0) / (1024 * 1024),
-                )
-        except Exception:
-            # Cleanup is maintenance: a failure must never reach the recorder or the host.
-            log.warning("omniscience: history cleanup failed", exc_info=True)
 
     # -- writer side ------------------------------------------------------
 
@@ -463,9 +405,6 @@ class EventStore:
                     delay = min(delay * 2, 30.0)
             if conn is None:
                 return
-            # A fresh process is the honest moment to ask: the stamp makes this a no-op on
-            # every start but the first after a day of recording.
-            self.maybe_cleanup_history(force=True)
             while not self._stop.is_set() or not self._q.empty():
                 # Honour a stop even while paused, or close() waits out its join timeout and
                 # the queue is never written.
@@ -486,10 +425,6 @@ class EventStore:
                     finally:
                         for _ in batch:
                             self._q.task_done()
-                else:
-                    # An idle writer is the other moment the daily pass may begin. The check
-                    # itself is throttled and the stamp does the real gating.
-                    self.maybe_cleanup_history()
                 try:
                     self._emit_drop_marker(conn)
                 except Exception:

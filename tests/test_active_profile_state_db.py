@@ -18,9 +18,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_API = REPO_ROOT / "dashboard" / "plugin_api.py"
 # What the plugin package needs to import; the rest of the repo is not part of the claim.
-PLUGIN_FILES = (
-    "__init__.py", "store.py", "prefs.py", "command.py", "sanitize.py", "schema.py", "cleanup.py",
-)
+PLUGIN_FILES = ("__init__.py", "store.py", "prefs.py", "command.py", "sanitize.py", "schema.py")
 
 
 def _plugin_under(profile: Path, module_name: str):

@@ -190,19 +190,12 @@ def summarise(
     days: int = 7,
     now: Optional[float] = None,
     parent_of: Optional[dict[str, str]] = None,
-    rolled: Iterable[dict] = (),
-    rolled_tools: Iterable[dict] = (),
 ) -> dict[str, Any]:
     """Build the whole page payload from event rows and Hermes' per-session costs.
 
     ``rows`` are ``(ts, kind, session_id, parent_session_id, status, attrs)``; ``cost_rows`` are
     dicts with
     ``id``, ``started_at``, ``model``, ``estimated_cost_usd``.
-
-    ``rolled``/``rolled_tools`` are the daily totals kept for step detail that is no longer in the
-    recording (the plugin's cleanup deletes old steps after rolling them up). They carry the same
-    columns as a ``daily_totals``/``daily_tools`` row, so a long range still answers for days whose
-    steps are gone.
     """
     now = time.time() if now is None else now
     since = 0.0 if days <= 0 else now - days * 86400
@@ -431,71 +424,6 @@ def summarise(
     cost_by_model: dict[str, float] = {}
     cost_total = 0.0
     cost_days: dict[str, float] = {}
-
-    # Days whose steps were deleted after being rolled up. The day grain is the honest grain here:
-    # the cleanup keeps no timestamp per step, so a range that starts mid-day includes that whole
-    # day rather than pretending the earlier hours never happened.
-    first_day = day_key(since) if since > 0 else ""
-    for row in rolled:
-        day = str(row.get("day") or "")
-        if not day or (first_day and day < first_day):
-            continue
-        calls = int(_num(row.get("calls")))
-        aux_calls = int(_num(row.get("aux_calls")))
-        errors = int(_num(row.get("errors")))
-        numbers = {
-            key: _num(row.get(key)) for key in
-            ("prompt", "fresh", "cache_read", "cache_write", "output", "reasoning")
-        }
-        if not calls and not aux_calls and not any(numbers.values()):
-            continue
-        totals["calls"] += calls
-        totals["aux_calls"] += aux_calls
-        totals["errors"] += errors
-        for key, value in numbers.items():
-            totals[key] += value
-        bucket = daily.get(day)
-        if bucket is None:
-            bucket = daily[day] = {"day": day, **_empty_totals()}
-        bucket["calls"] += calls
-        bucket["aux_calls"] += aux_calls
-        for key, value in numbers.items():
-            bucket[key] += value
-        model = str(row.get("model") or "")
-        if model and (calls or any(numbers.values())):
-            m = models.get(model)
-            if m is None:
-                m = models[model] = {
-                    "model": model, "calls": 0, "prompt": 0.0, "fresh": 0.0,
-                    "cache_read": 0.0, "cache_write": 0.0, "output": 0.0, "reasoning": 0.0,
-                    "errors": 0, "latencies": [], "ttfb": [],
-                }
-            m["calls"] += calls
-            m["errors"] += errors
-            for key, value in numbers.items():
-                m[key] += value
-            dm = day_models.setdefault(day, {}).setdefault(
-                model, {"prompt": 0.0, "output": 0.0, "calls": 0.0}
-            )
-            dm["calls"] += calls
-            dm["prompt"] += numbers["prompt"]
-            dm["output"] += numbers["output"]
-        # Cost is not taken from the roll-up: the page's cost comes from Hermes' own per-session
-        # estimates below, which outlive the cleanup, so adding a rolled cost would count it twice.
-
-    for row in rolled_tools:
-        day = str(row.get("day") or "")
-        if not day or (first_day and day < first_day):
-            continue
-        calls = int(_num(row.get("calls")))
-        if not calls:
-            continue
-        totals["tool_calls"] += calls
-        bucket = daily.get(day)
-        if bucket is None:
-            bucket = daily[day] = {"day": day, **_empty_totals()}
-        bucket["tool_calls"] += calls
-
     for row in cost_rows:
         started = _num(row.get("started_at"))
         cost = _num(row.get("estimated_cost_usd"))
@@ -757,41 +685,6 @@ def _sources_module():
         return None
 
 
-def _rolled_rows(events_db: str) -> tuple[list[dict], list[dict]]:
-    """Daily totals kept for steps the cleanup removed, plus their per-tool counts.
-
-    A recording that has never been cleaned up has no such tables: that is "nothing rolled up
-    yet", not an error, and the page answers from the steps alone exactly as before.
-    """
-    try:
-        con = sqlite3.connect(f"file:{events_db}?mode=ro", uri=True)
-    except sqlite3.Error:
-        return [], []
-    try:
-        try:
-            model_cur = con.execute(
-                "SELECT day, model, provider, calls, aux_calls, errors, prompt_tokens, "
-                "fresh_tokens, cache_read_tokens, cache_write_tokens, output_tokens, "
-                "reasoning_tokens, cost FROM daily_totals"
-            )
-            model_rows = [dict(zip(
-                ("day", "model", "provider", "calls", "aux_calls", "errors", "prompt", "fresh",
-                 "cache_read", "cache_write", "output", "reasoning", "cost"),
-                row,
-            )) for row in model_cur.fetchall()]
-        except sqlite3.Error:
-            model_rows = []
-        try:
-            tool_cur = con.execute("SELECT day, tool, calls, failures FROM daily_tools")
-            tool_rows = [dict(zip(("day", "tool", "calls", "failures"), row))
-                         for row in tool_cur.fetchall()]
-        except sqlite3.Error:
-            tool_rows = []
-        return model_rows, tool_rows
-    finally:
-        con.close()
-
-
 def build_usage(events_db: str, state_db: Optional[str] = None, days: int = 7,
                 now: Optional[float] = None, include_imported: bool = True) -> dict[str, Any]:
     """Read both databases and return the page payload. Read-only on both.
@@ -810,10 +703,8 @@ def build_usage(events_db: str, state_db: Optional[str] = None, days: int = 7,
             imported = sources_mod.export_for_usage(events_db, since)
         except Exception:
             imported = []
-    rolled, rolled_tools = _rolled_rows(events_db)
     payload = summarise(rows, costs, imported=imported, days=days, now=now,
-                        parent_of=_parent_links(events_db),
-                        rolled=rolled, rolled_tools=rolled_tools)
+                        parent_of=_parent_links(events_db))
     if sources_mod is not None:
         try:
             payload["sources"] = sources_mod.source_status(events_db)

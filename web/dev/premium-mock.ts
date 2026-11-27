@@ -567,15 +567,10 @@ export function installShowcaseViewer(): ShowcaseHarness {
     }
     if (path.endsWith('/privacy')) {
       if (!risky) return respond(200, { runs: [] });
-      const d = new Date(riskStep.ts * 1000);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const at = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-        `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       return respond(200, {
         runs: [{
-          event_id: riskStep.event_id, ts: riskStep.ts, at, tool: 'computer_use', cls: 'computer',
-          label: 'Computer use', why: "It used this computer's screen, mouse or keyboard.",
-          touched: null, tone: 'high', session_id: ROOT, chat_title: 'Research assistant',
+          event_id: riskStep.event_id, ts: riskStep.ts, tool: 'computer_use', cls: 'computer',
+          label: 'Computer use', tone: 'high', session_id: ROOT, chat_title: 'Research assistant',
           turn_id: null, status: 'ok', duration_ms: 1200,
         }],
       });

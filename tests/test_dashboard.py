@@ -10,7 +10,6 @@ import importlib.util
 import os
 import sqlite3
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -181,97 +180,3 @@ def test_health_counts_a_store_whose_timestamps_are_text(tmp_path, monkeypatch):
     assert data["ok"] is True
     assert data["events"] == 1
     assert data["last_ts"] is None
-
-
-FULL_DDL = """
-CREATE TABLE events (
-    rowid INTEGER PRIMARY KEY,
-    event_id TEXT UNIQUE,
-    schema TEXT,
-    boot_id TEXT,
-    seq INTEGER,
-    ts REAL,
-    kind TEXT,
-    session_id TEXT,
-    parent_session_id TEXT,
-    turn_id TEXT,
-    api_request_id TEXT,
-    tool_call_id TEXT,
-    subagent_id TEXT,
-    status TEXT,
-    attrs TEXT
-);
-"""
-
-
-def _make_full_db(hermes_home: Path) -> Path:
-    """A recording with one step well outside the retention window and one inside it."""
-    folder = hermes_home / "plugin-data" / "omniscience"
-    folder.mkdir(parents=True, exist_ok=True)
-    db_file = folder / "events.db"
-    conn = sqlite3.connect(db_file)
-    try:
-        conn.executescript(FULL_DDL)
-        conn.execute(
-            "INSERT INTO events (event_id, schema, boot_id, seq, ts, kind, session_id, status, attrs)"
-            " VALUES ('old', 'omni.v1', 'boot', 1, ?, 'llm.response', 's1', 'ok', ?)",
-            (time.time() - 30 * 86400, '{"response_model": "m1", "usage": {"prompt_tokens": 100, "output_tokens": 5}}'),
-        )
-        conn.execute(
-            "INSERT INTO events (event_id, schema, boot_id, seq, ts, kind, session_id, status, attrs)"
-            " VALUES ('new', 'omni.v1', 'boot', 2, ?, 'llm.response', 's1', 'ok', ?)",
-            (time.time() - 60, '{"response_model": "m1", "usage": {"prompt_tokens": 50, "output_tokens": 5}}'),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    return db_file
-
-
-def test_history_keep_defaults_to_30_days_and_saves_only_offered_values(tmp_path, monkeypatch):
-    module = _load_plugin_api(monkeypatch, tmp_path)
-    _make_full_db(tmp_path)
-    client = _make_app(module)
-
-    first = client.get("/api/plugins/omniscience/history/keep").json()
-    assert first["days"] == 30
-    assert first["choices"] == [7, 30, 90, 0]
-
-    saved = client.post("/api/plugins/omniscience/history/keep", json={"days": 7}).json()
-    assert saved["days"] == 7
-    assert client.get("/api/plugins/omniscience/history/keep").json()["days"] == 7
-
-    # Only the offered windows are accepted; nothing silently becomes "delete everything".
-    assert client.post("/api/plugins/omniscience/history/keep", json={"days": 12}).status_code == 400
-    assert client.post("/api/plugins/omniscience/history/keep", json={"days": True}).status_code == 400
-    assert client.get("/api/plugins/omniscience/history/keep").json()["days"] == 7
-
-
-def test_cleanup_run_deletes_old_steps_and_reports_the_size_before_and_after(tmp_path, monkeypatch):
-    module = _load_plugin_api(monkeypatch, tmp_path)
-    _make_full_db(tmp_path)
-    client = _make_app(module)
-    client.post("/api/plugins/omniscience/history/keep", json={"days": 7})
-
-    data = client.post("/api/plugins/omniscience/cleanup/run").json()
-
-    assert data["ok"] is True
-    assert data["deleted"] == 1
-    assert data["days_kept"] == 7
-    assert isinstance(data["before_bytes"], int) and data["before_bytes"] > 0
-    assert isinstance(data["after_bytes"], int)
-    assert client.get("/api/plugins/omniscience/health").json()["events"] == 1
-
-
-def test_cleanup_run_keeps_everything_when_the_owner_chose_forever(tmp_path, monkeypatch):
-    module = _load_plugin_api(monkeypatch, tmp_path)
-    _make_full_db(tmp_path)
-    client = _make_app(module)
-    client.post("/api/plugins/omniscience/history/keep", json={"days": 0})
-
-    data = client.post("/api/plugins/omniscience/cleanup/run").json()
-
-    assert data["ok"] is True
-    assert data["deleted"] == 0
-    assert data["skipped"] == "forever"
-    assert client.get("/api/plugins/omniscience/health").json()["events"] == 2

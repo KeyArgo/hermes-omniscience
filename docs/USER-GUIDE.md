@@ -1,8 +1,7 @@
 # Omniscience — User Guide
 
-> **Applies to:** Omniscience 1.0.0 · written at commit 1996df4
-> **Revised:** 2026-11-23 · **Body hash:** 7a2b08ce
-
+> **Applies to:** Omniscience 1.0.0 · written at commit 14336b6
+> **Revised:** 2026-11-20 · **Body hash:** 3d63ad3f
 
 
 
@@ -52,10 +51,6 @@ care about without losing anything.
 
 **Group** beside Sort switches between day, week, month and a flat list. Buckets are computed from
 last activity in your own timezone, and the sort you choose still applies inside each bucket.
-
-Only real chats get a row. A step recorded before its chat id was known — or by a surface that
-never had one — is still recorded, but a blank id is not a conversation and is never listed as a
-nameless chat that stays "running" for ever.
 
 ## Which build am I looking at
 
@@ -459,21 +454,6 @@ as before, and the turn summary still lists failures. The switch is the `failure
 in `prefs.json`, takes effect on the next turn, and is separate from `OMNISCIENCE_NOTICES`, which
 governs all live notices.
 
-### How long step history is kept
-
-Hermes Settings → Omniscience has **Keep step history for: 7 days / 30 days / 90 days / Forever**
-(30 days by default), beside **Clean up now**. It controls step detail only: once a day the
-recorder rolls older steps into small daily totals (day, model, provider, tokens, calls, cost,
-and tool calls with their failures) and then deletes those step rows, in batches, so recording is
-never held up for long. The Usage page reads those totals, so a 90-day range still answers after
-the steps are gone.
-
-**Clean up now** runs the same pass immediately using the saved window, and reports what it
-removed and the recording size before and after. A chat you have **flagged** on the Privacy page
-is never touched, nor are its helpers, whatever its age — the flag is evidence and its steps may
-be the only remaining source. **Forever** turns the automatic pass off; `/omni forget` is
-unaffected and still deletes one chat's recording on request.
-
 ### The turn summary in your chat
 
 Omniscience posts a short summary at the end of each turn, so you never have to open the viewer to
@@ -504,11 +484,6 @@ Every row in **Tokens → Chats** answers "when did this happen and what did it 
 the chat: the local time it started and ended, how long it ran, model calls, tool calls (and how many
 went over MCP), skill loads, and model calls made outside the conversation (chat titles, approvals,
 vision). Hover a row for the full sentence; click it to load that chat.
-
-The window above the list is a control, not a limit. **Last hour** (the default), **Last 24 hours**,
-**Today** and **All chats** each show a count, so an empty hour tells you where the work went
-instead of looking like an empty recorder. **Last 24 hours** rolls back from the current time, not
-from midnight, so a chat that ran after midnight yesterday still counts.
 
 A **compaction** is a drop in the context sent to the model. Omniscience has no "compaction" event to
 read, so it derives one: the chat's own calls are read in order and a prompt that is more than 25%
@@ -567,25 +542,6 @@ While you wait, Omniscience can show one line in the chat for:
 The line is edited in place instead of repeated. The repeated-failure pop-up additionally waits
 30 minutes before the same tool may speak again in the same chat, and has its own switch
 (**Pop-up when a tool keeps failing**, above). Turn all notices off with `OMNISCIENCE_NOTICES=0`.
-
-## The Privacy record
-
-The **Privacy** view is the permanent record of every tool run that drove a browser or this
-desktop, swept many files, called the network or reached an MCP server. Each row states, in plain
-words and without hovering:
-
-- **When** — the exact local date and time it ran, with how long ago that was underneath.
-- **Why it is listed** — the class and a sentence saying what that class means (for example
-  "Computer use: it used this computer's screen, mouse or keyboard"), plus what it touched when
-  the metadata has it: the host of a URL, a file count, or an MCP server name. Metadata only;
-  never the content of the page, the files or the request.
-- **Tool, chat, how long it took** — the tool's name, a link to its chat, and the duration.
-
-Click anywhere on a row (not only the chat name) to open that exact step: the viewer switches to
-the map with the details panel on the recorded event, so you see the step in the run around it.
-Rows are keyboard-reachable too — Tab to one and press Enter. **Flag** is unchanged: it writes a
-file with the action, the chat, the surrounding steps and both clock times, and a flagged chat's
-steps are never removed by the history cleanup.
 
 ## Privacy
 
