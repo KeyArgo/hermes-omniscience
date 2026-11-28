@@ -34,12 +34,10 @@ references assets it ships; a stale bundle renders a blank page, and the name co
 rule (every referenced asset exists, no sourcemaps) is a Python test:
 `tests/test_viewer_static_bundle.py`.
 
-Two additional workflows guard one design rule each and do not run the suite:
+One additional workflow guards a design rule and does not run the suite:
 
 - [`polling-guard.yml`](.github/workflows/polling-guard.yml) checks that the live feed interval is
-  environment-based with a 1.0 s default.
-- [`polling-interval-guard.yml`](.github/workflows/polling-interval-guard.yml) checks that both
-  viewer copies agree on the interval.
+  environment-based with a 1.0 s default and that both viewer copies agree on it.
 
 The platform badge says Linux, macOS and Windows because those are the CI matrix entries. This
 local run was made on Linux only; macOS and Windows are covered by the CI jobs above, not by a

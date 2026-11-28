@@ -1,7 +1,8 @@
 # Development
 
-> **Applies to:** Omniscience 1.0.0 · written at commit f2109ab
-> **Revised:** 2026-11-11 · **Body hash:** 36a7a2a6
+> **Applies to:** Omniscience 1.0.0 · written at commit 2672146
+> **Revised:** 2026-11-27 · **Body hash:** 3f84383b
+
 
 
 How the repository is laid out, how to run each suite, and how CI and the documentation stamps work.
@@ -68,8 +69,8 @@ The counts for this commit are in [../TESTING.md](../TESTING.md).
 ## CI
 
 `.github/workflows/tests.yml` runs the Python suite on Ubuntu, macOS and Windows for Python 3.11
-and 3.12, with `PYTHONPATH=viewer`. Two guard workflows enforce the viewer's polling rule:
-`polling-guard.yml` and `polling-interval-guard.yml`. There is no CI job for the front-end suite.
+and 3.12, with `PYTHONPATH=viewer`. The guard workflow
+`polling-guard.yml` enforces the viewer's polling rule. There is no CI job for the front-end suite.
 
 ## Documentation stamps
 
